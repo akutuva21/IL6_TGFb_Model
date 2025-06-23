@@ -1,0 +1,1109 @@
+# Created by BioNetGen 2.9.3
+begin parameters
+    1 kf_tgfb_bind              1.0  # Constant
+    2 kr_tgfb_bind              0.1  # Constant
+    3 kf_il6_bind               1.0  # Constant
+    4 kr_il6_bind               0.1  # Constant
+    5 kf_stat3_dimer            1.0  # Constant
+    6 kr_stat3_dimer            0.1  # Constant
+    7 kf_s3s4                   1.0  # Constant
+    8 kr_s3s4                   0.1  # Constant
+    9 kf_st3dimer_s3            1.0  # Constant
+   10 kr_st3dimer_s3            0.1  # Constant
+   11 kf_pka_s3s4               1.0  # Constant
+   12 kr_pka_s3s4               0.1  # Constant
+   13 kf_pi3k_bind              1.0  # Constant
+   14 kr_pi3k_bind              0.1  # Constant
+   15 kf_il6r_jak2              1.0  # Constant
+   16 kr_il6r_jak2              0.1  # Constant
+   17 kf_pip2_pi3k              1.0  # Constant
+   18 kr_pip2_pi3k              0.1  # Constant
+   19 kf_pip3_akt               1.0  # Constant
+   20 kr_pip3_akt               0.1  # Constant
+   21 k_act_tgfbr               1.0  # Constant
+   22 k_inact_tgfbr             0.1  # Constant
+   23 k_act_il6r                1.0  # Constant
+   24 k_inact_il6r              0.1  # Constant
+   25 k_act_jak2                1.0  # Constant
+   26 k_inact_jak2              0.1  # Constant
+   27 k_phos_stat3              1.0  # Constant
+   28 k_dephos_stat3            0.1  # Constant
+   29 k_phos_smad3              1.0  # Constant
+   30 k_dephos_smad3            0.1  # Constant
+   31 k_act_pka                 1.0  # Constant
+   32 k_inact_pka               0.1  # Constant
+   33 k_act_csk                 1.0  # Constant
+   34 k_inact_csk               0.1  # Constant
+   35 k_cat_pi3k                0.5  # Constant
+   36 k_phos_p85                1.0  # Constant
+   37 k_act_akt                 1.0  # Constant
+   38 k_dephos_akt              0.1  # Constant
+   39 k_pten                    0.05  # Constant
+   40 k_deg_p85P                0.01  # Constant
+   41 k_deg_il6                 0.001  # Constant
+   42 k_prod_rec                0.1  # Constant
+   43 k_deg_rec                 0.01  # Constant
+   44 k_prod_kin_adapt          0.1  # Constant
+   45 k_deg_kin_adapt           0.01  # Constant
+   46 k_prod_smad               0.1  # Constant
+   47 k_deg_smad                0.01  # Constant
+   48 k_prod_stat3              0.1  # Constant
+   49 k_deg_stat3               0.01  # Constant
+   50 k_prod_lipid              0.005  # Constant
+end parameters
+begin species
+    1 TGFbR(act~I,l) 100
+    2 IL6R(act~I,jak2,l) 100
+    3 TGFb(r) 100
+    4 IL6(r) 100
+    5 JAK2(act~I,il6r_site) 100
+    6 STAT3(dimer_site,pY~U,smad3_bs) 100
+    7 SMAD3(pS~U,pka_bs,smad4_bs,stat3_bs) 100
+    8 SMAD4(smad3_bs) 100
+    9 PKA(act~I,smad3_4_bs) 100
+   10 CSK(act~I) 100
+   11 P85(p110_bs,phos~U) 100
+   12 P110(p85_bs,pip2_bs) 100
+   13 PIP2(pi3k_bs) 1000
+   14 PIP3(akt_bs) 0
+   15 AKT(pS473~U,pip3_bs) 100
+   16 TGFb(r!1).TGFbR(act~I,l!1) 0
+   17 IL6(r!1).IL6R(act~I,jak2,l!1) 0
+   18 IL6R(act~I,jak2!1,l).JAK2(act~I,il6r_site!1) 0
+   19 P110(p85_bs!1,pip2_bs).P85(p110_bs!1,phos~U) 0
+   20 AKT(pS473~U,pip3_bs!1).PIP3(akt_bs!1) 0
+   21 IL6(r!1).IL6R(act~I,jak2!2,l!1).JAK2(act~I,il6r_site!2) 0
+   22 TGFb(r!1).TGFbR(act~A,l!1) 0
+   23 IL6(r!1).IL6R(act~A,jak2,l!1) 0
+   24 P110(p85_bs!1,pip2_bs!2).P85(p110_bs!1,phos~U).PIP2(pi3k_bs!2) 0
+   25 AKT(pS473~P,pip3_bs!1).PIP3(akt_bs!1) 0
+   26 TGFbR(act~A,l) 0
+   27 IL6R(act~A,jak2,l) 0
+   28 IL6(r!1).IL6R(act~A,jak2!2,l!1).JAK2(act~I,il6r_site!2) 0
+   29 SMAD3(pS~P,pka_bs,smad4_bs,stat3_bs) 0
+   30 P110(p85_bs,pip2_bs!1).PIP2(pi3k_bs!1) 0
+   31 AKT(pS473~P,pip3_bs) 0
+   32 IL6R(act~A,jak2!1,l).JAK2(act~I,il6r_site!1) 0
+   33 IL6(r!1).IL6R(act~A,jak2!2,l!1).JAK2(act~A,il6r_site!2) 0
+   34 SMAD3(pS~P,pka_bs,smad4_bs!1,stat3_bs).SMAD4(smad3_bs!1) 0
+   35 IL6R(act~A,jak2!1,l).JAK2(act~A,il6r_site!1) 0
+   36 IL6(r!1).IL6R(act~I,jak2!2,l!1).JAK2(act~A,il6r_site!2) 0
+   37 JAK2(act~A,il6r_site) 0
+   38 STAT3(dimer_site,pY~P,smad3_bs) 0
+   39 SMAD3(pS~U,pka_bs,smad4_bs!1,stat3_bs).SMAD4(smad3_bs!1) 0
+   40 PKA(act~I,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs!2,stat3_bs).SMAD4(smad3_bs!2) 0
+   41 IL6R(act~I,jak2!1,l).JAK2(act~A,il6r_site!1) 0
+   42 STAT3(dimer_site!1,pY~P,smad3_bs).STAT3(dimer_site!1,pY~P,smad3_bs) 0
+   43 PKA(act~I,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs!2,stat3_bs).SMAD4(smad3_bs!2) 0
+   44 PKA(act~I,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs,stat3_bs) 0
+   45 PKA(act~A,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs!2,stat3_bs).SMAD4(smad3_bs!2) 0
+   46 STAT3(dimer_site!1,pY~P,smad3_bs).STAT3(dimer_site!1,pY~U,smad3_bs) 0
+   47 PKA(act~I,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs,stat3_bs) 0
+   48 PKA(act~A,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs!2,stat3_bs).SMAD4(smad3_bs!2) 0
+   49 PKA(act~A,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs,stat3_bs) 0
+   50 SMAD3(pS~P,pka_bs,smad4_bs,stat3_bs!1).STAT3(dimer_site!2,pY~P,smad3_bs!1).STAT3(dimer_site!2,pY~P,smad3_bs) 0
+   51 SMAD3(pS~P,pka_bs,smad4_bs!1,stat3_bs!2).SMAD4(smad3_bs!1).STAT3(dimer_site!3,pY~P,smad3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs) 0
+   52 PKA(act~I,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs) 0
+   53 CSK(act~A) 0
+   54 STAT3(dimer_site!1,pY~U,smad3_bs).STAT3(dimer_site!1,pY~U,smad3_bs) 0
+   55 SMAD3(pS~P,pka_bs,smad4_bs,stat3_bs!1).STAT3(dimer_site!2,pY~P,smad3_bs).STAT3(dimer_site!2,pY~U,smad3_bs!1) 0
+   56 SMAD3(pS~P,pka_bs,smad4_bs,stat3_bs!1).STAT3(dimer_site!2,pY~P,smad3_bs!1).STAT3(dimer_site!2,pY~U,smad3_bs) 0
+   57 SMAD3(pS~P,pka_bs,smad4_bs!1,stat3_bs!2).SMAD4(smad3_bs!1).STAT3(dimer_site!3,pY~P,smad3_bs).STAT3(dimer_site!3,pY~U,smad3_bs!2) 0
+   58 SMAD3(pS~P,pka_bs,smad4_bs!1,stat3_bs!2).SMAD4(smad3_bs!1).STAT3(dimer_site!3,pY~P,smad3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs) 0
+   59 PKA(act~I,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs).STAT3(dimer_site!3,pY~U,smad3_bs!2) 0
+   60 PKA(act~I,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs) 0
+   61 SMAD3(pS~P,pka_bs,smad4_bs,stat3_bs!1).STAT3(dimer_site,pY~P,smad3_bs!1) 0
+   62 SMAD3(pS~P,pka_bs,smad4_bs!1,stat3_bs!2).SMAD4(smad3_bs!1).STAT3(dimer_site,pY~P,smad3_bs!2) 0
+   63 PKA(act~I,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site,pY~P,smad3_bs!2) 0
+   64 PKA(act~A,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs,stat3_bs) 0
+   65 SMAD3(pS~U,pka_bs,smad4_bs,stat3_bs!1).STAT3(dimer_site!2,pY~P,smad3_bs!1).STAT3(dimer_site!2,pY~P,smad3_bs) 0
+   66 SMAD3(pS~U,pka_bs,smad4_bs!1,stat3_bs!2).SMAD4(smad3_bs!1).STAT3(dimer_site!3,pY~P,smad3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs) 0
+   67 PKA(act~I,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs) 0
+   68 PKA(act~A,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs) 0
+   69 SMAD3(pS~P,pka_bs,smad4_bs,stat3_bs!1).SMAD3(pS~P,pka_bs,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs!1).STAT3(dimer_site!3,pY~P,smad3_bs!2) 0
+   70 P85(p110_bs,phos~P) 0
+   71 P110(p85_bs!1,pip2_bs).P85(p110_bs!1,phos~P) 0
+   72 P110(p85_bs!1,pip2_bs!2).P85(p110_bs!1,phos~P).PIP2(pi3k_bs!2) 0
+   73 SMAD3(pS~P,pka_bs,smad4_bs,stat3_bs!1).STAT3(dimer_site!2,pY~U,smad3_bs!1).STAT3(dimer_site!2,pY~U,smad3_bs) 0
+   74 SMAD3(pS~P,pka_bs,smad4_bs!1,stat3_bs!2).SMAD4(smad3_bs!1).STAT3(dimer_site!3,pY~U,smad3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs) 0
+   75 PKA(act~I,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs) 0
+   76 SMAD3(pS~P,pka_bs,smad4_bs,stat3_bs!1).STAT3(dimer_site,pY~U,smad3_bs!1) 0
+   77 SMAD3(pS~P,pka_bs,smad4_bs!1,stat3_bs!2).SMAD4(smad3_bs!1).STAT3(dimer_site,pY~U,smad3_bs!2) 0
+   78 PKA(act~I,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site,pY~U,smad3_bs!2) 0
+   79 SMAD3(pS~U,pka_bs,smad4_bs,stat3_bs!1).STAT3(dimer_site!2,pY~P,smad3_bs).STAT3(dimer_site!2,pY~U,smad3_bs!1) 0
+   80 SMAD3(pS~U,pka_bs,smad4_bs,stat3_bs!1).STAT3(dimer_site!2,pY~P,smad3_bs!1).STAT3(dimer_site!2,pY~U,smad3_bs) 0
+   81 SMAD3(pS~U,pka_bs,smad4_bs!1,stat3_bs!2).SMAD4(smad3_bs!1).STAT3(dimer_site!3,pY~P,smad3_bs).STAT3(dimer_site!3,pY~U,smad3_bs!2) 0
+   82 SMAD3(pS~U,pka_bs,smad4_bs!1,stat3_bs!2).SMAD4(smad3_bs!1).STAT3(dimer_site!3,pY~P,smad3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs) 0
+   83 PKA(act~I,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs).STAT3(dimer_site!3,pY~U,smad3_bs!2) 0
+   84 PKA(act~I,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs) 0
+   85 PKA(act~A,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs).STAT3(dimer_site!3,pY~U,smad3_bs!2) 0
+   86 PKA(act~A,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs) 0
+   87 SMAD3(pS~P,pka_bs,smad4_bs,stat3_bs!1).SMAD3(pS~P,pka_bs,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs!1) 0
+   88 SMAD3(pS~U,pka_bs,smad4_bs,stat3_bs!1).STAT3(dimer_site,pY~P,smad3_bs!1) 0
+   89 SMAD3(pS~U,pka_bs,smad4_bs!1,stat3_bs!2).SMAD4(smad3_bs!1).STAT3(dimer_site,pY~P,smad3_bs!2) 0
+   90 PKA(act~I,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site,pY~P,smad3_bs!2) 0
+   91 PKA(act~A,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site,pY~P,smad3_bs!2) 0
+   92 PKA(act~A,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs) 0
+   93 SMAD3(pS~P,pka_bs,smad4_bs,stat3_bs!1).SMAD3(pS~U,pka_bs,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs!1) 0
+   94 PKA(act~I,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs!2,stat3_bs!3).SMAD4(smad3_bs!2).STAT3(dimer_site,pY~P,smad3_bs!3) 0
+   95 SMAD3(pS~U,pka_bs,smad4_bs,stat3_bs!1).STAT3(dimer_site!2,pY~U,smad3_bs!1).STAT3(dimer_site!2,pY~U,smad3_bs) 0
+   96 SMAD3(pS~U,pka_bs,smad4_bs!1,stat3_bs!2).SMAD4(smad3_bs!1).STAT3(dimer_site!3,pY~U,smad3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs) 0
+   97 PKA(act~I,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs) 0
+   98 PKA(act~A,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs) 0
+   99 SMAD3(pS~P,pka_bs,smad4_bs,stat3_bs!1).SMAD3(pS~P,pka_bs,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs!1) 0
+  100 SMAD3(pS~U,pka_bs,smad4_bs,stat3_bs!1).STAT3(dimer_site,pY~U,smad3_bs!1) 0
+  101 SMAD3(pS~U,pka_bs,smad4_bs!1,stat3_bs!2).SMAD4(smad3_bs!1).STAT3(dimer_site,pY~U,smad3_bs!2) 0
+  102 PKA(act~I,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site,pY~U,smad3_bs!2) 0
+  103 PKA(act~A,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site,pY~U,smad3_bs!2) 0
+  104 PKA(act~A,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs).STAT3(dimer_site!3,pY~U,smad3_bs!2) 0
+  105 PKA(act~A,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs) 0
+  106 SMAD3(pS~P,pka_bs,smad4_bs,stat3_bs!1).SMAD3(pS~U,pka_bs,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs!1).STAT3(dimer_site!3,pY~U,smad3_bs!2) 0
+  107 SMAD3(pS~P,pka_bs,smad4_bs,stat3_bs!1).SMAD3(pS~U,pka_bs,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs!1) 0
+  108 PKA(act~I,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs!2,stat3_bs!3).SMAD4(smad3_bs!2).STAT3(dimer_site,pY~U,smad3_bs!3) 0
+  109 SMAD3(pS~U,pka_bs,smad4_bs,stat3_bs!1).SMAD3(pS~U,pka_bs,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs!1).STAT3(dimer_site!3,pY~P,smad3_bs!2) 0
+  110 PKA(act~A,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site,pY~P,smad3_bs!2) 0
+  111 PKA(act~I,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs!2,stat3_bs!3).SMAD4(smad3_bs!2).STAT3(dimer_site,pY~P,smad3_bs!3) 0
+  112 PKA(act~A,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs!2,stat3_bs!3).SMAD4(smad3_bs!2).STAT3(dimer_site,pY~P,smad3_bs!3) 0
+  113 PKA(act~A,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs) 0
+  114 SMAD3(pS~P,pka_bs,smad4_bs,stat3_bs!1).SMAD3(pS~U,pka_bs,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs!1).STAT3(dimer_site!3,pY~U,smad3_bs!2) 0
+  115 SMAD3(pS~U,pka_bs,smad4_bs,stat3_bs!1).SMAD3(pS~U,pka_bs,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~P,smad3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs!1) 0
+  116 PKA(act~A,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs,stat3_bs!2).STAT3(dimer_site,pY~U,smad3_bs!2) 0
+  117 PKA(act~I,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs!2,stat3_bs!3).SMAD4(smad3_bs!2).STAT3(dimer_site,pY~U,smad3_bs!3) 0
+  118 PKA(act~A,smad3_4_bs!1).SMAD3(pS~P,pka_bs!1,smad4_bs!2,stat3_bs!3).SMAD4(smad3_bs!2).STAT3(dimer_site,pY~U,smad3_bs!3) 0
+  119 PKA(act~A,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs!2,stat3_bs!3).SMAD4(smad3_bs!2).STAT3(dimer_site,pY~P,smad3_bs!3) 0
+  120 SMAD3(pS~U,pka_bs,smad4_bs,stat3_bs!1).SMAD3(pS~U,pka_bs,smad4_bs,stat3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs!2).STAT3(dimer_site!3,pY~U,smad3_bs!1) 0
+  121 PKA(act~A,smad3_4_bs!1).SMAD3(pS~U,pka_bs!1,smad4_bs!2,stat3_bs!3).SMAD4(smad3_bs!2).STAT3(dimer_site,pY~U,smad3_bs!3) 0
+end species
+begin reactions
+    1 1,3 16 kf_tgfb_bind #Ligand_TGFbR
+    2 2,4 17 kf_il6_bind #Ligand_IL6R
+    3 2,5 18 kf_il6r_jak2 #Bind_JAK2_IL6R
+    4 11,12 19 kf_pi3k_bind #PI3K_Complex_Formation
+    5 14,15 20 kf_pip3_akt #Bind_PIP3_AKT
+    6 14 13 k_pten #Degrade_PIP3_by_PTEN
+    7 4 0 k_deg_il6 #Degrade_IL6
+    8 0 1 k_prod_rec #Prod_TGFbR
+    9 1 0 k_deg_rec #Deg_TGFbR
+   10 0 2 k_prod_rec #Prod_IL6R
+   11 2 0 k_deg_rec #Deg_IL6R
+   12 0 5 k_prod_kin_adapt #Prod_JAK2
+   13 5 0 k_deg_kin_adapt #Deg_JAK2
+   14 0 9 k_prod_kin_adapt #Prod_PKA
+   15 9 0 k_deg_kin_adapt #Deg_PKA
+   16 0 10 k_prod_kin_adapt #Prod_CSK
+   17 10 0 k_deg_kin_adapt #Deg_CSK
+   18 0 11 k_prod_kin_adapt #Prod_P85
+   19 11 0 k_deg_kin_adapt #Deg_P85_Total
+   20 0 12 k_prod_kin_adapt #Prod_P110
+   21 12 0 k_deg_kin_adapt #Deg_P110
+   22 0 15 k_prod_kin_adapt #Prod_AKT
+   23 15 0 k_deg_kin_adapt #Deg_AKT
+   24 0 7 k_prod_smad #Prod_SMAD3
+   25 7 0 k_deg_smad #Deg_SMAD3
+   26 0 8 k_prod_smad #Prod_SMAD4
+   27 8 0 k_deg_smad #Deg_SMAD4
+   28 0 6 k_prod_stat3 #Prod_STAT3
+   29 6 0 k_deg_stat3 #Deg_STAT3
+   30 0 13 k_prod_lipid #Prod_PIP2
+   31 16 1,3 kr_tgfb_bind #_reverse_Ligand_TGFbR
+   32 4,18 21 kf_il6_bind #Ligand_IL6R
+   33 17 2,4 kr_il6_bind #_reverse_Ligand_IL6R
+   34 16 22 k_act_tgfbr #Act_TGFbR
+   35 17 23 k_act_il6r #Act_IL6R
+   36 5,17 21 kf_il6r_jak2 #Bind_JAK2_IL6R
+   37 18 2,5 kr_il6r_jak2 #_reverse_Bind_JAK2_IL6R
+   38 19 11,12 kr_pi3k_bind #_reverse_PI3K_Complex_Formation
+   39 13,19 24 kf_pip2_pi3k #Bind_PIP2_To_PI3K
+   40 20 14,15 kr_pip3_akt #_reverse_Bind_PIP3_AKT
+   41 20 25 k_act_akt #Act_AKT
+   42 20 13 k_pten #Degrade_PIP3_by_PTEN
+   43 16 0 k_deg_rec #Deg_TGFbR
+   44 17 0 k_deg_rec #Deg_IL6R
+   45 18 0 k_deg_rec #Deg_IL6R
+   46 18 0 k_deg_kin_adapt #Deg_JAK2
+   47 19 0 2*k_deg_kin_adapt #Deg_P85_Total,Deg_P110
+   48 20 0 k_deg_kin_adapt #Deg_AKT
+   49 22 3,26 kr_tgfb_bind #_reverse_Ligand_TGFbR
+   50 21 4,18 kr_il6_bind #_reverse_Ligand_IL6R
+   51 23 4,27 kr_il6_bind #_reverse_Ligand_IL6R
+   52 22 16 k_inact_tgfbr #Deact_TGFbR
+   53 21 28 k_act_il6r #Act_IL6R
+   54 23 17 k_inact_il6r #Deact_IL6R
+   55 5,23 28 kf_il6r_jak2 #Bind_JAK2_IL6R
+   56 21 5,17 kr_il6r_jak2 #_reverse_Bind_JAK2_IL6R
+   57 7,22 22,29 k_phos_smad3 #Phos_SMAD3
+   58 24 11,30 kr_pi3k_bind #_reverse_PI3K_Complex_Formation
+   59 24 13,19 kr_pip2_pi3k #_reverse_Bind_PIP2_To_PI3K
+   60 24 14,19 k_cat_pi3k #PI3K_Catalysis
+   61 25 14,31 kr_pip3_akt #_reverse_Bind_PIP3_AKT
+   62 25 20 k_dephos_akt #Dephos_AKT
+   63 25 13 k_pten #Degrade_PIP3_by_PTEN
+   64 22 0 k_deg_rec #Deg_TGFbR
+   65 21 0 k_deg_rec #Deg_IL6R
+   66 23 0 k_deg_rec #Deg_IL6R
+   67 21 0 k_deg_kin_adapt #Deg_JAK2
+   68 24 0 2*k_deg_kin_adapt #Deg_P85_Total,Deg_P110
+   69 25 0 k_deg_kin_adapt #Deg_AKT
+   70 3,26 22 kf_tgfb_bind #Ligand_TGFbR
+   71 4,27 23 kf_il6_bind #Ligand_IL6R
+   72 28 4,32 kr_il6_bind #_reverse_Ligand_IL6R
+   73 26 1 k_inact_tgfbr #Deact_TGFbR
+   74 27 2 k_inact_il6r #Deact_IL6R
+   75 28 21 k_inact_il6r #Deact_IL6R
+   76 5,27 32 kf_il6r_jak2 #Bind_JAK2_IL6R
+   77 28 5,23 kr_il6r_jak2 #_reverse_Bind_JAK2_IL6R
+   78 28 33 k_act_jak2 #Act_JAK2
+   79 7,26 26,29 k_phos_smad3 #Phos_SMAD3
+   80 29 7 k_dephos_smad3 #Dephos_SMAD3
+   81 8,29 34 kf_s3s4 #Bind_SMAD3_SMAD4
+   82 11,30 24 kf_pi3k_bind #PI3K_Complex_Formation
+   83 14,31 25 kf_pip3_akt #Bind_PIP3_AKT
+   84 31 15 k_dephos_akt #Dephos_AKT
+   85 26 0 k_deg_rec #Deg_TGFbR
+   86 27 0 k_deg_rec #Deg_IL6R
+   87 28 0 k_deg_rec #Deg_IL6R
+   88 28 0 k_deg_kin_adapt #Deg_JAK2
+   89 30 0 k_deg_kin_adapt #Deg_P110
+   90 31 0 k_deg_kin_adapt #Deg_AKT
+   91 29 0 k_deg_smad #Deg_SMAD3
+   92 4,32 28 kf_il6_bind #Ligand_IL6R
+   93 33 4,35 kr_il6_bind #_reverse_Ligand_IL6R
+   94 32 18 k_inact_il6r #Deact_IL6R
+   95 33 36 k_inact_il6r #Deact_IL6R
+   96 32 5,27 kr_il6r_jak2 #_reverse_Bind_JAK2_IL6R
+   97 33 23,37 kr_il6r_jak2 #_reverse_Bind_JAK2_IL6R
+   98 32 35 k_act_jak2 #Act_JAK2
+   99 33 28 k_inact_jak2 #Deact_JAK2
+  100 6,33 33,38 k_phos_stat3 #Phos_STAT3
+  101 34 39 k_dephos_smad3 #Dephos_SMAD3
+  102 34 8,29 kr_s3s4 #_reverse_Bind_SMAD3_SMAD4
+  103 9,34 40 kf_pka_s3s4 #Bind_PKA_SMAD3_SMAD4
+  104 32 0 k_deg_rec #Deg_IL6R
+  105 33 0 k_deg_rec #Deg_IL6R
+  106 32 0 k_deg_kin_adapt #Deg_JAK2
+  107 33 0 k_deg_kin_adapt #Deg_JAK2
+  108 34 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  109 4,35 33 kf_il6_bind #Ligand_IL6R
+  110 36 4,41 kr_il6_bind #_reverse_Ligand_IL6R
+  111 36 33 k_act_il6r #Act_IL6R
+  112 35 41 k_inact_il6r #Deact_IL6R
+  113 2,37 41 kf_il6r_jak2 #Bind_JAK2_IL6R
+  114 17,37 36 kf_il6r_jak2 #Bind_JAK2_IL6R
+  115 23,37 33 kf_il6r_jak2 #Bind_JAK2_IL6R
+  116 27,37 35 kf_il6r_jak2 #Bind_JAK2_IL6R
+  117 35 27,37 kr_il6r_jak2 #_reverse_Bind_JAK2_IL6R
+  118 36 17,37 kr_il6r_jak2 #_reverse_Bind_JAK2_IL6R
+  119 35 32 k_inact_jak2 #Deact_JAK2
+  120 36 21 k_inact_jak2 #Deact_JAK2
+  121 37 5 k_inact_jak2 #Deact_JAK2
+  122 6,35 35,38 k_phos_stat3 #Phos_STAT3
+  123 6,36 36,38 k_phos_stat3 #Phos_STAT3
+  124 6,37 37,38 k_phos_stat3 #Phos_STAT3
+  125 38 6 k_dephos_stat3 #Dephos_STAT3
+  126 38,38 42 0.5*kf_stat3_dimer #Dimerize_STAT3
+  127 22,39 22,34 k_phos_smad3 #Phos_SMAD3
+  128 26,39 26,34 k_phos_smad3 #Phos_SMAD3
+  129 40 43 k_dephos_smad3 #Dephos_SMAD3
+  130 40 8,44 kr_s3s4 #_reverse_Bind_SMAD3_SMAD4
+  131 9,39 43 kf_pka_s3s4 #Bind_PKA_SMAD3_SMAD4
+  132 40 9,34 kr_pka_s3s4 #_reverse_Bind_PKA_SMAD3_SMAD4
+  133 40 45 k_act_pka #Act_PKA
+  134 35 0 k_deg_rec #Deg_IL6R
+  135 36 0 k_deg_rec #Deg_IL6R
+  136 35 0 k_deg_kin_adapt #Deg_JAK2
+  137 36 0 k_deg_kin_adapt #Deg_JAK2
+  138 37 0 k_deg_kin_adapt #Deg_JAK2
+  139 40 0 k_deg_kin_adapt #Deg_PKA
+  140 39 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  141 40 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  142 38 0 k_deg_stat3 #Deg_STAT3
+  143 4,41 36 kf_il6_bind #Ligand_IL6R
+  144 41 2,37 kr_il6r_jak2 #_reverse_Bind_JAK2_IL6R
+  145 41 18 k_inact_jak2 #Deact_JAK2
+  146 6,41 38,41 k_phos_stat3 #Phos_STAT3
+  147 42 46 2*k_dephos_stat3 #Dephos_STAT3
+  148 42 38,38 kr_stat3_dimer #_reverse_Dimerize_STAT3
+  149 22,43 22,40 k_phos_smad3 #Phos_SMAD3
+  150 26,43 26,40 k_phos_smad3 #Phos_SMAD3
+  151 44 47 k_dephos_smad3 #Dephos_SMAD3
+  152 45 48 k_dephos_smad3 #Dephos_SMAD3
+  153 8,44 40 kf_s3s4 #Bind_SMAD3_SMAD4
+  154 45 8,49 kr_s3s4 #_reverse_Bind_SMAD3_SMAD4
+  155 29,42 50 2*kf_st3dimer_s3 #Bind_STAT3dimer_SMAD3
+  156 34,42 51 2*kf_st3dimer_s3 #Bind_STAT3dimer_SMAD3
+  157 42,44 52 2*kf_st3dimer_s3 #Bind_STAT3dimer_SMAD3
+  158 43 9,39 kr_pka_s3s4 #_reverse_Bind_PKA_SMAD3_SMAD4
+  159 43 48 k_act_pka #Act_PKA
+  160 44 49 k_act_pka #Act_PKA
+  161 45 40 k_inact_pka #Deact_PKA
+  162 10,45 45,53 k_act_csk #Act_CSK
+  163 41 0 k_deg_rec #Deg_IL6R
+  164 41 0 k_deg_kin_adapt #Deg_JAK2
+  165 43 0 k_deg_kin_adapt #Deg_PKA
+  166 44 0 k_deg_kin_adapt #Deg_PKA
+  167 45 0 k_deg_kin_adapt #Deg_PKA
+  168 43 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  169 44 0 k_deg_smad #Deg_SMAD3
+  170 45 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  171 42 0 k_deg_stat3 #Deg_STAT3
+  172 33,46 33,42 k_phos_stat3 #Phos_STAT3
+  173 35,46 35,42 k_phos_stat3 #Phos_STAT3
+  174 36,46 36,42 k_phos_stat3 #Phos_STAT3
+  175 37,46 37,42 k_phos_stat3 #Phos_STAT3
+  176 41,46 41,42 k_phos_stat3 #Phos_STAT3
+  177 46 54 k_dephos_stat3 #Dephos_STAT3
+  178 50 55 k_dephos_stat3 #Dephos_STAT3
+  179 50 56 k_dephos_stat3 #Dephos_STAT3
+  180 51 57 k_dephos_stat3 #Dephos_STAT3
+  181 51 58 k_dephos_stat3 #Dephos_STAT3
+  182 52 59 k_dephos_stat3 #Dephos_STAT3
+  183 52 60 k_dephos_stat3 #Dephos_STAT3
+  184 50 38,61 kr_stat3_dimer #_reverse_Dimerize_STAT3
+  185 51 38,62 kr_stat3_dimer #_reverse_Dimerize_STAT3
+  186 52 38,63 kr_stat3_dimer #_reverse_Dimerize_STAT3
+  187 22,47 22,44 k_phos_smad3 #Phos_SMAD3
+  188 22,48 22,45 k_phos_smad3 #Phos_SMAD3
+  189 26,47 26,44 k_phos_smad3 #Phos_SMAD3
+  190 26,48 26,45 k_phos_smad3 #Phos_SMAD3
+  191 49 64 k_dephos_smad3 #Dephos_SMAD3
+  192 50 65 k_dephos_smad3 #Dephos_SMAD3
+  193 51 66 k_dephos_smad3 #Dephos_SMAD3
+  194 52 67 k_dephos_smad3 #Dephos_SMAD3
+  195 8,49 45 kf_s3s4 #Bind_SMAD3_SMAD4
+  196 8,50 51 kf_s3s4 #Bind_SMAD3_SMAD4
+  197 51 8,50 kr_s3s4 #_reverse_Bind_SMAD3_SMAD4
+  198 42,49 68 2*kf_st3dimer_s3 #Bind_STAT3dimer_SMAD3
+  199 29,50 69 kf_st3dimer_s3 #Bind_STAT3dimer_SMAD3
+  200 50 29,42 kr_st3dimer_s3 #_reverse_Bind_STAT3dimer_SMAD3
+  201 51 34,42 kr_st3dimer_s3 #_reverse_Bind_STAT3dimer_SMAD3
+  202 52 42,44 kr_st3dimer_s3 #_reverse_Bind_STAT3dimer_SMAD3
+  203 47 64 k_act_pka #Act_PKA
+  204 52 68 k_act_pka #Act_PKA
+  205 48 43 k_inact_pka #Deact_PKA
+  206 49 44 k_inact_pka #Deact_PKA
+  207 10,48 48,53 k_act_csk #Act_CSK
+  208 10,49 49,53 k_act_csk #Act_CSK
+  209 53 10 k_inact_csk #Deact_CSK
+  210 11,53 53,70 k_phos_p85 #Phosphorylate_P85_by_CSK
+  211 19,53 53,71 k_phos_p85 #Phosphorylate_P85_by_CSK
+  212 24,53 53,72 k_phos_p85 #Phosphorylate_P85_by_CSK
+  213 47 0 k_deg_kin_adapt #Deg_PKA
+  214 48 0 k_deg_kin_adapt #Deg_PKA
+  215 49 0 k_deg_kin_adapt #Deg_PKA
+  216 52 0 k_deg_kin_adapt #Deg_PKA
+  217 53 0 k_deg_kin_adapt #Deg_CSK
+  218 47 0 k_deg_smad #Deg_SMAD3
+  219 48 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  220 49 0 k_deg_smad #Deg_SMAD3
+  221 50 0 k_deg_smad #Deg_SMAD3
+  222 51 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  223 52 0 k_deg_smad #Deg_SMAD3
+  224 46 0 k_deg_stat3 #Deg_STAT3
+  225 50 0 k_deg_stat3 #Deg_STAT3
+  226 51 0 k_deg_stat3 #Deg_STAT3
+  227 52 0 k_deg_stat3 #Deg_STAT3
+  228 33,54 33,46 2*k_phos_stat3 #Phos_STAT3
+  229 33,55 33,50 k_phos_stat3 #Phos_STAT3
+  230 33,56 33,50 k_phos_stat3 #Phos_STAT3
+  231 33,57 33,51 k_phos_stat3 #Phos_STAT3
+  232 33,58 33,51 k_phos_stat3 #Phos_STAT3
+  233 33,59 33,52 k_phos_stat3 #Phos_STAT3
+  234 33,60 33,52 k_phos_stat3 #Phos_STAT3
+  235 35,54 35,46 2*k_phos_stat3 #Phos_STAT3
+  236 35,55 35,50 k_phos_stat3 #Phos_STAT3
+  237 35,56 35,50 k_phos_stat3 #Phos_STAT3
+  238 35,57 35,51 k_phos_stat3 #Phos_STAT3
+  239 35,58 35,51 k_phos_stat3 #Phos_STAT3
+  240 35,59 35,52 k_phos_stat3 #Phos_STAT3
+  241 35,60 35,52 k_phos_stat3 #Phos_STAT3
+  242 36,54 36,46 2*k_phos_stat3 #Phos_STAT3
+  243 36,55 36,50 k_phos_stat3 #Phos_STAT3
+  244 36,56 36,50 k_phos_stat3 #Phos_STAT3
+  245 36,57 36,51 k_phos_stat3 #Phos_STAT3
+  246 36,58 36,51 k_phos_stat3 #Phos_STAT3
+  247 36,59 36,52 k_phos_stat3 #Phos_STAT3
+  248 36,60 36,52 k_phos_stat3 #Phos_STAT3
+  249 37,54 37,46 2*k_phos_stat3 #Phos_STAT3
+  250 37,55 37,50 k_phos_stat3 #Phos_STAT3
+  251 37,56 37,50 k_phos_stat3 #Phos_STAT3
+  252 37,57 37,51 k_phos_stat3 #Phos_STAT3
+  253 37,58 37,51 k_phos_stat3 #Phos_STAT3
+  254 37,59 37,52 k_phos_stat3 #Phos_STAT3
+  255 37,60 37,52 k_phos_stat3 #Phos_STAT3
+  256 41,54 41,46 2*k_phos_stat3 #Phos_STAT3
+  257 41,55 41,50 k_phos_stat3 #Phos_STAT3
+  258 41,56 41,50 k_phos_stat3 #Phos_STAT3
+  259 41,57 41,51 k_phos_stat3 #Phos_STAT3
+  260 41,58 41,51 k_phos_stat3 #Phos_STAT3
+  261 41,59 41,52 k_phos_stat3 #Phos_STAT3
+  262 41,60 41,52 k_phos_stat3 #Phos_STAT3
+  263 55 73 k_dephos_stat3 #Dephos_STAT3
+  264 56 73 k_dephos_stat3 #Dephos_STAT3
+  265 57 74 k_dephos_stat3 #Dephos_STAT3
+  266 58 74 k_dephos_stat3 #Dephos_STAT3
+  267 59 75 k_dephos_stat3 #Dephos_STAT3
+  268 60 75 k_dephos_stat3 #Dephos_STAT3
+  269 61 76 k_dephos_stat3 #Dephos_STAT3
+  270 62 77 k_dephos_stat3 #Dephos_STAT3
+  271 63 78 k_dephos_stat3 #Dephos_STAT3
+  272 65 79 k_dephos_stat3 #Dephos_STAT3
+  273 65 80 k_dephos_stat3 #Dephos_STAT3
+  274 66 81 k_dephos_stat3 #Dephos_STAT3
+  275 66 82 k_dephos_stat3 #Dephos_STAT3
+  276 67 83 k_dephos_stat3 #Dephos_STAT3
+  277 67 84 k_dephos_stat3 #Dephos_STAT3
+  278 68 85 k_dephos_stat3 #Dephos_STAT3
+  279 68 86 k_dephos_stat3 #Dephos_STAT3
+  280 69 87 2*k_dephos_stat3 #Dephos_STAT3
+  281 38,61 50 kf_stat3_dimer #Dimerize_STAT3
+  282 38,62 51 kf_stat3_dimer #Dimerize_STAT3
+  283 38,63 52 kf_stat3_dimer #Dimerize_STAT3
+  284 61,61 69 0.5*kf_stat3_dimer #Dimerize_STAT3
+  285 65 38,88 kr_stat3_dimer #_reverse_Dimerize_STAT3
+  286 66 38,89 kr_stat3_dimer #_reverse_Dimerize_STAT3
+  287 67 38,90 kr_stat3_dimer #_reverse_Dimerize_STAT3
+  288 68 38,91 kr_stat3_dimer #_reverse_Dimerize_STAT3
+  289 69 61,61 kr_stat3_dimer #_reverse_Dimerize_STAT3
+  290 22,64 22,49 k_phos_smad3 #Phos_SMAD3
+  291 22,65 22,50 k_phos_smad3 #Phos_SMAD3
+  292 22,66 22,51 k_phos_smad3 #Phos_SMAD3
+  293 22,67 22,52 k_phos_smad3 #Phos_SMAD3
+  294 26,64 26,49 k_phos_smad3 #Phos_SMAD3
+  295 26,65 26,50 k_phos_smad3 #Phos_SMAD3
+  296 26,66 26,51 k_phos_smad3 #Phos_SMAD3
+  297 26,67 26,52 k_phos_smad3 #Phos_SMAD3
+  298 55 79 k_dephos_smad3 #Dephos_SMAD3
+  299 56 80 k_dephos_smad3 #Dephos_SMAD3
+  300 57 81 k_dephos_smad3 #Dephos_SMAD3
+  301 58 82 k_dephos_smad3 #Dephos_SMAD3
+  302 59 83 k_dephos_smad3 #Dephos_SMAD3
+  303 60 84 k_dephos_smad3 #Dephos_SMAD3
+  304 61 88 k_dephos_smad3 #Dephos_SMAD3
+  305 62 89 k_dephos_smad3 #Dephos_SMAD3
+  306 63 90 k_dephos_smad3 #Dephos_SMAD3
+  307 68 92 k_dephos_smad3 #Dephos_SMAD3
+  308 69 93 2*k_dephos_smad3 #Dephos_SMAD3
+  309 8,55 57 kf_s3s4 #Bind_SMAD3_SMAD4
+  310 8,56 58 kf_s3s4 #Bind_SMAD3_SMAD4
+  311 8,61 62 kf_s3s4 #Bind_SMAD3_SMAD4
+  312 8,63 94 kf_s3s4 #Bind_SMAD3_SMAD4
+  313 57 8,55 kr_s3s4 #_reverse_Bind_SMAD3_SMAD4
+  314 58 8,56 kr_s3s4 #_reverse_Bind_SMAD3_SMAD4
+  315 62 8,61 kr_s3s4 #_reverse_Bind_SMAD3_SMAD4
+  316 29,65 93 kf_st3dimer_s3 #Bind_STAT3dimer_SMAD3
+  317 68 42,49 kr_st3dimer_s3 #_reverse_Bind_STAT3dimer_SMAD3
+  318 69 29,50 2*kr_st3dimer_s3 #_reverse_Bind_STAT3dimer_SMAD3
+  319 9,62 94 kf_pka_s3s4 #Bind_PKA_SMAD3_SMAD4
+  320 59 85 k_act_pka #Act_PKA
+  321 60 86 k_act_pka #Act_PKA
+  322 63 91 k_act_pka #Act_PKA
+  323 67 92 k_act_pka #Act_PKA
+  324 64 47 k_inact_pka #Deact_PKA
+  325 68 52 k_inact_pka #Deact_PKA
+  326 10,64 53,64 k_act_csk #Act_CSK
+  327 10,68 53,68 k_act_csk #Act_CSK
+  328 12,70 71 kf_pi3k_bind #PI3K_Complex_Formation
+  329 30,70 72 kf_pi3k_bind #PI3K_Complex_Formation
+  330 71 12,70 kr_pi3k_bind #_reverse_PI3K_Complex_Formation
+  331 72 30,70 kr_pi3k_bind #_reverse_PI3K_Complex_Formation
+  332 13,71 72 kf_pip2_pi3k #Bind_PIP2_To_PI3K
+  333 72 13,71 kr_pip2_pi3k #_reverse_Bind_PIP2_To_PI3K
+  334 70 0 k_deg_p85P #Degrade_P85_Phos
+  335 71 0 k_deg_p85P #Degrade_P85_Phos
+  336 72 0 k_deg_p85P #Degrade_P85_Phos
+  337 59 0 k_deg_kin_adapt #Deg_PKA
+  338 60 0 k_deg_kin_adapt #Deg_PKA
+  339 63 0 k_deg_kin_adapt #Deg_PKA
+  340 64 0 k_deg_kin_adapt #Deg_PKA
+  341 67 0 k_deg_kin_adapt #Deg_PKA
+  342 68 0 k_deg_kin_adapt #Deg_PKA
+  343 70 0 k_deg_kin_adapt #Deg_P85_Total
+  344 71 0 2*k_deg_kin_adapt #Deg_P85_Total,Deg_P110
+  345 72 0 2*k_deg_kin_adapt #Deg_P85_Total,Deg_P110
+  346 55 0 k_deg_smad #Deg_SMAD3
+  347 56 0 k_deg_smad #Deg_SMAD3
+  348 57 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  349 58 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  350 59 0 k_deg_smad #Deg_SMAD3
+  351 60 0 k_deg_smad #Deg_SMAD3
+  352 61 0 k_deg_smad #Deg_SMAD3
+  353 62 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  354 63 0 k_deg_smad #Deg_SMAD3
+  355 64 0 k_deg_smad #Deg_SMAD3
+  356 65 0 k_deg_smad #Deg_SMAD3
+  357 66 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  358 67 0 k_deg_smad #Deg_SMAD3
+  359 68 0 k_deg_smad #Deg_SMAD3
+  360 69 0 k_deg_smad #Deg_SMAD3
+  361 54 0 k_deg_stat3 #Deg_STAT3
+  362 55 0 k_deg_stat3 #Deg_STAT3
+  363 56 0 k_deg_stat3 #Deg_STAT3
+  364 57 0 k_deg_stat3 #Deg_STAT3
+  365 58 0 k_deg_stat3 #Deg_STAT3
+  366 59 0 k_deg_stat3 #Deg_STAT3
+  367 60 0 k_deg_stat3 #Deg_STAT3
+  368 61 0 k_deg_stat3 #Deg_STAT3
+  369 62 0 k_deg_stat3 #Deg_STAT3
+  370 63 0 k_deg_stat3 #Deg_STAT3
+  371 65 0 k_deg_stat3 #Deg_STAT3
+  372 66 0 k_deg_stat3 #Deg_STAT3
+  373 67 0 k_deg_stat3 #Deg_STAT3
+  374 68 0 k_deg_stat3 #Deg_STAT3
+  375 69 0 k_deg_stat3 #Deg_STAT3
+  376 33,73 33,56 k_phos_stat3 #Phos_STAT3
+  377 33,73 33,55 k_phos_stat3 #Phos_STAT3
+  378 33,74 33,58 k_phos_stat3 #Phos_STAT3
+  379 33,74 33,57 k_phos_stat3 #Phos_STAT3
+  380 33,75 33,60 k_phos_stat3 #Phos_STAT3
+  381 33,75 33,59 k_phos_stat3 #Phos_STAT3
+  382 33,76 33,61 k_phos_stat3 #Phos_STAT3
+  383 33,77 33,62 k_phos_stat3 #Phos_STAT3
+  384 33,78 33,63 k_phos_stat3 #Phos_STAT3
+  385 33,79 33,65 k_phos_stat3 #Phos_STAT3
+  386 33,80 33,65 k_phos_stat3 #Phos_STAT3
+  387 33,81 33,66 k_phos_stat3 #Phos_STAT3
+  388 33,82 33,66 k_phos_stat3 #Phos_STAT3
+  389 33,83 33,67 k_phos_stat3 #Phos_STAT3
+  390 33,84 33,67 k_phos_stat3 #Phos_STAT3
+  391 33,85 33,68 k_phos_stat3 #Phos_STAT3
+  392 33,86 33,68 k_phos_stat3 #Phos_STAT3
+  393 33,87 33,69 k_phos_stat3 #Phos_STAT3
+  394 35,73 35,56 k_phos_stat3 #Phos_STAT3
+  395 35,73 35,55 k_phos_stat3 #Phos_STAT3
+  396 35,74 35,58 k_phos_stat3 #Phos_STAT3
+  397 35,74 35,57 k_phos_stat3 #Phos_STAT3
+  398 35,75 35,60 k_phos_stat3 #Phos_STAT3
+  399 35,75 35,59 k_phos_stat3 #Phos_STAT3
+  400 35,76 35,61 k_phos_stat3 #Phos_STAT3
+  401 35,77 35,62 k_phos_stat3 #Phos_STAT3
+  402 35,78 35,63 k_phos_stat3 #Phos_STAT3
+  403 35,79 35,65 k_phos_stat3 #Phos_STAT3
+  404 35,80 35,65 k_phos_stat3 #Phos_STAT3
+  405 35,81 35,66 k_phos_stat3 #Phos_STAT3
+  406 35,82 35,66 k_phos_stat3 #Phos_STAT3
+  407 35,83 35,67 k_phos_stat3 #Phos_STAT3
+  408 35,84 35,67 k_phos_stat3 #Phos_STAT3
+  409 35,85 35,68 k_phos_stat3 #Phos_STAT3
+  410 35,86 35,68 k_phos_stat3 #Phos_STAT3
+  411 35,87 35,69 k_phos_stat3 #Phos_STAT3
+  412 36,73 36,56 k_phos_stat3 #Phos_STAT3
+  413 36,73 36,55 k_phos_stat3 #Phos_STAT3
+  414 36,74 36,58 k_phos_stat3 #Phos_STAT3
+  415 36,74 36,57 k_phos_stat3 #Phos_STAT3
+  416 36,75 36,60 k_phos_stat3 #Phos_STAT3
+  417 36,75 36,59 k_phos_stat3 #Phos_STAT3
+  418 36,76 36,61 k_phos_stat3 #Phos_STAT3
+  419 36,77 36,62 k_phos_stat3 #Phos_STAT3
+  420 36,78 36,63 k_phos_stat3 #Phos_STAT3
+  421 36,79 36,65 k_phos_stat3 #Phos_STAT3
+  422 36,80 36,65 k_phos_stat3 #Phos_STAT3
+  423 36,81 36,66 k_phos_stat3 #Phos_STAT3
+  424 36,82 36,66 k_phos_stat3 #Phos_STAT3
+  425 36,83 36,67 k_phos_stat3 #Phos_STAT3
+  426 36,84 36,67 k_phos_stat3 #Phos_STAT3
+  427 36,85 36,68 k_phos_stat3 #Phos_STAT3
+  428 36,86 36,68 k_phos_stat3 #Phos_STAT3
+  429 36,87 36,69 k_phos_stat3 #Phos_STAT3
+  430 37,73 37,56 k_phos_stat3 #Phos_STAT3
+  431 37,73 37,55 k_phos_stat3 #Phos_STAT3
+  432 37,74 37,58 k_phos_stat3 #Phos_STAT3
+  433 37,74 37,57 k_phos_stat3 #Phos_STAT3
+  434 37,75 37,60 k_phos_stat3 #Phos_STAT3
+  435 37,75 37,59 k_phos_stat3 #Phos_STAT3
+  436 37,76 37,61 k_phos_stat3 #Phos_STAT3
+  437 37,77 37,62 k_phos_stat3 #Phos_STAT3
+  438 37,78 37,63 k_phos_stat3 #Phos_STAT3
+  439 37,79 37,65 k_phos_stat3 #Phos_STAT3
+  440 37,80 37,65 k_phos_stat3 #Phos_STAT3
+  441 37,81 37,66 k_phos_stat3 #Phos_STAT3
+  442 37,82 37,66 k_phos_stat3 #Phos_STAT3
+  443 37,83 37,67 k_phos_stat3 #Phos_STAT3
+  444 37,84 37,67 k_phos_stat3 #Phos_STAT3
+  445 37,85 37,68 k_phos_stat3 #Phos_STAT3
+  446 37,86 37,68 k_phos_stat3 #Phos_STAT3
+  447 37,87 37,69 k_phos_stat3 #Phos_STAT3
+  448 41,73 41,56 k_phos_stat3 #Phos_STAT3
+  449 41,73 41,55 k_phos_stat3 #Phos_STAT3
+  450 41,74 41,58 k_phos_stat3 #Phos_STAT3
+  451 41,74 41,57 k_phos_stat3 #Phos_STAT3
+  452 41,75 41,60 k_phos_stat3 #Phos_STAT3
+  453 41,75 41,59 k_phos_stat3 #Phos_STAT3
+  454 41,76 41,61 k_phos_stat3 #Phos_STAT3
+  455 41,77 41,62 k_phos_stat3 #Phos_STAT3
+  456 41,78 41,63 k_phos_stat3 #Phos_STAT3
+  457 41,79 41,65 k_phos_stat3 #Phos_STAT3
+  458 41,80 41,65 k_phos_stat3 #Phos_STAT3
+  459 41,81 41,66 k_phos_stat3 #Phos_STAT3
+  460 41,82 41,66 k_phos_stat3 #Phos_STAT3
+  461 41,83 41,67 k_phos_stat3 #Phos_STAT3
+  462 41,84 41,67 k_phos_stat3 #Phos_STAT3
+  463 41,85 41,68 k_phos_stat3 #Phos_STAT3
+  464 41,86 41,68 k_phos_stat3 #Phos_STAT3
+  465 41,87 41,69 k_phos_stat3 #Phos_STAT3
+  466 79 95 k_dephos_stat3 #Dephos_STAT3
+  467 80 95 k_dephos_stat3 #Dephos_STAT3
+  468 81 96 k_dephos_stat3 #Dephos_STAT3
+  469 82 96 k_dephos_stat3 #Dephos_STAT3
+  470 83 97 k_dephos_stat3 #Dephos_STAT3
+  471 84 97 k_dephos_stat3 #Dephos_STAT3
+  472 85 98 k_dephos_stat3 #Dephos_STAT3
+  473 86 98 k_dephos_stat3 #Dephos_STAT3
+  474 87 99 k_dephos_stat3 #Dephos_STAT3
+  475 88 100 k_dephos_stat3 #Dephos_STAT3
+  476 89 101 k_dephos_stat3 #Dephos_STAT3
+  477 90 102 k_dephos_stat3 #Dephos_STAT3
+  478 91 103 k_dephos_stat3 #Dephos_STAT3
+  479 92 104 k_dephos_stat3 #Dephos_STAT3
+  480 92 105 k_dephos_stat3 #Dephos_STAT3
+  481 93 106 k_dephos_stat3 #Dephos_STAT3
+  482 93 107 k_dephos_stat3 #Dephos_STAT3
+  483 94 108 k_dephos_stat3 #Dephos_STAT3
+  484 38,88 65 kf_stat3_dimer #Dimerize_STAT3
+  485 38,89 66 kf_stat3_dimer #Dimerize_STAT3
+  486 38,90 67 kf_stat3_dimer #Dimerize_STAT3
+  487 38,91 68 kf_stat3_dimer #Dimerize_STAT3
+  488 61,88 93 kf_stat3_dimer #Dimerize_STAT3
+  489 88,88 109 0.5*kf_stat3_dimer #Dimerize_STAT3
+  490 92 38,110 kr_stat3_dimer #_reverse_Dimerize_STAT3
+  491 93 61,88 kr_stat3_dimer #_reverse_Dimerize_STAT3
+  492 22,79 22,55 k_phos_smad3 #Phos_SMAD3
+  493 22,80 22,56 k_phos_smad3 #Phos_SMAD3
+  494 22,81 22,57 k_phos_smad3 #Phos_SMAD3
+  495 22,82 22,58 k_phos_smad3 #Phos_SMAD3
+  496 22,83 22,59 k_phos_smad3 #Phos_SMAD3
+  497 22,84 22,60 k_phos_smad3 #Phos_SMAD3
+  498 22,88 22,61 k_phos_smad3 #Phos_SMAD3
+  499 22,89 22,62 k_phos_smad3 #Phos_SMAD3
+  500 22,90 22,63 k_phos_smad3 #Phos_SMAD3
+  501 22,92 22,68 k_phos_smad3 #Phos_SMAD3
+  502 22,93 22,69 k_phos_smad3 #Phos_SMAD3
+  503 26,79 26,55 k_phos_smad3 #Phos_SMAD3
+  504 26,80 26,56 k_phos_smad3 #Phos_SMAD3
+  505 26,81 26,57 k_phos_smad3 #Phos_SMAD3
+  506 26,82 26,58 k_phos_smad3 #Phos_SMAD3
+  507 26,83 26,59 k_phos_smad3 #Phos_SMAD3
+  508 26,84 26,60 k_phos_smad3 #Phos_SMAD3
+  509 26,88 26,61 k_phos_smad3 #Phos_SMAD3
+  510 26,89 26,62 k_phos_smad3 #Phos_SMAD3
+  511 26,90 26,63 k_phos_smad3 #Phos_SMAD3
+  512 26,92 26,68 k_phos_smad3 #Phos_SMAD3
+  513 26,93 26,69 k_phos_smad3 #Phos_SMAD3
+  514 73 95 k_dephos_smad3 #Dephos_SMAD3
+  515 74 96 k_dephos_smad3 #Dephos_SMAD3
+  516 75 97 k_dephos_smad3 #Dephos_SMAD3
+  517 76 100 k_dephos_smad3 #Dephos_SMAD3
+  518 77 101 k_dephos_smad3 #Dephos_SMAD3
+  519 78 102 k_dephos_smad3 #Dephos_SMAD3
+  520 85 104 k_dephos_smad3 #Dephos_SMAD3
+  521 86 105 k_dephos_smad3 #Dephos_SMAD3
+  522 87 106 k_dephos_smad3 #Dephos_SMAD3
+  523 87 107 k_dephos_smad3 #Dephos_SMAD3
+  524 91 110 k_dephos_smad3 #Dephos_SMAD3
+  525 93 109 k_dephos_smad3 #Dephos_SMAD3
+  526 94 111 k_dephos_smad3 #Dephos_SMAD3
+  527 8,73 74 kf_s3s4 #Bind_SMAD3_SMAD4
+  528 8,76 77 kf_s3s4 #Bind_SMAD3_SMAD4
+  529 8,78 108 kf_s3s4 #Bind_SMAD3_SMAD4
+  530 8,91 112 kf_s3s4 #Bind_SMAD3_SMAD4
+  531 74 8,73 kr_s3s4 #_reverse_Bind_SMAD3_SMAD4
+  532 77 8,76 kr_s3s4 #_reverse_Bind_SMAD3_SMAD4
+  533 94 8,63 kr_s3s4 #_reverse_Bind_SMAD3_SMAD4
+  534 93 29,65 kr_st3dimer_s3 #_reverse_Bind_STAT3dimer_SMAD3
+  535 9,77 108 kf_pka_s3s4 #Bind_PKA_SMAD3_SMAD4
+  536 9,89 111 kf_pka_s3s4 #Bind_PKA_SMAD3_SMAD4
+  537 94 9,62 kr_pka_s3s4 #_reverse_Bind_PKA_SMAD3_SMAD4
+  538 75 98 k_act_pka #Act_PKA
+  539 78 103 k_act_pka #Act_PKA
+  540 83 104 k_act_pka #Act_PKA
+  541 84 105 k_act_pka #Act_PKA
+  542 90 110 k_act_pka #Act_PKA
+  543 94 112 k_act_pka #Act_PKA
+  544 85 59 k_inact_pka #Deact_PKA
+  545 86 60 k_inact_pka #Deact_PKA
+  546 91 63 k_inact_pka #Deact_PKA
+  547 92 67 k_inact_pka #Deact_PKA
+  548 10,85 53,85 k_act_csk #Act_CSK
+  549 10,86 53,86 k_act_csk #Act_CSK
+  550 10,91 53,91 k_act_csk #Act_CSK
+  551 10,92 53,92 k_act_csk #Act_CSK
+  552 75 0 k_deg_kin_adapt #Deg_PKA
+  553 78 0 k_deg_kin_adapt #Deg_PKA
+  554 83 0 k_deg_kin_adapt #Deg_PKA
+  555 84 0 k_deg_kin_adapt #Deg_PKA
+  556 85 0 k_deg_kin_adapt #Deg_PKA
+  557 86 0 k_deg_kin_adapt #Deg_PKA
+  558 90 0 k_deg_kin_adapt #Deg_PKA
+  559 91 0 k_deg_kin_adapt #Deg_PKA
+  560 92 0 k_deg_kin_adapt #Deg_PKA
+  561 94 0 k_deg_kin_adapt #Deg_PKA
+  562 73 0 k_deg_smad #Deg_SMAD3
+  563 74 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  564 75 0 k_deg_smad #Deg_SMAD3
+  565 76 0 k_deg_smad #Deg_SMAD3
+  566 77 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  567 78 0 k_deg_smad #Deg_SMAD3
+  568 79 0 k_deg_smad #Deg_SMAD3
+  569 80 0 k_deg_smad #Deg_SMAD3
+  570 81 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  571 82 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  572 83 0 k_deg_smad #Deg_SMAD3
+  573 84 0 k_deg_smad #Deg_SMAD3
+  574 85 0 k_deg_smad #Deg_SMAD3
+  575 86 0 k_deg_smad #Deg_SMAD3
+  576 87 0 k_deg_smad #Deg_SMAD3
+  577 88 0 k_deg_smad #Deg_SMAD3
+  578 89 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  579 90 0 k_deg_smad #Deg_SMAD3
+  580 91 0 k_deg_smad #Deg_SMAD3
+  581 92 0 k_deg_smad #Deg_SMAD3
+  582 93 0 k_deg_smad #Deg_SMAD3
+  583 94 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  584 73 0 k_deg_stat3 #Deg_STAT3
+  585 74 0 k_deg_stat3 #Deg_STAT3
+  586 75 0 k_deg_stat3 #Deg_STAT3
+  587 76 0 k_deg_stat3 #Deg_STAT3
+  588 77 0 k_deg_stat3 #Deg_STAT3
+  589 78 0 k_deg_stat3 #Deg_STAT3
+  590 79 0 k_deg_stat3 #Deg_STAT3
+  591 80 0 k_deg_stat3 #Deg_STAT3
+  592 81 0 k_deg_stat3 #Deg_STAT3
+  593 82 0 k_deg_stat3 #Deg_STAT3
+  594 83 0 k_deg_stat3 #Deg_STAT3
+  595 84 0 k_deg_stat3 #Deg_STAT3
+  596 85 0 k_deg_stat3 #Deg_STAT3
+  597 86 0 k_deg_stat3 #Deg_STAT3
+  598 87 0 k_deg_stat3 #Deg_STAT3
+  599 88 0 k_deg_stat3 #Deg_STAT3
+  600 89 0 k_deg_stat3 #Deg_STAT3
+  601 90 0 k_deg_stat3 #Deg_STAT3
+  602 91 0 k_deg_stat3 #Deg_STAT3
+  603 92 0 k_deg_stat3 #Deg_STAT3
+  604 93 0 k_deg_stat3 #Deg_STAT3
+  605 94 0 k_deg_stat3 #Deg_STAT3
+  606 33,95 33,80 k_phos_stat3 #Phos_STAT3
+  607 33,95 33,79 k_phos_stat3 #Phos_STAT3
+  608 33,96 33,82 k_phos_stat3 #Phos_STAT3
+  609 33,96 33,81 k_phos_stat3 #Phos_STAT3
+  610 33,97 33,84 k_phos_stat3 #Phos_STAT3
+  611 33,97 33,83 k_phos_stat3 #Phos_STAT3
+  612 33,98 33,86 k_phos_stat3 #Phos_STAT3
+  613 33,98 33,85 k_phos_stat3 #Phos_STAT3
+  614 33,99 33,87 2*k_phos_stat3 #Phos_STAT3
+  615 33,100 33,88 k_phos_stat3 #Phos_STAT3
+  616 33,101 33,89 k_phos_stat3 #Phos_STAT3
+  617 33,102 33,90 k_phos_stat3 #Phos_STAT3
+  618 33,103 33,91 k_phos_stat3 #Phos_STAT3
+  619 33,104 33,92 k_phos_stat3 #Phos_STAT3
+  620 33,105 33,92 k_phos_stat3 #Phos_STAT3
+  621 33,106 33,93 k_phos_stat3 #Phos_STAT3
+  622 33,107 33,93 k_phos_stat3 #Phos_STAT3
+  623 33,108 33,94 k_phos_stat3 #Phos_STAT3
+  624 35,95 35,80 k_phos_stat3 #Phos_STAT3
+  625 35,95 35,79 k_phos_stat3 #Phos_STAT3
+  626 35,96 35,82 k_phos_stat3 #Phos_STAT3
+  627 35,96 35,81 k_phos_stat3 #Phos_STAT3
+  628 35,97 35,84 k_phos_stat3 #Phos_STAT3
+  629 35,97 35,83 k_phos_stat3 #Phos_STAT3
+  630 35,98 35,86 k_phos_stat3 #Phos_STAT3
+  631 35,98 35,85 k_phos_stat3 #Phos_STAT3
+  632 35,99 35,87 2*k_phos_stat3 #Phos_STAT3
+  633 35,100 35,88 k_phos_stat3 #Phos_STAT3
+  634 35,101 35,89 k_phos_stat3 #Phos_STAT3
+  635 35,102 35,90 k_phos_stat3 #Phos_STAT3
+  636 35,103 35,91 k_phos_stat3 #Phos_STAT3
+  637 35,104 35,92 k_phos_stat3 #Phos_STAT3
+  638 35,105 35,92 k_phos_stat3 #Phos_STAT3
+  639 35,106 35,93 k_phos_stat3 #Phos_STAT3
+  640 35,107 35,93 k_phos_stat3 #Phos_STAT3
+  641 35,108 35,94 k_phos_stat3 #Phos_STAT3
+  642 36,95 36,80 k_phos_stat3 #Phos_STAT3
+  643 36,95 36,79 k_phos_stat3 #Phos_STAT3
+  644 36,96 36,82 k_phos_stat3 #Phos_STAT3
+  645 36,96 36,81 k_phos_stat3 #Phos_STAT3
+  646 36,97 36,84 k_phos_stat3 #Phos_STAT3
+  647 36,97 36,83 k_phos_stat3 #Phos_STAT3
+  648 36,98 36,86 k_phos_stat3 #Phos_STAT3
+  649 36,98 36,85 k_phos_stat3 #Phos_STAT3
+  650 36,99 36,87 2*k_phos_stat3 #Phos_STAT3
+  651 36,100 36,88 k_phos_stat3 #Phos_STAT3
+  652 36,101 36,89 k_phos_stat3 #Phos_STAT3
+  653 36,102 36,90 k_phos_stat3 #Phos_STAT3
+  654 36,103 36,91 k_phos_stat3 #Phos_STAT3
+  655 36,104 36,92 k_phos_stat3 #Phos_STAT3
+  656 36,105 36,92 k_phos_stat3 #Phos_STAT3
+  657 36,106 36,93 k_phos_stat3 #Phos_STAT3
+  658 36,107 36,93 k_phos_stat3 #Phos_STAT3
+  659 36,108 36,94 k_phos_stat3 #Phos_STAT3
+  660 37,95 37,80 k_phos_stat3 #Phos_STAT3
+  661 37,95 37,79 k_phos_stat3 #Phos_STAT3
+  662 37,96 37,82 k_phos_stat3 #Phos_STAT3
+  663 37,96 37,81 k_phos_stat3 #Phos_STAT3
+  664 37,97 37,84 k_phos_stat3 #Phos_STAT3
+  665 37,97 37,83 k_phos_stat3 #Phos_STAT3
+  666 37,98 37,86 k_phos_stat3 #Phos_STAT3
+  667 37,98 37,85 k_phos_stat3 #Phos_STAT3
+  668 37,99 37,87 2*k_phos_stat3 #Phos_STAT3
+  669 37,100 37,88 k_phos_stat3 #Phos_STAT3
+  670 37,101 37,89 k_phos_stat3 #Phos_STAT3
+  671 37,102 37,90 k_phos_stat3 #Phos_STAT3
+  672 37,103 37,91 k_phos_stat3 #Phos_STAT3
+  673 37,104 37,92 k_phos_stat3 #Phos_STAT3
+  674 37,105 37,92 k_phos_stat3 #Phos_STAT3
+  675 37,106 37,93 k_phos_stat3 #Phos_STAT3
+  676 37,107 37,93 k_phos_stat3 #Phos_STAT3
+  677 37,108 37,94 k_phos_stat3 #Phos_STAT3
+  678 41,95 41,80 k_phos_stat3 #Phos_STAT3
+  679 41,95 41,79 k_phos_stat3 #Phos_STAT3
+  680 41,96 41,82 k_phos_stat3 #Phos_STAT3
+  681 41,96 41,81 k_phos_stat3 #Phos_STAT3
+  682 41,97 41,84 k_phos_stat3 #Phos_STAT3
+  683 41,97 41,83 k_phos_stat3 #Phos_STAT3
+  684 41,98 41,86 k_phos_stat3 #Phos_STAT3
+  685 41,98 41,85 k_phos_stat3 #Phos_STAT3
+  686 41,99 41,87 2*k_phos_stat3 #Phos_STAT3
+  687 41,100 41,88 k_phos_stat3 #Phos_STAT3
+  688 41,101 41,89 k_phos_stat3 #Phos_STAT3
+  689 41,102 41,90 k_phos_stat3 #Phos_STAT3
+  690 41,103 41,91 k_phos_stat3 #Phos_STAT3
+  691 41,104 41,92 k_phos_stat3 #Phos_STAT3
+  692 41,105 41,92 k_phos_stat3 #Phos_STAT3
+  693 41,106 41,93 k_phos_stat3 #Phos_STAT3
+  694 41,107 41,93 k_phos_stat3 #Phos_STAT3
+  695 41,108 41,94 k_phos_stat3 #Phos_STAT3
+  696 104 113 k_dephos_stat3 #Dephos_STAT3
+  697 105 113 k_dephos_stat3 #Dephos_STAT3
+  698 106 114 k_dephos_stat3 #Dephos_STAT3
+  699 107 114 k_dephos_stat3 #Dephos_STAT3
+  700 109 115 2*k_dephos_stat3 #Dephos_STAT3
+  701 110 116 k_dephos_stat3 #Dephos_STAT3
+  702 111 117 k_dephos_stat3 #Dephos_STAT3
+  703 112 118 k_dephos_stat3 #Dephos_STAT3
+  704 38,110 92 kf_stat3_dimer #Dimerize_STAT3
+  705 109 88,88 kr_stat3_dimer #_reverse_Dimerize_STAT3
+  706 22,95 22,73 k_phos_smad3 #Phos_SMAD3
+  707 22,96 22,74 k_phos_smad3 #Phos_SMAD3
+  708 22,97 22,75 k_phos_smad3 #Phos_SMAD3
+  709 22,100 22,76 k_phos_smad3 #Phos_SMAD3
+  710 22,101 22,77 k_phos_smad3 #Phos_SMAD3
+  711 22,102 22,78 k_phos_smad3 #Phos_SMAD3
+  712 22,104 22,85 k_phos_smad3 #Phos_SMAD3
+  713 22,105 22,86 k_phos_smad3 #Phos_SMAD3
+  714 22,106 22,87 k_phos_smad3 #Phos_SMAD3
+  715 22,107 22,87 k_phos_smad3 #Phos_SMAD3
+  716 22,109 22,93 2*k_phos_smad3 #Phos_SMAD3
+  717 22,110 22,91 k_phos_smad3 #Phos_SMAD3
+  718 22,111 22,94 k_phos_smad3 #Phos_SMAD3
+  719 26,95 26,73 k_phos_smad3 #Phos_SMAD3
+  720 26,96 26,74 k_phos_smad3 #Phos_SMAD3
+  721 26,97 26,75 k_phos_smad3 #Phos_SMAD3
+  722 26,100 26,76 k_phos_smad3 #Phos_SMAD3
+  723 26,101 26,77 k_phos_smad3 #Phos_SMAD3
+  724 26,102 26,78 k_phos_smad3 #Phos_SMAD3
+  725 26,104 26,85 k_phos_smad3 #Phos_SMAD3
+  726 26,105 26,86 k_phos_smad3 #Phos_SMAD3
+  727 26,106 26,87 k_phos_smad3 #Phos_SMAD3
+  728 26,107 26,87 k_phos_smad3 #Phos_SMAD3
+  729 26,109 26,93 2*k_phos_smad3 #Phos_SMAD3
+  730 26,110 26,91 k_phos_smad3 #Phos_SMAD3
+  731 26,111 26,94 k_phos_smad3 #Phos_SMAD3
+  732 98 113 k_dephos_smad3 #Dephos_SMAD3
+  733 99 114 2*k_dephos_smad3 #Dephos_SMAD3
+  734 103 116 k_dephos_smad3 #Dephos_SMAD3
+  735 106 115 k_dephos_smad3 #Dephos_SMAD3
+  736 107 115 k_dephos_smad3 #Dephos_SMAD3
+  737 108 117 k_dephos_smad3 #Dephos_SMAD3
+  738 112 119 k_dephos_smad3 #Dephos_SMAD3
+  739 8,103 118 kf_s3s4 #Bind_SMAD3_SMAD4
+  740 108 8,78 kr_s3s4 #_reverse_Bind_SMAD3_SMAD4
+  741 112 8,91 kr_s3s4 #_reverse_Bind_SMAD3_SMAD4
+  742 9,101 117 kf_pka_s3s4 #Bind_PKA_SMAD3_SMAD4
+  743 108 9,77 kr_pka_s3s4 #_reverse_Bind_PKA_SMAD3_SMAD4
+  744 111 9,89 kr_pka_s3s4 #_reverse_Bind_PKA_SMAD3_SMAD4
+  745 97 113 k_act_pka #Act_PKA
+  746 102 116 k_act_pka #Act_PKA
+  747 108 118 k_act_pka #Act_PKA
+  748 111 119 k_act_pka #Act_PKA
+  749 98 75 k_inact_pka #Deact_PKA
+  750 103 78 k_inact_pka #Deact_PKA
+  751 104 83 k_inact_pka #Deact_PKA
+  752 105 84 k_inact_pka #Deact_PKA
+  753 110 90 k_inact_pka #Deact_PKA
+  754 112 94 k_inact_pka #Deact_PKA
+  755 10,98 53,98 k_act_csk #Act_CSK
+  756 10,103 53,103 k_act_csk #Act_CSK
+  757 10,104 53,104 k_act_csk #Act_CSK
+  758 10,105 53,105 k_act_csk #Act_CSK
+  759 10,110 53,110 k_act_csk #Act_CSK
+  760 10,112 53,112 k_act_csk #Act_CSK
+  761 97 0 k_deg_kin_adapt #Deg_PKA
+  762 98 0 k_deg_kin_adapt #Deg_PKA
+  763 102 0 k_deg_kin_adapt #Deg_PKA
+  764 103 0 k_deg_kin_adapt #Deg_PKA
+  765 104 0 k_deg_kin_adapt #Deg_PKA
+  766 105 0 k_deg_kin_adapt #Deg_PKA
+  767 108 0 k_deg_kin_adapt #Deg_PKA
+  768 110 0 k_deg_kin_adapt #Deg_PKA
+  769 111 0 k_deg_kin_adapt #Deg_PKA
+  770 112 0 k_deg_kin_adapt #Deg_PKA
+  771 95 0 k_deg_smad #Deg_SMAD3
+  772 96 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  773 97 0 k_deg_smad #Deg_SMAD3
+  774 98 0 k_deg_smad #Deg_SMAD3
+  775 99 0 k_deg_smad #Deg_SMAD3
+  776 100 0 k_deg_smad #Deg_SMAD3
+  777 101 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  778 102 0 k_deg_smad #Deg_SMAD3
+  779 103 0 k_deg_smad #Deg_SMAD3
+  780 104 0 k_deg_smad #Deg_SMAD3
+  781 105 0 k_deg_smad #Deg_SMAD3
+  782 106 0 k_deg_smad #Deg_SMAD3
+  783 107 0 k_deg_smad #Deg_SMAD3
+  784 108 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  785 109 0 k_deg_smad #Deg_SMAD3
+  786 110 0 k_deg_smad #Deg_SMAD3
+  787 111 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  788 112 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  789 95 0 k_deg_stat3 #Deg_STAT3
+  790 96 0 k_deg_stat3 #Deg_STAT3
+  791 97 0 k_deg_stat3 #Deg_STAT3
+  792 98 0 k_deg_stat3 #Deg_STAT3
+  793 99 0 k_deg_stat3 #Deg_STAT3
+  794 100 0 k_deg_stat3 #Deg_STAT3
+  795 101 0 k_deg_stat3 #Deg_STAT3
+  796 102 0 k_deg_stat3 #Deg_STAT3
+  797 103 0 k_deg_stat3 #Deg_STAT3
+  798 104 0 k_deg_stat3 #Deg_STAT3
+  799 105 0 k_deg_stat3 #Deg_STAT3
+  800 106 0 k_deg_stat3 #Deg_STAT3
+  801 107 0 k_deg_stat3 #Deg_STAT3
+  802 108 0 k_deg_stat3 #Deg_STAT3
+  803 109 0 k_deg_stat3 #Deg_STAT3
+  804 110 0 k_deg_stat3 #Deg_STAT3
+  805 111 0 k_deg_stat3 #Deg_STAT3
+  806 112 0 k_deg_stat3 #Deg_STAT3
+  807 33,113 33,105 k_phos_stat3 #Phos_STAT3
+  808 33,113 33,104 k_phos_stat3 #Phos_STAT3
+  809 33,114 33,106 k_phos_stat3 #Phos_STAT3
+  810 33,114 33,107 k_phos_stat3 #Phos_STAT3
+  811 33,115 33,109 k_phos_stat3 #Phos_STAT3
+  812 33,116 33,110 k_phos_stat3 #Phos_STAT3
+  813 33,117 33,111 k_phos_stat3 #Phos_STAT3
+  814 33,118 33,112 k_phos_stat3 #Phos_STAT3
+  815 35,113 35,105 k_phos_stat3 #Phos_STAT3
+  816 35,113 35,104 k_phos_stat3 #Phos_STAT3
+  817 35,114 35,106 k_phos_stat3 #Phos_STAT3
+  818 35,114 35,107 k_phos_stat3 #Phos_STAT3
+  819 35,115 35,109 k_phos_stat3 #Phos_STAT3
+  820 35,116 35,110 k_phos_stat3 #Phos_STAT3
+  821 35,117 35,111 k_phos_stat3 #Phos_STAT3
+  822 35,118 35,112 k_phos_stat3 #Phos_STAT3
+  823 36,113 36,105 k_phos_stat3 #Phos_STAT3
+  824 36,113 36,104 k_phos_stat3 #Phos_STAT3
+  825 36,114 36,106 k_phos_stat3 #Phos_STAT3
+  826 36,114 36,107 k_phos_stat3 #Phos_STAT3
+  827 36,115 36,109 k_phos_stat3 #Phos_STAT3
+  828 36,116 36,110 k_phos_stat3 #Phos_STAT3
+  829 36,117 36,111 k_phos_stat3 #Phos_STAT3
+  830 36,118 36,112 k_phos_stat3 #Phos_STAT3
+  831 37,113 37,105 k_phos_stat3 #Phos_STAT3
+  832 37,113 37,104 k_phos_stat3 #Phos_STAT3
+  833 37,114 37,106 k_phos_stat3 #Phos_STAT3
+  834 37,114 37,107 k_phos_stat3 #Phos_STAT3
+  835 37,115 37,109 k_phos_stat3 #Phos_STAT3
+  836 37,116 37,110 k_phos_stat3 #Phos_STAT3
+  837 37,117 37,111 k_phos_stat3 #Phos_STAT3
+  838 37,118 37,112 k_phos_stat3 #Phos_STAT3
+  839 41,113 41,105 k_phos_stat3 #Phos_STAT3
+  840 41,113 41,104 k_phos_stat3 #Phos_STAT3
+  841 41,114 41,106 k_phos_stat3 #Phos_STAT3
+  842 41,114 41,107 k_phos_stat3 #Phos_STAT3
+  843 41,115 41,109 k_phos_stat3 #Phos_STAT3
+  844 41,116 41,110 k_phos_stat3 #Phos_STAT3
+  845 41,117 41,111 k_phos_stat3 #Phos_STAT3
+  846 41,118 41,112 k_phos_stat3 #Phos_STAT3
+  847 115 120 k_dephos_stat3 #Dephos_STAT3
+  848 119 121 k_dephos_stat3 #Dephos_STAT3
+  849 22,113 22,98 k_phos_smad3 #Phos_SMAD3
+  850 22,114 22,99 k_phos_smad3 #Phos_SMAD3
+  851 22,115 22,107 k_phos_smad3 #Phos_SMAD3
+  852 22,115 22,106 k_phos_smad3 #Phos_SMAD3
+  853 22,116 22,103 k_phos_smad3 #Phos_SMAD3
+  854 22,117 22,108 k_phos_smad3 #Phos_SMAD3
+  855 22,119 22,112 k_phos_smad3 #Phos_SMAD3
+  856 26,113 26,98 k_phos_smad3 #Phos_SMAD3
+  857 26,114 26,99 k_phos_smad3 #Phos_SMAD3
+  858 26,115 26,107 k_phos_smad3 #Phos_SMAD3
+  859 26,115 26,106 k_phos_smad3 #Phos_SMAD3
+  860 26,116 26,103 k_phos_smad3 #Phos_SMAD3
+  861 26,117 26,108 k_phos_smad3 #Phos_SMAD3
+  862 26,119 26,112 k_phos_smad3 #Phos_SMAD3
+  863 114 120 k_dephos_smad3 #Dephos_SMAD3
+  864 118 121 k_dephos_smad3 #Dephos_SMAD3
+  865 118 8,103 kr_s3s4 #_reverse_Bind_SMAD3_SMAD4
+  866 117 9,101 kr_pka_s3s4 #_reverse_Bind_PKA_SMAD3_SMAD4
+  867 117 121 k_act_pka #Act_PKA
+  868 113 97 k_inact_pka #Deact_PKA
+  869 116 102 k_inact_pka #Deact_PKA
+  870 118 108 k_inact_pka #Deact_PKA
+  871 119 111 k_inact_pka #Deact_PKA
+  872 10,113 53,113 k_act_csk #Act_CSK
+  873 10,116 53,116 k_act_csk #Act_CSK
+  874 10,118 53,118 k_act_csk #Act_CSK
+  875 10,119 53,119 k_act_csk #Act_CSK
+  876 113 0 k_deg_kin_adapt #Deg_PKA
+  877 116 0 k_deg_kin_adapt #Deg_PKA
+  878 117 0 k_deg_kin_adapt #Deg_PKA
+  879 118 0 k_deg_kin_adapt #Deg_PKA
+  880 119 0 k_deg_kin_adapt #Deg_PKA
+  881 113 0 k_deg_smad #Deg_SMAD3
+  882 114 0 k_deg_smad #Deg_SMAD3
+  883 115 0 k_deg_smad #Deg_SMAD3
+  884 116 0 k_deg_smad #Deg_SMAD3
+  885 117 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  886 118 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  887 119 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  888 113 0 k_deg_stat3 #Deg_STAT3
+  889 114 0 k_deg_stat3 #Deg_STAT3
+  890 115 0 k_deg_stat3 #Deg_STAT3
+  891 116 0 k_deg_stat3 #Deg_STAT3
+  892 117 0 k_deg_stat3 #Deg_STAT3
+  893 118 0 k_deg_stat3 #Deg_STAT3
+  894 119 0 k_deg_stat3 #Deg_STAT3
+  895 33,120 33,115 2*k_phos_stat3 #Phos_STAT3
+  896 33,121 33,119 k_phos_stat3 #Phos_STAT3
+  897 35,120 35,115 2*k_phos_stat3 #Phos_STAT3
+  898 35,121 35,119 k_phos_stat3 #Phos_STAT3
+  899 36,120 36,115 2*k_phos_stat3 #Phos_STAT3
+  900 36,121 36,119 k_phos_stat3 #Phos_STAT3
+  901 37,120 37,115 2*k_phos_stat3 #Phos_STAT3
+  902 37,121 37,119 k_phos_stat3 #Phos_STAT3
+  903 41,120 41,115 2*k_phos_stat3 #Phos_STAT3
+  904 41,121 41,119 k_phos_stat3 #Phos_STAT3
+  905 22,120 22,114 2*k_phos_smad3 #Phos_SMAD3
+  906 22,121 22,118 k_phos_smad3 #Phos_SMAD3
+  907 26,120 26,114 2*k_phos_smad3 #Phos_SMAD3
+  908 26,121 26,118 k_phos_smad3 #Phos_SMAD3
+  909 121 117 k_inact_pka #Deact_PKA
+  910 10,121 53,121 k_act_csk #Act_CSK
+  911 121 0 k_deg_kin_adapt #Deg_PKA
+  912 120 0 k_deg_smad #Deg_SMAD3
+  913 121 0 2*k_deg_smad #Deg_SMAD3,Deg_SMAD4
+  914 120 0 k_deg_stat3 #Deg_STAT3
+  915 121 0 k_deg_stat3 #Deg_STAT3
+end reactions
+begin groups
+    1 TGFbR_Active         22,26
+    2 IL6R_Active          23,27,28,32,33,35
+    3 JAK2_Active          33,35,36,37,41
+    4 SMAD3_P              29,34,40,44,45,49,50,51,52,55,56,57,58,59,60,61,62,63,68,2*69,73,74,75,76,77,78,85,86,2*87,91,93,94,98,2*99,103,106,107,108,112,114,118
+    5 STAT3_P_monomer      38,2*42,46,2*50,2*51,2*52,55,56,57,58,59,60,61,62,63,2*65,2*66,2*67,2*68,2*69,79,80,81,82,83,84,85,86,87,88,89,90,91,2*92,2*93,94,104,105,106,107,2*109,110,111,112,115,119
+    6 STAT3_Dimer          2*42,2*46,2*50,2*51,2*52,2*54,2*55,2*56,2*57,2*58,2*59,2*60,2*65,2*66,2*67,2*68,2*69,2*73,2*74,2*75,2*79,2*80,2*81,2*82,2*83,2*84,2*85,2*86,2*87,2*92,2*93,2*95,2*96,2*97,2*98,2*99,2*104,2*105,2*106,2*107,2*109,2*113,2*114,2*115,2*120
+    7 SMAD3_SMAD4_Complex  34,39,40,43,45,48,51,57,58,62,66,74,77,81,82,89,94,96,101,108,111,112,117,118,119,121
+    8 STAT3dimer_SMAD3_Complex 50,51,52,55,56,57,58,59,60,65,66,67,68,2*69,73,74,75,79,80,81,82,83,84,85,86,2*87,92,2*93,95,96,97,98,2*99,104,105,2*106,2*107,2*109,113,2*114,2*115,2*120
+    9 PKA_Active           45,48,49,64,68,85,86,91,92,98,103,104,105,110,112,113,116,118,119,121
+   10 CSK_Active           53
+   11 P85_P                70,71,72
+   12 PI3K_Active_Complex  19,24
+   13 PIP3_conc            14,20,25
+   14 AKT_pS473            25,31
+end groups

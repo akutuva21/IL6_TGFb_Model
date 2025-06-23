@@ -1,0 +1,8 @@
+BioNetGen version 2.9.3
+Reading from file c:\IL6_TGFB\model_small\2025_06_17__23_13_07\model_small.bngl (level 0)
+Read 56 parameters.
+Read 17 molecule types.
+Read 16 species.
+Read 16 observable(s).
+ERROR: Undefined parameter 'k_pten' is referenced in Ratelaw.
+at line 210

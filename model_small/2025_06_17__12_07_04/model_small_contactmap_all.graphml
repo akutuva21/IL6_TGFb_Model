@@ -1,0 +1,906 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:java="http://www.yworks.com/xml/yfiles-common/1.0/java" xmlns:sys="http://www.yworks.com/xml/yfiles-common/markup/primitives/2.0" xmlns:x="http://www.yworks.com/xml/yfiles-common/markup/2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:y="http://www.yworks.com/xml/graphml" xmlns:yed="http://www.yworks.com/xml/yed/3" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://www.yworks.com/xml/schema/graphml/1.1/ygraphml.xsd">
+<key id="d0" for="node" yfiles.type="nodegraphics"/>
+<key id="d1" for="edge" yfiles.type="edgegraphics"/>
+  <graph edgedefault="directed" id="G">
+    <node id="n0" yfiles.foldertype="group">
+      <data key="d0">
+        <y:ProxyAutoBoundsNode>
+          <y:Realizers active="0">
+            <y:GroupNode>
+              <y:Fill color="#D2D2D2"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">AKT</y:NodeLabel>
+            </y:GroupNode>
+          </y:Realizers>
+        </y:ProxyAutoBoundsNode>
+      </data>
+      <graph id="n0:" edgedefault="directed">
+        <node id="n0::n0" yfiles.foldertype="group">
+          <data key="d0">
+            <y:ProxyAutoBoundsNode>
+              <y:Realizers active="0">
+                <y:GroupNode>
+                  <y:Fill color="#FFFFFF"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">pS473</y:NodeLabel>
+                </y:GroupNode>
+              </y:Realizers>
+            </y:ProxyAutoBoundsNode>
+          </data>
+          <graph id="n0::n0:" edgedefault="directed">
+            <node id="n0::n0::n0">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">U</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+            <node id="n0::n0::n1">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">P</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+          </graph>
+        </node>
+        <node id="n0::n1">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">pip3_bs</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+      </graph>
+    </node>
+    <node id="n1" yfiles.foldertype="group">
+      <data key="d0">
+        <y:ProxyAutoBoundsNode>
+          <y:Realizers active="0">
+            <y:GroupNode>
+              <y:Fill color="#D2D2D2"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">CSK</y:NodeLabel>
+            </y:GroupNode>
+          </y:Realizers>
+        </y:ProxyAutoBoundsNode>
+      </data>
+      <graph id="n1:" edgedefault="directed">
+        <node id="n1::n0" yfiles.foldertype="group">
+          <data key="d0">
+            <y:ProxyAutoBoundsNode>
+              <y:Realizers active="0">
+                <y:GroupNode>
+                  <y:Fill color="#FFFFFF"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">act</y:NodeLabel>
+                </y:GroupNode>
+              </y:Realizers>
+            </y:ProxyAutoBoundsNode>
+          </data>
+          <graph id="n1::n0:" edgedefault="directed">
+            <node id="n1::n0::n0">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">I</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+            <node id="n1::n0::n1">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">A</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+          </graph>
+        </node>
+      </graph>
+    </node>
+    <node id="n2" yfiles.foldertype="group">
+      <data key="d0">
+        <y:ProxyAutoBoundsNode>
+          <y:Realizers active="0">
+            <y:GroupNode>
+              <y:Fill color="#D2D2D2"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">IL6</y:NodeLabel>
+            </y:GroupNode>
+          </y:Realizers>
+        </y:ProxyAutoBoundsNode>
+      </data>
+      <graph id="n2:" edgedefault="directed">
+        <node id="n2::n0">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">r</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+      </graph>
+    </node>
+    <node id="n3" yfiles.foldertype="group">
+      <data key="d0">
+        <y:ProxyAutoBoundsNode>
+          <y:Realizers active="0">
+            <y:GroupNode>
+              <y:Fill color="#D2D2D2"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">IL6R</y:NodeLabel>
+            </y:GroupNode>
+          </y:Realizers>
+        </y:ProxyAutoBoundsNode>
+      </data>
+      <graph id="n3:" edgedefault="directed">
+        <node id="n3::n0" yfiles.foldertype="group">
+          <data key="d0">
+            <y:ProxyAutoBoundsNode>
+              <y:Realizers active="0">
+                <y:GroupNode>
+                  <y:Fill color="#FFFFFF"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">act</y:NodeLabel>
+                </y:GroupNode>
+              </y:Realizers>
+            </y:ProxyAutoBoundsNode>
+          </data>
+          <graph id="n3::n0:" edgedefault="directed">
+            <node id="n3::n0::n0">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">I</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+            <node id="n3::n0::n1">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">A</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+          </graph>
+        </node>
+        <node id="n3::n1">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">jak2</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+        <node id="n3::n2">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">l</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+      </graph>
+    </node>
+    <node id="n4" yfiles.foldertype="group">
+      <data key="d0">
+        <y:ProxyAutoBoundsNode>
+          <y:Realizers active="0">
+            <y:GroupNode>
+              <y:Fill color="#D2D2D2"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">JAK2</y:NodeLabel>
+            </y:GroupNode>
+          </y:Realizers>
+        </y:ProxyAutoBoundsNode>
+      </data>
+      <graph id="n4:" edgedefault="directed">
+        <node id="n4::n0" yfiles.foldertype="group">
+          <data key="d0">
+            <y:ProxyAutoBoundsNode>
+              <y:Realizers active="0">
+                <y:GroupNode>
+                  <y:Fill color="#FFFFFF"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">act</y:NodeLabel>
+                </y:GroupNode>
+              </y:Realizers>
+            </y:ProxyAutoBoundsNode>
+          </data>
+          <graph id="n4::n0:" edgedefault="directed">
+            <node id="n4::n0::n0">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">I</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+            <node id="n4::n0::n1">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">A</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+          </graph>
+        </node>
+        <node id="n4::n1">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">il6r_site</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+        <node id="n4::n2">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">socs_bs</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+      </graph>
+    </node>
+    <node id="n5">
+      <data key="d0">
+        <y:ShapeNode>
+          <y:Fill color="#D2D2D2"/>
+          <y:BorderStyle color="#000000" type="" width="1"/>
+          <y:Shape type="roundrectangle"/>
+          <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">P11</y:NodeLabel>
+        </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n6" yfiles.foldertype="group">
+      <data key="d0">
+        <y:ProxyAutoBoundsNode>
+          <y:Realizers active="0">
+            <y:GroupNode>
+              <y:Fill color="#D2D2D2"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">P110</y:NodeLabel>
+            </y:GroupNode>
+          </y:Realizers>
+        </y:ProxyAutoBoundsNode>
+      </data>
+      <graph id="n6:" edgedefault="directed">
+        <node id="n6::n0">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">p85_bs</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+        <node id="n6::n1">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">pip2_bs</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+      </graph>
+    </node>
+    <node id="n7" yfiles.foldertype="group">
+      <data key="d0">
+        <y:ProxyAutoBoundsNode>
+          <y:Realizers active="0">
+            <y:GroupNode>
+              <y:Fill color="#D2D2D2"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">P85</y:NodeLabel>
+            </y:GroupNode>
+          </y:Realizers>
+        </y:ProxyAutoBoundsNode>
+      </data>
+      <graph id="n7:" edgedefault="directed">
+        <node id="n7::n0">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">p110_bs</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+        <node id="n7::n1" yfiles.foldertype="group">
+          <data key="d0">
+            <y:ProxyAutoBoundsNode>
+              <y:Realizers active="0">
+                <y:GroupNode>
+                  <y:Fill color="#FFFFFF"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">phos</y:NodeLabel>
+                </y:GroupNode>
+              </y:Realizers>
+            </y:ProxyAutoBoundsNode>
+          </data>
+          <graph id="n7::n1:" edgedefault="directed">
+            <node id="n7::n1::n0">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">U</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+            <node id="n7::n1::n1">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">P</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+          </graph>
+        </node>
+      </graph>
+    </node>
+    <node id="n8" yfiles.foldertype="group">
+      <data key="d0">
+        <y:ProxyAutoBoundsNode>
+          <y:Realizers active="0">
+            <y:GroupNode>
+              <y:Fill color="#D2D2D2"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">PIP2</y:NodeLabel>
+            </y:GroupNode>
+          </y:Realizers>
+        </y:ProxyAutoBoundsNode>
+      </data>
+      <graph id="n8:" edgedefault="directed">
+        <node id="n8::n0">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">pi3k_bs</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+      </graph>
+    </node>
+    <node id="n9" yfiles.foldertype="group">
+      <data key="d0">
+        <y:ProxyAutoBoundsNode>
+          <y:Realizers active="0">
+            <y:GroupNode>
+              <y:Fill color="#D2D2D2"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">PIP3</y:NodeLabel>
+            </y:GroupNode>
+          </y:Realizers>
+        </y:ProxyAutoBoundsNode>
+      </data>
+      <graph id="n9:" edgedefault="directed">
+        <node id="n9::n0">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">akt_bs</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+      </graph>
+    </node>
+    <node id="n10" yfiles.foldertype="group">
+      <data key="d0">
+        <y:ProxyAutoBoundsNode>
+          <y:Realizers active="0">
+            <y:GroupNode>
+              <y:Fill color="#D2D2D2"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">PKA</y:NodeLabel>
+            </y:GroupNode>
+          </y:Realizers>
+        </y:ProxyAutoBoundsNode>
+      </data>
+      <graph id="n10:" edgedefault="directed">
+        <node id="n10::n0" yfiles.foldertype="group">
+          <data key="d0">
+            <y:ProxyAutoBoundsNode>
+              <y:Realizers active="0">
+                <y:GroupNode>
+                  <y:Fill color="#FFFFFF"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">act</y:NodeLabel>
+                </y:GroupNode>
+              </y:Realizers>
+            </y:ProxyAutoBoundsNode>
+          </data>
+          <graph id="n10::n0:" edgedefault="directed">
+            <node id="n10::n0::n0">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">I</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+            <node id="n10::n0::n1">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">A</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+          </graph>
+        </node>
+        <node id="n10::n1">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">smad3_4_bs</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+      </graph>
+    </node>
+    <node id="n11" yfiles.foldertype="group">
+      <data key="d0">
+        <y:ProxyAutoBoundsNode>
+          <y:Realizers active="0">
+            <y:GroupNode>
+              <y:Fill color="#D2D2D2"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">SMAD3</y:NodeLabel>
+            </y:GroupNode>
+          </y:Realizers>
+        </y:ProxyAutoBoundsNode>
+      </data>
+      <graph id="n11:" edgedefault="directed">
+        <node id="n11::n0" yfiles.foldertype="group">
+          <data key="d0">
+            <y:ProxyAutoBoundsNode>
+              <y:Realizers active="0">
+                <y:GroupNode>
+                  <y:Fill color="#FFFFFF"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">pS</y:NodeLabel>
+                </y:GroupNode>
+              </y:Realizers>
+            </y:ProxyAutoBoundsNode>
+          </data>
+          <graph id="n11::n0:" edgedefault="directed">
+            <node id="n11::n0::n0">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">U</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+            <node id="n11::n0::n1">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">P</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+          </graph>
+        </node>
+        <node id="n11::n1">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">pka_bs</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+        <node id="n11::n2">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">smad4_bs</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+        <node id="n11::n3">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">stat3_bs</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+      </graph>
+    </node>
+    <node id="n12" yfiles.foldertype="group">
+      <data key="d0">
+        <y:ProxyAutoBoundsNode>
+          <y:Realizers active="0">
+            <y:GroupNode>
+              <y:Fill color="#D2D2D2"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">SMAD4</y:NodeLabel>
+            </y:GroupNode>
+          </y:Realizers>
+        </y:ProxyAutoBoundsNode>
+      </data>
+      <graph id="n12:" edgedefault="directed">
+        <node id="n12::n0">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">smad3_bs</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+      </graph>
+    </node>
+    <node id="n13" yfiles.foldertype="group">
+      <data key="d0">
+        <y:ProxyAutoBoundsNode>
+          <y:Realizers active="0">
+            <y:GroupNode>
+              <y:Fill color="#D2D2D2"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">SOCS3</y:NodeLabel>
+            </y:GroupNode>
+          </y:Realizers>
+        </y:ProxyAutoBoundsNode>
+      </data>
+      <graph id="n13:" edgedefault="directed">
+        <node id="n13::n0">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">jak_bs</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+      </graph>
+    </node>
+    <node id="n14" yfiles.foldertype="group">
+      <data key="d0">
+        <y:ProxyAutoBoundsNode>
+          <y:Realizers active="0">
+            <y:GroupNode>
+              <y:Fill color="#D2D2D2"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">STAT3</y:NodeLabel>
+            </y:GroupNode>
+          </y:Realizers>
+        </y:ProxyAutoBoundsNode>
+      </data>
+      <graph id="n14:" edgedefault="directed">
+        <node id="n14::n0">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">dimer_site</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+        <node id="n14::n1" yfiles.foldertype="group">
+          <data key="d0">
+            <y:ProxyAutoBoundsNode>
+              <y:Realizers active="0">
+                <y:GroupNode>
+                  <y:Fill color="#FFFFFF"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">pY</y:NodeLabel>
+                </y:GroupNode>
+              </y:Realizers>
+            </y:ProxyAutoBoundsNode>
+          </data>
+          <graph id="n14::n1:" edgedefault="directed">
+            <node id="n14::n1::n0">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">U</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+            <node id="n14::n1::n1">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">P</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+          </graph>
+        </node>
+        <node id="n14::n2">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">smad3_bs</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+      </graph>
+    </node>
+    <node id="n15" yfiles.foldertype="group">
+      <data key="d0">
+        <y:ProxyAutoBoundsNode>
+          <y:Realizers active="0">
+            <y:GroupNode>
+              <y:Fill color="#D2D2D2"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">TGFb</y:NodeLabel>
+            </y:GroupNode>
+          </y:Realizers>
+        </y:ProxyAutoBoundsNode>
+      </data>
+      <graph id="n15:" edgedefault="directed">
+        <node id="n15::n0">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">r</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+      </graph>
+    </node>
+    <node id="n16" yfiles.foldertype="group">
+      <data key="d0">
+        <y:ProxyAutoBoundsNode>
+          <y:Realizers active="0">
+            <y:GroupNode>
+              <y:Fill color="#D2D2D2"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="bold" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">TGFbR</y:NodeLabel>
+            </y:GroupNode>
+          </y:Realizers>
+        </y:ProxyAutoBoundsNode>
+      </data>
+      <graph id="n16:" edgedefault="directed">
+        <node id="n16::n0" yfiles.foldertype="group">
+          <data key="d0">
+            <y:ProxyAutoBoundsNode>
+              <y:Realizers active="0">
+                <y:GroupNode>
+                  <y:Fill color="#FFFFFF"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="t" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">act</y:NodeLabel>
+                </y:GroupNode>
+              </y:Realizers>
+            </y:ProxyAutoBoundsNode>
+          </data>
+          <graph id="n16::n0:" edgedefault="directed">
+            <node id="n16::n0::n0">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">I</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+            <node id="n16::n0::n1">
+              <data key="d0">
+                <y:ShapeNode>
+                  <y:Fill color="#FFCC00"/>
+                  <y:BorderStyle color="#000000" type="" width="1"/>
+                  <y:Shape type="roundrectangle"/>
+                  <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">A</y:NodeLabel>
+                </y:ShapeNode>
+              </data>
+            </node>
+          </graph>
+        </node>
+        <node id="n16::n1">
+          <data key="d0">
+            <y:ShapeNode>
+              <y:Fill color="#FFFFFF"/>
+              <y:BorderStyle color="#000000" type="" width="1"/>
+              <y:Shape type="roundrectangle"/>
+              <y:NodeLabel alignment="c" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="" hasBackgroundColor="false" hasLineColor="false" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="t" textColor="#000000" verticalTextPosition="bottom" visible="true">l</y:NodeLabel>
+            </y:ShapeNode>
+          </data>
+        </node>
+      </graph>
+    </node>
+    <edge id="n15::n0::e0" source="n15::n0" target="n16::n1">
+    <data key="d1">
+      <y:PolyLineEdge>
+        <y:LineStyle color="#000000" type="line" width="1"/>
+        <y:Arrows source="none" target="none"/>
+        <y:BendStyle smoothed="false"/>
+      </y:PolyLineEdge>
+    </data>
+    </edge>
+    <edge id="n2::n0::e0" source="n2::n0" target="n3::n2">
+    <data key="d1">
+      <y:PolyLineEdge>
+        <y:LineStyle color="#000000" type="line" width="1"/>
+        <y:Arrows source="none" target="none"/>
+        <y:BendStyle smoothed="false"/>
+      </y:PolyLineEdge>
+    </data>
+    </edge>
+    <edge id="n3::n1::e0" source="n3::n1" target="n4::n1">
+    <data key="d1">
+      <y:PolyLineEdge>
+        <y:LineStyle color="#000000" type="line" width="1"/>
+        <y:Arrows source="none" target="none"/>
+        <y:BendStyle smoothed="false"/>
+      </y:PolyLineEdge>
+    </data>
+    </edge>
+    <edge id="n4::n2::e0" source="n4::n2" target="n13::n0">
+    <data key="d1">
+      <y:PolyLineEdge>
+        <y:LineStyle color="#000000" type="line" width="1"/>
+        <y:Arrows source="none" target="none"/>
+        <y:BendStyle smoothed="false"/>
+      </y:PolyLineEdge>
+    </data>
+    </edge>
+    <edge id="n14::n0::e0" source="n14::n0" target="n14::n0">
+    <data key="d1">
+      <y:PolyLineEdge>
+        <y:LineStyle color="#000000" type="line" width="1"/>
+        <y:Arrows source="none" target="none"/>
+        <y:BendStyle smoothed="false"/>
+      </y:PolyLineEdge>
+    </data>
+    </edge>
+    <edge id="n11::n2::e0" source="n11::n2" target="n12::n0">
+    <data key="d1">
+      <y:PolyLineEdge>
+        <y:LineStyle color="#000000" type="line" width="1"/>
+        <y:Arrows source="none" target="none"/>
+        <y:BendStyle smoothed="false"/>
+      </y:PolyLineEdge>
+    </data>
+    </edge>
+    <edge id="n11::n3::e0" source="n11::n3" target="n14::n2">
+    <data key="d1">
+      <y:PolyLineEdge>
+        <y:LineStyle color="#000000" type="line" width="1"/>
+        <y:Arrows source="none" target="none"/>
+        <y:BendStyle smoothed="false"/>
+      </y:PolyLineEdge>
+    </data>
+    </edge>
+    <edge id="n10::n1::e0" source="n10::n1" target="n11::n1">
+    <data key="d1">
+      <y:PolyLineEdge>
+        <y:LineStyle color="#000000" type="line" width="1"/>
+        <y:Arrows source="none" target="none"/>
+        <y:BendStyle smoothed="false"/>
+      </y:PolyLineEdge>
+    </data>
+    </edge>
+    <edge id="n6::n0::e0" source="n6::n0" target="n7::n0">
+    <data key="d1">
+      <y:PolyLineEdge>
+        <y:LineStyle color="#000000" type="line" width="1"/>
+        <y:Arrows source="none" target="none"/>
+        <y:BendStyle smoothed="false"/>
+      </y:PolyLineEdge>
+    </data>
+    </edge>
+    <edge id="n6::n1::e0" source="n6::n1" target="n8::n0">
+    <data key="d1">
+      <y:PolyLineEdge>
+        <y:LineStyle color="#000000" type="line" width="1"/>
+        <y:Arrows source="none" target="none"/>
+        <y:BendStyle smoothed="false"/>
+      </y:PolyLineEdge>
+    </data>
+    </edge>
+    <edge id="n9::n0::e0" source="n9::n0" target="n0::n1">
+    <data key="d1">
+      <y:PolyLineEdge>
+        <y:LineStyle color="#000000" type="line" width="1"/>
+        <y:Arrows source="none" target="none"/>
+        <y:BendStyle smoothed="false"/>
+      </y:PolyLineEdge>
+    </data>
+    </edge>
+  </graph>
+</graphml>

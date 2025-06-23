@@ -1,0 +1,629 @@
+BioNetGen version 2.9.3
+Reading from file c:\IL6_TGFB\model_small\2025_06_18__13_45_32\model_small.bngl (level 0)
+Read 66 parameters.
+Read 17 molecule types.
+Read 17 species.
+Read 16 observable(s).
+Read 60 reaction rule(s).
+ACTION: generate_network( model_small )
+Iteration   0:    17 species      0 rxns  0.00e+00 CPU s
+Iteration   1:    22 species     31 rxns  1.60e-02 CPU s
+WARNING: Duplicate of rxn 48 detected. Rules generating this rxn are Deg_P85_Total, Deg_P110.
+Iteration   2:    27 species     49 rxns  1.50e-02 CPU s
+WARNING: Duplicate of rxn 69 detected. Rules generating this rxn are Deg_P85_Total, Deg_P110.
+Iteration   3:    34 species     70 rxns  1.60e-02 CPU s
+Iteration   4:    37 species     94 rxns  1.60e-02 CPU s
+WARNING: Duplicate of rxn 112 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+Iteration   5:    44 species    112 rxns  0.00e+00 CPU s
+WARNING: Duplicate of rxn 156 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 157 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+Iteration   6:    53 species    158 rxns  3.10e-02 CPU s
+WARNING: Duplicate of rxn 222 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 224 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+Iteration   7:    67 species    225 rxns  3.10e-02 CPU s
+WARNING: Duplicate of rxn 336 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 339 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 340 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 342 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+Iteration   8:    98 species    348 rxns  7.80e-02 CPU s
+WARNING: Duplicate of rxn 665 detected. Rules generating this rxn are Deg_P85_Total, Deg_P110.
+WARNING: Duplicate of rxn 666 detected. Rules generating this rxn are Deg_P85_Total, Deg_P110.
+WARNING: Duplicate of rxn 669 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 670 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 671 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 672 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 675 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 676 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 678 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 679 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 681 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 684 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 685 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 687 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 690 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+Iteration   9:   141 species    718 rxns  2.66e-01 CPU s
+WARNING: Duplicate of rxn 1341 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1342 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1344 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1346 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1347 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1349 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1352 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1353 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1354 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1355 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1358 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1359 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1363 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1364 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1370 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1371 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1373 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1377 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 1378 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+Iteration  10:   178 species   1425 rxns  5.00e-01 CPU s
+WARNING: Duplicate of rxn 2060 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 2061 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 2063 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 2066 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 2070 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 2071 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 2073 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 2079 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 2080 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 2081 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 2082 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 2092 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+Iteration  11:   194 species   2132 rxns  5.31e-01 CPU s
+WARNING: Duplicate of rxn 2478 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 2479 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 2485 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+WARNING: Duplicate of rxn 2486 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+Iteration  12:   198 species   2507 rxns  2.66e-01 CPU s
+WARNING: Duplicate of rxn 2602 detected. Rules generating this rxn are Deg_SMAD3, Deg_SMAD4.
+Iteration  13:   198 species   2608 rxns  9.30e-02 CPU s
+Cumulative CPU time for each rule
+Rule   1:     4 reactions 1.60e-02 CPU s 4.00e-03 CPU s/rxn
+Rule   2:    20 reactions 3.10e-02 CPU s 1.55e-03 CPU s/rxn
+Rule   3:     1 reactions 1.50e-02 CPU s 1.50e-02 CPU s/rxn
+Rule   4:     2 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule   5:     5 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule   6:    10 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule   7:    32 reactions 4.60e-02 CPU s 1.44e-03 CPU s/rxn
+Rule   8:     4 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule   9:    10 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  10:   109 reactions 6.20e-02 CPU s 5.69e-04 CPU s/rxn
+Rule  11:    10 reactions 1.50e-02 CPU s 1.50e-03 CPU s/rxn
+Rule  12:    11 reactions 1.60e-02 CPU s 1.45e-03 CPU s/rxn
+Rule  13:  1190 reactions 8.30e-01 CPU s 6.97e-04 CPU s/rxn
+Rule  14:   119 reactions 1.23e-01 CPU s 1.03e-03 CPU s/rxn
+Rule  15:    56 reactions 1.09e-01 CPU s 1.95e-03 CPU s/rxn
+Rule  16:   196 reactions 1.25e-01 CPU s 6.38e-04 CPU s/rxn
+Rule  17:    98 reactions 6.20e-02 CPU s 6.33e-04 CPU s/rxn
+Rule  18:    58 reactions 6.40e-02 CPU s 1.10e-03 CPU s/rxn
+Rule  19:    40 reactions 7.80e-02 CPU s 1.95e-03 CPU s/rxn
+Rule  20:    28 reactions 1.60e-02 CPU s 5.71e-04 CPU s/rxn
+Rule  21:    44 reactions 3.20e-02 CPU s 7.27e-04 CPU s/rxn
+Rule  22:    44 reactions 3.00e-02 CPU s 6.82e-04 CPU s/rxn
+Rule  23:    44 reactions 1.60e-02 CPU s 3.64e-04 CPU s/rxn
+Rule  24:     1 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  25:     8 reactions 1.60e-02 CPU s 2.00e-03 CPU s/rxn
+Rule  26:     4 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  27:     1 reactions 3.20e-02 CPU s 3.20e-02 CPU s/rxn
+Rule  28:     3 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  29:     3 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  30:     4 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  31:     1 reactions 1.50e-02 CPU s 1.50e-02 CPU s/rxn
+Rule  32:     1 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  33:     3 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  34:     2 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  35:     1 reactions 1.60e-02 CPU s 1.60e-02 CPU s/rxn
+Rule  36:     3 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  37:     1 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  38:     1 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  39:     4 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  40:     1 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  41:    20 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  42:     1 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  43:    20 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  44:     1 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  45:    89 reactions 1.50e-02 CPU s 1.69e-04 CPU s/rxn
+Rule  46:     1 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  47:     2 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  48:     1 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  49:     6 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  50:     1 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  51:     2 reactions 1.60e-02 CPU s 8.00e-03 CPU s/rxn
+Rule  52:     1 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  53:     4 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  54:     1 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  55:   142 reactions 3.10e-02 CPU s 2.18e-04 CPU s/rxn
+Rule  56:     1 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  57:     1 reactions 1.60e-02 CPU s 1.60e-02 CPU s/rxn
+Rule  58:     1 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Rule  59:   135 reactions 1.60e-02 CPU s 1.19e-04 CPU s/rxn
+Rule  60:     1 reactions 0.00e+00 CPU s 0.00e+00 CPU s/rxn
+Total   :  2608 reactions 1.86e+00 CPU s 7.13e-04 CPU s/rxn
+Wrote network in net format to model_small.net.
+CPU TIME: generate_network 1.91 s.
+ACTION: simulate( method=>"cvode" )
+TEND:100
+Network simulation using cvode
+WARNING: writeFile(): Overwriting existing file model_small.net.
+Wrote network in net format to model_small.net.
+Running run_network on hawsexps15
+full command: C:\Users\Achyudhan\anaconda3\Lib\site-packages\bionetgen\bng-win\bin\run_network.exe -o model_small -p cvode -a 1e-08 -r 1e-08 --cdat 1 --fdat 0 -g model_small.net model_small.net 0.1 1000
+[simulation PID is: 58928]
+run_network 3.0
+Read 66 parameters from model_small.net
+Read 198 species from model_small.net
+Read 16 group(s) from model_small.net
+Read 0 function(s) from model_small.net
+Found species with index 0 at line 274: assuming this is the null species.
+Found species with index 0 at line 278: assuming this is the null species.
+Found species with index 0 at line 279: assuming this is the null species.
+Found species with index 0 at line 280: assuming this is the null species.
+Found species with index 0 at line 281: assuming this is the null species.
+Found species with index 0 at line 282: assuming this is the null species.
+Found species with index 0 at line 283: assuming this is the null species.
+Found species with index 0 at line 284: assuming this is the null species.
+Found species with index 0 at line 285: assuming this is the null species.
+Found species with index 0 at line 286: assuming this is the null species.
+Found species with index 0 at line 287: assuming this is the null species.
+Found species with index 0 at line 288: assuming this is the null species.
+Found species with index 0 at line 289: assuming this is the null species.
+Found species with index 0 at line 290: assuming this is the null species.
+Found species with index 0 at line 291: assuming this is the null species.
+Found species with index 0 at line 292: assuming this is the null species.
+Found species with index 0 at line 293: assuming this is the null species.
+Found species with index 0 at line 294: assuming this is the null species.
+Found species with index 0 at line 295: assuming this is the null species.
+Found species with index 0 at line 296: assuming this is the null species.
+Found species with index 0 at line 297: assuming this is the null species.
+Found species with index 0 at line 298: assuming this is the null species.
+Found species with index 0 at line 299: assuming this is the null species.
+Found species with index 0 at line 300: assuming this is the null species.
+Found species with index 0 at line 301: assuming this is the null species.
+Found species with index 0 at line 314: assuming this is the null species.
+Found species with index 0 at line 315: assuming this is the null species.
+Found species with index 0 at line 316: assuming this is the null species.
+Found species with index 0 at line 317: assuming this is the null species.
+Found species with index 0 at line 318: assuming this is the null species.
+Found species with index 0 at line 319: assuming this is the null species.
+Found species with index 0 at line 335: assuming this is the null species.
+Found species with index 0 at line 336: assuming this is the null species.
+Found species with index 0 at line 337: assuming this is the null species.
+Found species with index 0 at line 338: assuming this is the null species.
+Found species with index 0 at line 339: assuming this is the null species.
+Found species with index 0 at line 340: assuming this is the null species.
+Found species with index 0 at line 358: assuming this is the null species.
+Found species with index 0 at line 359: assuming this is the null species.
+Found species with index 0 at line 360: assuming this is the null species.
+Found species with index 0 at line 361: assuming this is the null species.
+Found species with index 0 at line 362: assuming this is the null species.
+Found species with index 0 at line 363: assuming this is the null species.
+Found species with index 0 at line 364: assuming this is the null species.
+Found species with index 0 at line 378: assuming this is the null species.
+Found species with index 0 at line 379: assuming this is the null species.
+Found species with index 0 at line 380: assuming this is the null species.
+Found species with index 0 at line 381: assuming this is the null species.
+Found species with index 0 at line 382: assuming this is the null species.
+Found species with index 0 at line 404: assuming this is the null species.
+Found species with index 0 at line 418: assuming this is the null species.
+Found species with index 0 at line 419: assuming this is the null species.
+Found species with index 0 at line 420: assuming this is the null species.
+Found species with index 0 at line 421: assuming this is the null species.
+Found species with index 0 at line 422: assuming this is the null species.
+Found species with index 0 at line 423: assuming this is the null species.
+Found species with index 0 at line 424: assuming this is the null species.
+Found species with index 0 at line 425: assuming this is the null species.
+Found species with index 0 at line 426: assuming this is the null species.
+Found species with index 0 at line 427: assuming this is the null species.
+Found species with index 0 at line 428: assuming this is the null species.
+Found species with index 0 at line 454: assuming this is the null species.
+Found species with index 0 at line 455: assuming this is the null species.
+Found species with index 0 at line 456: assuming this is the null species.
+Found species with index 0 at line 457: assuming this is the null species.
+Found species with index 0 at line 480: assuming this is the null species.
+Found species with index 0 at line 481: assuming this is the null species.
+Found species with index 0 at line 482: assuming this is the null species.
+Found species with index 0 at line 483: assuming this is the null species.
+Found species with index 0 at line 484: assuming this is the null species.
+Found species with index 0 at line 485: assuming this is the null species.
+Found species with index 0 at line 486: assuming this is the null species.
+Found species with index 0 at line 487: assuming this is the null species.
+Found species with index 0 at line 488: assuming this is the null species.
+Found species with index 0 at line 489: assuming this is the null species.
+Found species with index 0 at line 490: assuming this is the null species.
+Found species with index 0 at line 491: assuming this is the null species.
+Found species with index 0 at line 492: assuming this is the null species.
+Found species with index 0 at line 493: assuming this is the null species.
+Found species with index 0 at line 494: assuming this is the null species.
+Found species with index 0 at line 495: assuming this is the null species.
+Found species with index 0 at line 517: assuming this is the null species.
+Found species with index 0 at line 518: assuming this is the null species.
+Found species with index 0 at line 519: assuming this is the null species.
+Found species with index 0 at line 520: assuming this is the null species.
+Found species with index 0 at line 591: assuming this is the null species.
+Found species with index 0 at line 592: assuming this is the null species.
+Found species with index 0 at line 593: assuming this is the null species.
+Found species with index 0 at line 594: assuming this is the null species.
+Found species with index 0 at line 595: assuming this is the null species.
+Found species with index 0 at line 596: assuming this is the null species.
+Found species with index 0 at line 597: assuming this is the null species.
+Found species with index 0 at line 598: assuming this is the null species.
+Found species with index 0 at line 599: assuming this is the null species.
+Found species with index 0 at line 600: assuming this is the null species.
+Found species with index 0 at line 601: assuming this is the null species.
+Found species with index 0 at line 602: assuming this is the null species.
+Found species with index 0 at line 603: assuming this is the null species.
+Found species with index 0 at line 604: assuming this is the null species.
+Found species with index 0 at line 605: assuming this is the null species.
+Found species with index 0 at line 606: assuming this is the null species.
+Found species with index 0 at line 607: assuming this is the null species.
+Found species with index 0 at line 608: assuming this is the null species.
+Found species with index 0 at line 609: assuming this is the null species.
+Found species with index 0 at line 610: assuming this is the null species.
+Found species with index 0 at line 611: assuming this is the null species.
+Found species with index 0 at line 612: assuming this is the null species.
+Found species with index 0 at line 613: assuming this is the null species.
+Found species with index 0 at line 614: assuming this is the null species.
+Found species with index 0 at line 615: assuming this is the null species.
+Found species with index 0 at line 616: assuming this is the null species.
+Found species with index 0 at line 617: assuming this is the null species.
+Found species with index 0 at line 618: assuming this is the null species.
+Found species with index 0 at line 642: assuming this is the null species.
+Found species with index 0 at line 913: assuming this is the null species.
+Found species with index 0 at line 914: assuming this is the null species.
+Found species with index 0 at line 915: assuming this is the null species.
+Found species with index 0 at line 916: assuming this is the null species.
+Found species with index 0 at line 917: assuming this is the null species.
+Found species with index 0 at line 918: assuming this is the null species.
+Found species with index 0 at line 919: assuming this is the null species.
+Found species with index 0 at line 920: assuming this is the null species.
+Found species with index 0 at line 921: assuming this is the null species.
+Found species with index 0 at line 922: assuming this is the null species.
+Found species with index 0 at line 923: assuming this is the null species.
+Found species with index 0 at line 924: assuming this is the null species.
+Found species with index 0 at line 925: assuming this is the null species.
+Found species with index 0 at line 926: assuming this is the null species.
+Found species with index 0 at line 927: assuming this is the null species.
+Found species with index 0 at line 928: assuming this is the null species.
+Found species with index 0 at line 929: assuming this is the null species.
+Found species with index 0 at line 930: assuming this is the null species.
+Found species with index 0 at line 931: assuming this is the null species.
+Found species with index 0 at line 932: assuming this is the null species.
+Found species with index 0 at line 933: assuming this is the null species.
+Found species with index 0 at line 934: assuming this is the null species.
+Found species with index 0 at line 935: assuming this is the null species.
+Found species with index 0 at line 936: assuming this is the null species.
+Found species with index 0 at line 937: assuming this is the null species.
+Found species with index 0 at line 938: assuming this is the null species.
+Found species with index 0 at line 939: assuming this is the null species.
+Found species with index 0 at line 940: assuming this is the null species.
+Found species with index 0 at line 941: assuming this is the null species.
+Found species with index 0 at line 942: assuming this is the null species.
+Found species with index 0 at line 943: assuming this is the null species.
+Found species with index 0 at line 944: assuming this is the null species.
+Found species with index 0 at line 945: assuming this is the null species.
+Found species with index 0 at line 946: assuming this is the null species.
+Found species with index 0 at line 947: assuming this is the null species.
+Found species with index 0 at line 948: assuming this is the null species.
+Found species with index 0 at line 949: assuming this is the null species.
+Found species with index 0 at line 950: assuming this is the null species.
+Found species with index 0 at line 951: assuming this is the null species.
+Found species with index 0 at line 952: assuming this is the null species.
+Found species with index 0 at line 953: assuming this is the null species.
+Found species with index 0 at line 954: assuming this is the null species.
+Found species with index 0 at line 955: assuming this is the null species.
+Found species with index 0 at line 956: assuming this is the null species.
+Found species with index 0 at line 957: assuming this is the null species.
+Found species with index 0 at line 958: assuming this is the null species.
+Found species with index 0 at line 959: assuming this is the null species.
+Found species with index 0 at line 960: assuming this is the null species.
+Found species with index 0 at line 961: assuming this is the null species.
+Found species with index 0 at line 962: assuming this is the null species.
+Found species with index 0 at line 963: assuming this is the null species.
+Found species with index 0 at line 964: assuming this is the null species.
+Found species with index 0 at line 965: assuming this is the null species.
+Found species with index 0 at line 966: assuming this is the null species.
+Found species with index 0 at line 967: assuming this is the null species.
+Found species with index 0 at line 968: assuming this is the null species.
+Found species with index 0 at line 969: assuming this is the null species.
+Found species with index 0 at line 970: assuming this is the null species.
+Found species with index 0 at line 971: assuming this is the null species.
+Found species with index 0 at line 972: assuming this is the null species.
+Found species with index 0 at line 973: assuming this is the null species.
+Found species with index 0 at line 974: assuming this is the null species.
+Found species with index 0 at line 975: assuming this is the null species.
+Found species with index 0 at line 976: assuming this is the null species.
+Found species with index 0 at line 977: assuming this is the null species.
+Found species with index 0 at line 978: assuming this is the null species.
+Found species with index 0 at line 979: assuming this is the null species.
+Found species with index 0 at line 980: assuming this is the null species.
+Found species with index 0 at line 981: assuming this is the null species.
+Found species with index 0 at line 982: assuming this is the null species.
+Found species with index 0 at line 983: assuming this is the null species.
+Found species with index 0 at line 984: assuming this is the null species.
+Found species with index 0 at line 985: assuming this is the null species.
+Found species with index 0 at line 986: assuming this is the null species.
+Found species with index 0 at line 987: assuming this is the null species.
+Found species with index 0 at line 988: assuming this is the null species.
+Found species with index 0 at line 1583: assuming this is the null species.
+Found species with index 0 at line 1584: assuming this is the null species.
+Found species with index 0 at line 1585: assuming this is the null species.
+Found species with index 0 at line 1586: assuming this is the null species.
+Found species with index 0 at line 1587: assuming this is the null species.
+Found species with index 0 at line 1588: assuming this is the null species.
+Found species with index 0 at line 1589: assuming this is the null species.
+Found species with index 0 at line 1590: assuming this is the null species.
+Found species with index 0 at line 1591: assuming this is the null species.
+Found species with index 0 at line 1592: assuming this is the null species.
+Found species with index 0 at line 1593: assuming this is the null species.
+Found species with index 0 at line 1594: assuming this is the null species.
+Found species with index 0 at line 1595: assuming this is the null species.
+Found species with index 0 at line 1596: assuming this is the null species.
+Found species with index 0 at line 1597: assuming this is the null species.
+Found species with index 0 at line 1598: assuming this is the null species.
+Found species with index 0 at line 1599: assuming this is the null species.
+Found species with index 0 at line 1600: assuming this is the null species.
+Found species with index 0 at line 1601: assuming this is the null species.
+Found species with index 0 at line 1602: assuming this is the null species.
+Found species with index 0 at line 1603: assuming this is the null species.
+Found species with index 0 at line 1604: assuming this is the null species.
+Found species with index 0 at line 1605: assuming this is the null species.
+Found species with index 0 at line 1606: assuming this is the null species.
+Found species with index 0 at line 1607: assuming this is the null species.
+Found species with index 0 at line 1608: assuming this is the null species.
+Found species with index 0 at line 1609: assuming this is the null species.
+Found species with index 0 at line 1610: assuming this is the null species.
+Found species with index 0 at line 1611: assuming this is the null species.
+Found species with index 0 at line 1612: assuming this is the null species.
+Found species with index 0 at line 1613: assuming this is the null species.
+Found species with index 0 at line 1614: assuming this is the null species.
+Found species with index 0 at line 1615: assuming this is the null species.
+Found species with index 0 at line 1616: assuming this is the null species.
+Found species with index 0 at line 1617: assuming this is the null species.
+Found species with index 0 at line 1618: assuming this is the null species.
+Found species with index 0 at line 1619: assuming this is the null species.
+Found species with index 0 at line 1620: assuming this is the null species.
+Found species with index 0 at line 1621: assuming this is the null species.
+Found species with index 0 at line 1622: assuming this is the null species.
+Found species with index 0 at line 1623: assuming this is the null species.
+Found species with index 0 at line 1624: assuming this is the null species.
+Found species with index 0 at line 1625: assuming this is the null species.
+Found species with index 0 at line 1626: assuming this is the null species.
+Found species with index 0 at line 1627: assuming this is the null species.
+Found species with index 0 at line 1628: assuming this is the null species.
+Found species with index 0 at line 1629: assuming this is the null species.
+Found species with index 0 at line 1630: assuming this is the null species.
+Found species with index 0 at line 1631: assuming this is the null species.
+Found species with index 0 at line 1632: assuming this is the null species.
+Found species with index 0 at line 1633: assuming this is the null species.
+Found species with index 0 at line 1634: assuming this is the null species.
+Found species with index 0 at line 1635: assuming this is the null species.
+Found species with index 0 at line 1636: assuming this is the null species.
+Found species with index 0 at line 1637: assuming this is the null species.
+Found species with index 0 at line 1638: assuming this is the null species.
+Found species with index 0 at line 1639: assuming this is the null species.
+Found species with index 0 at line 1640: assuming this is the null species.
+Found species with index 0 at line 1641: assuming this is the null species.
+Found species with index 0 at line 1642: assuming this is the null species.
+Found species with index 0 at line 1643: assuming this is the null species.
+Found species with index 0 at line 1644: assuming this is the null species.
+Found species with index 0 at line 1645: assuming this is the null species.
+Found species with index 0 at line 1646: assuming this is the null species.
+Found species with index 0 at line 1647: assuming this is the null species.
+Found species with index 0 at line 1648: assuming this is the null species.
+Found species with index 0 at line 1649: assuming this is the null species.
+Found species with index 0 at line 1650: assuming this is the null species.
+Found species with index 0 at line 1651: assuming this is the null species.
+Found species with index 0 at line 1652: assuming this is the null species.
+Found species with index 0 at line 1653: assuming this is the null species.
+Found species with index 0 at line 1654: assuming this is the null species.
+Found species with index 0 at line 1655: assuming this is the null species.
+Found species with index 0 at line 1656: assuming this is the null species.
+Found species with index 0 at line 1657: assuming this is the null species.
+Found species with index 0 at line 1658: assuming this is the null species.
+Found species with index 0 at line 1659: assuming this is the null species.
+Found species with index 0 at line 1660: assuming this is the null species.
+Found species with index 0 at line 1661: assuming this is the null species.
+Found species with index 0 at line 1662: assuming this is the null species.
+Found species with index 0 at line 1663: assuming this is the null species.
+Found species with index 0 at line 1664: assuming this is the null species.
+Found species with index 0 at line 1665: assuming this is the null species.
+Found species with index 0 at line 1666: assuming this is the null species.
+Found species with index 0 at line 1667: assuming this is the null species.
+Found species with index 0 at line 1668: assuming this is the null species.
+Found species with index 0 at line 1669: assuming this is the null species.
+Found species with index 0 at line 1670: assuming this is the null species.
+Found species with index 0 at line 1671: assuming this is the null species.
+Found species with index 0 at line 1672: assuming this is the null species.
+Found species with index 0 at line 1673: assuming this is the null species.
+Found species with index 0 at line 1674: assuming this is the null species.
+Found species with index 0 at line 1675: assuming this is the null species.
+Found species with index 0 at line 1676: assuming this is the null species.
+Found species with index 0 at line 1677: assuming this is the null species.
+Found species with index 0 at line 1678: assuming this is the null species.
+Found species with index 0 at line 1679: assuming this is the null species.
+Found species with index 0 at line 1680: assuming this is the null species.
+Found species with index 0 at line 1681: assuming this is the null species.
+Found species with index 0 at line 1682: assuming this is the null species.
+Found species with index 0 at line 1683: assuming this is the null species.
+Found species with index 0 at line 1684: assuming this is the null species.
+Found species with index 0 at line 1685: assuming this is the null species.
+Found species with index 0 at line 1686: assuming this is the null species.
+Found species with index 0 at line 1687: assuming this is the null species.
+Found species with index 0 at line 1688: assuming this is the null species.
+Found species with index 0 at line 1689: assuming this is the null species.
+Found species with index 0 at line 1690: assuming this is the null species.
+Found species with index 0 at line 1691: assuming this is the null species.
+Found species with index 0 at line 1692: assuming this is the null species.
+Found species with index 0 at line 1693: assuming this is the null species.
+Found species with index 0 at line 1694: assuming this is the null species.
+Found species with index 0 at line 1695: assuming this is the null species.
+Found species with index 0 at line 2306: assuming this is the null species.
+Found species with index 0 at line 2307: assuming this is the null species.
+Found species with index 0 at line 2308: assuming this is the null species.
+Found species with index 0 at line 2309: assuming this is the null species.
+Found species with index 0 at line 2310: assuming this is the null species.
+Found species with index 0 at line 2311: assuming this is the null species.
+Found species with index 0 at line 2312: assuming this is the null species.
+Found species with index 0 at line 2313: assuming this is the null species.
+Found species with index 0 at line 2314: assuming this is the null species.
+Found species with index 0 at line 2315: assuming this is the null species.
+Found species with index 0 at line 2316: assuming this is the null species.
+Found species with index 0 at line 2317: assuming this is the null species.
+Found species with index 0 at line 2318: assuming this is the null species.
+Found species with index 0 at line 2319: assuming this is the null species.
+Found species with index 0 at line 2320: assuming this is the null species.
+Found species with index 0 at line 2321: assuming this is the null species.
+Found species with index 0 at line 2322: assuming this is the null species.
+Found species with index 0 at line 2323: assuming this is the null species.
+Found species with index 0 at line 2324: assuming this is the null species.
+Found species with index 0 at line 2325: assuming this is the null species.
+Found species with index 0 at line 2326: assuming this is the null species.
+Found species with index 0 at line 2327: assuming this is the null species.
+Found species with index 0 at line 2328: assuming this is the null species.
+Found species with index 0 at line 2329: assuming this is the null species.
+Found species with index 0 at line 2330: assuming this is the null species.
+Found species with index 0 at line 2331: assuming this is the null species.
+Found species with index 0 at line 2332: assuming this is the null species.
+Found species with index 0 at line 2333: assuming this is the null species.
+Found species with index 0 at line 2334: assuming this is the null species.
+Found species with index 0 at line 2335: assuming this is the null species.
+Found species with index 0 at line 2336: assuming this is the null species.
+Found species with index 0 at line 2337: assuming this is the null species.
+Found species with index 0 at line 2338: assuming this is the null species.
+Found species with index 0 at line 2339: assuming this is the null species.
+Found species with index 0 at line 2340: assuming this is the null species.
+Found species with index 0 at line 2341: assuming this is the null species.
+Found species with index 0 at line 2342: assuming this is the null species.
+Found species with index 0 at line 2343: assuming this is the null species.
+Found species with index 0 at line 2344: assuming this is the null species.
+Found species with index 0 at line 2345: assuming this is the null species.
+Found species with index 0 at line 2346: assuming this is the null species.
+Found species with index 0 at line 2347: assuming this is the null species.
+Found species with index 0 at line 2348: assuming this is the null species.
+Found species with index 0 at line 2349: assuming this is the null species.
+Found species with index 0 at line 2350: assuming this is the null species.
+Found species with index 0 at line 2351: assuming this is the null species.
+Found species with index 0 at line 2352: assuming this is the null species.
+Found species with index 0 at line 2353: assuming this is the null species.
+Found species with index 0 at line 2354: assuming this is the null species.
+Found species with index 0 at line 2355: assuming this is the null species.
+Found species with index 0 at line 2356: assuming this is the null species.
+Found species with index 0 at line 2357: assuming this is the null species.
+Found species with index 0 at line 2358: assuming this is the null species.
+Found species with index 0 at line 2359: assuming this is the null species.
+Found species with index 0 at line 2360: assuming this is the null species.
+Found species with index 0 at line 2361: assuming this is the null species.
+Found species with index 0 at line 2362: assuming this is the null species.
+Found species with index 0 at line 2363: assuming this is the null species.
+Found species with index 0 at line 2364: assuming this is the null species.
+Found species with index 0 at line 2365: assuming this is the null species.
+Found species with index 0 at line 2366: assuming this is the null species.
+Found species with index 0 at line 2367: assuming this is the null species.
+Found species with index 0 at line 2368: assuming this is the null species.
+Found species with index 0 at line 2369: assuming this is the null species.
+Found species with index 0 at line 2370: assuming this is the null species.
+Found species with index 0 at line 2371: assuming this is the null species.
+Found species with index 0 at line 2372: assuming this is the null species.
+Found species with index 0 at line 2373: assuming this is the null species.
+Found species with index 0 at line 2374: assuming this is the null species.
+Found species with index 0 at line 2375: assuming this is the null species.
+Found species with index 0 at line 2376: assuming this is the null species.
+Found species with index 0 at line 2377: assuming this is the null species.
+Found species with index 0 at line 2378: assuming this is the null species.
+Found species with index 0 at line 2379: assuming this is the null species.
+Found species with index 0 at line 2380: assuming this is the null species.
+Found species with index 0 at line 2381: assuming this is the null species.
+Found species with index 0 at line 2382: assuming this is the null species.
+Found species with index 0 at line 2383: assuming this is the null species.
+Found species with index 0 at line 2384: assuming this is the null species.
+Found species with index 0 at line 2385: assuming this is the null species.
+Found species with index 0 at line 2386: assuming this is the null species.
+Found species with index 0 at line 2387: assuming this is the null species.
+Found species with index 0 at line 2388: assuming this is the null species.
+Found species with index 0 at line 2389: assuming this is the null species.
+Found species with index 0 at line 2390: assuming this is the null species.
+Found species with index 0 at line 2391: assuming this is the null species.
+Found species with index 0 at line 2392: assuming this is the null species.
+Found species with index 0 at line 2393: assuming this is the null species.
+Found species with index 0 at line 2394: assuming this is the null species.
+Found species with index 0 at line 2395: assuming this is the null species.
+Found species with index 0 at line 2396: assuming this is the null species.
+Found species with index 0 at line 2397: assuming this is the null species.
+Found species with index 0 at line 2398: assuming this is the null species.
+Found species with index 0 at line 2399: assuming this is the null species.
+Found species with index 0 at line 2400: assuming this is the null species.
+Found species with index 0 at line 2401: assuming this is the null species.
+Found species with index 0 at line 2402: assuming this is the null species.
+Found species with index 0 at line 2736: assuming this is the null species.
+Found species with index 0 at line 2737: assuming this is the null species.
+Found species with index 0 at line 2738: assuming this is the null species.
+Found species with index 0 at line 2739: assuming this is the null species.
+Found species with index 0 at line 2740: assuming this is the null species.
+Found species with index 0 at line 2741: assuming this is the null species.
+Found species with index 0 at line 2742: assuming this is the null species.
+Found species with index 0 at line 2743: assuming this is the null species.
+Found species with index 0 at line 2744: assuming this is the null species.
+Found species with index 0 at line 2745: assuming this is the null species.
+Found species with index 0 at line 2746: assuming this is the null species.
+Found species with index 0 at line 2747: assuming this is the null species.
+Found species with index 0 at line 2748: assuming this is the null species.
+Found species with index 0 at line 2749: assuming this is the null species.
+Found species with index 0 at line 2750: assuming this is the null species.
+Found species with index 0 at line 2751: assuming this is the null species.
+Found species with index 0 at line 2752: assuming this is the null species.
+Found species with index 0 at line 2753: assuming this is the null species.
+Found species with index 0 at line 2754: assuming this is the null species.
+Found species with index 0 at line 2755: assuming this is the null species.
+Found species with index 0 at line 2756: assuming this is the null species.
+Found species with index 0 at line 2757: assuming this is the null species.
+Found species with index 0 at line 2758: assuming this is the null species.
+Found species with index 0 at line 2759: assuming this is the null species.
+Found species with index 0 at line 2760: assuming this is the null species.
+Found species with index 0 at line 2761: assuming this is the null species.
+Found species with index 0 at line 2762: assuming this is the null species.
+Found species with index 0 at line 2763: assuming this is the null species.
+Found species with index 0 at line 2764: assuming this is the null species.
+Found species with index 0 at line 2765: assuming this is the null species.
+Found species with index 0 at line 2766: assuming this is the null species.
+Found species with index 0 at line 2767: assuming this is the null species.
+Found species with index 0 at line 2768: assuming this is the null species.
+Found species with index 0 at line 2769: assuming this is the null species.
+Found species with index 0 at line 2770: assuming this is the null species.
+Found species with index 0 at line 2771: assuming this is the null species.
+Found species with index 0 at line 2772: assuming this is the null species.
+Found species with index 0 at line 2773: assuming this is the null species.
+Found species with index 0 at line 2774: assuming this is the null species.
+Found species with index 0 at line 2775: assuming this is the null species.
+Found species with index 0 at line 2776: assuming this is the null species.
+Found species with index 0 at line 2777: assuming this is the null species.
+Found species with index 0 at line 2869: assuming this is the null species.
+Found species with index 0 at line 2870: assuming this is the null species.
+Found species with index 0 at line 2871: assuming this is the null species.
+Found species with index 0 at line 2872: assuming this is the null species.
+Found species with index 0 at line 2873: assuming this is the null species.
+Found species with index 0 at line 2874: assuming this is the null species.
+Found species with index 0 at line 2875: assuming this is the null species.
+Found species with index 0 at line 2876: assuming this is the null species.
+Found species with index 0 at line 2877: assuming this is the null species.
+Found species with index 0 at line 2878: assuming this is the null species.
+Read 2608 reaction(s) from model_small.net
+2608 reaction(s) have nonzero rate
+Initialization took 0.03 CPU seconds
+Propagating with cvode using dense LU
+Time course of concentrations written to file model_small.cdat.
+Time course of groups written to file model_small.gdat.
+Propagation took 2.81e-01 CPU seconds
+Program times:  0.31 CPU s 0.00 clock s
+Updating species concentrations from model_small.cdat
+CPU TIME: simulate 0.06 s.
+Executing visualize() command.
+Building network graphs for individual rules.
+Wrote contact map of model in graphml format to model_small_contactmap_all.graphml.
+CPU TIME: visualize 0.03 s.
+Finished processing file c:\IL6_TGFB\model_small\2025_06_18__13_45_32\model_small.bngl.
+CPU TIME: total 2.03 s.

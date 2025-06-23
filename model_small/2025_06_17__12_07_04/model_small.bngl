@@ -1,0 +1,242 @@
+# ------------------------------------------------------------------
+#  T-cell Model: TGF-β and IL-6 Interaction (Prado et al., 2021) - REFINED
+# -----------------------------------------------------------------------------------------------------------------------------
+#  T‑cell Model: TGF-β and IL-6 Interaction (Prado et al., 2021)
+# ------------------------------------------------------------
+
+begin model
+
+begin parameters
+  # binding
+  kf_tgfb_bind      1.0
+  kr_tgfb_bind      0.1
+  kf_il6_bind       1.0
+  kr_il6_bind       0.1
+  kf_stat3_dimer    0.5   # REFINED: Adjusted from 1.0
+  kr_stat3_dimer    0.1
+  kf_s3s4           1.0  # SMAD3-SMAD4 binding
+  kr_s3s4           0.1
+  kf_st3dimer_s3    1.0  # STAT3_dimer-SMAD3 binding
+  kr_st3dimer_s3    0.1
+  kf_pka_s3s4       1.0  # PKA binding to SMAD3/4 complex
+  kr_pka_s3s4       0.1
+  kf_pi3k_bind      1.0  # P85-P110 binding
+  kr_pi3k_bind      0.1
+  kf_il6r_jak2      1.0
+  kr_il6r_jak2      0.1
+  kf_pip2_pi3k      1.0
+  kr_pip2_pi3k      0.1
+  kf_pip3_akt       1.0
+  kr_pip3_akt       0.1
+
+  # catalytic / switching
+  k_act_tgfbr       1.0
+  k_inact_tgfbr     0.1
+  k_act_il6r        1.0
+  k_inact_il6r      0.1
+  k_act_jak2        1.0
+  k_inact_jak2      0.1
+  k_phos_stat3      0.1   # REFINED: Adjusted from 1.0
+  k_dephos_stat3    0.1
+  k_phos_smad3      1.0
+  k_dephos_smad3    0.1
+  k_act_pka         1.0
+  k_inact_pka       0.1
+  k_act_csk         1.0
+  k_inact_csk       0.1
+
+  # PI3K / AKT
+  k_cat_pi3k        5.0   # REFINED: Adjusted from 0.5
+  k_phos_p85        1.0   # P85 phosphorylation by active CSK
+  k_act_akt         10.0  # REFINED: Adjusted from 1.0
+  k_dephos_akt      0.05  # REFINED: Adjusted from 0.1
+  k_pten            0.05  # PIP3 -> PIP2
+  k_deg_p85P        0.01  # Degradation of phosphorylated P85
+
+  # ### REFINED: SOCS3 Negative Feedback Parameters
+  k_prod_socs3      0.05   # Production rate of SOCS3 induced by STAT3 dimer
+  k_deg_socs3       0.01   # Degradation of SOCS3
+  kf_socs3_bind     1.0    # SOCS3 binding to JAK2
+  kr_socs3_bind     0.1    # SOCS3 unbinding from JAK2
+
+  # ### REFINED: p85 Dephosphorylation
+  k_dephos_p85      0.1    # Rate of p85 dephosphorylation
+
+  # outputs / clearance
+  k_deg_il6         0.001
+
+  # constitutive turnover
+  k_prod_rec        0.1 # For TGFbR, IL6R
+  k_deg_rec         0.01
+  k_prod_kin_adapt  0.1 # For JAK2, PKA, CSK, P85, P110, AKT
+  k_deg_kin_adapt   0.01
+  k_prod_smad       0.1
+  k_deg_smad        0.01
+  k_prod_stat3      0.1
+  k_deg_stat3       0.01
+  k_prod_lipid      0.005 # For PIP2
+end parameters
+
+
+begin molecule types
+  TGFbR(l,act~I~A)
+  IL6R(l,act~I~A,jak2)
+  TGFb(r)
+  IL6(r)
+  JAK2(act~I~A,il6r_site,socs_bs) # ### REFINED: Added SOCS3 binding site to JAK2
+  STAT3(pY~U~P,dimer_site,smad3_bs) # smad3_bs for SMAD3 binding site
+  SMAD3(pS~U~P,smad4_bs,pka_bs,stat3_bs) # _bs for binding site
+  SMAD4(smad3_bs)
+  PKA(smad3_4_bs,act~I~A) # smad3_4_bs for SMAD3/4 complex binding site
+  CSK(act~I~A) # LCK binding site removed
+  P85(phos~U~P,p110_bs)
+  P110(p85_bs,pip2_bs)
+  PIP2(pi3k_bs)
+  PIP3(akt_bs)
+  AKT(pS473~U~P,pip3_bs)
+  
+  # ### REFINED: Added SOCS3 for negative feedback
+  SOCS3(jak_bs)
+end molecule types
+
+
+begin seed species
+  TGFbR(l,act~I)                                                  100
+  IL6R(l,act~I,jak2)                                              100
+  TGFb(r)                                                         100  # Stimulus
+  IL6(r)                                                          100  # Stimulus (adjust as needed for Treg vs Th17 conditions)
+  JAK2(act~I,il6r_site,socs_bs)                                   100  # ### REFINED: Added socs_bs site
+  STAT3(pY~U,dimer_site,smad3_bs)                                 100
+  SMAD3(pS~U,smad4_bs,pka_bs,stat3_bs)                          100
+  SMAD4(smad3_bs)                                                100
+  PKA(smad3_4_bs,act~I)                                          100
+  CSK(act~I)                                                     100
+  P85(phos~U,p110_bs)                                             100
+  P110(p85_bs,pip2_bs)                                            100
+  PIP2(pi3k_bs)                                                   1000 # Substrate, often higher concentration
+  PIP3(akt_bs)                                                    0
+  AKT(pS473~U,pip3_bs)                                           200   # ### REFINED: Initial amount of AKT increased
+  
+  # ### REFINED: Start with no SOCS3
+  SOCS3(jak_bs)                                                   0
+end seed species
+
+
+begin observables
+  Molecules TGFbR_Active    TGFbR(act~A)
+  Molecules IL6R_Active     IL6R(act~A)
+  Molecules JAK2_Active     JAK2(act~A)
+  Molecules SMAD3_P         SMAD3(pS~P)
+  Molecules STAT3_P_monomer STAT3(pY~P) # Phosphorylated STAT3 monomer
+  Molecules STAT3_Dimer     STAT3(dimer_site!1).STAT3(dimer_site!1)
+  Molecules SMAD3_SMAD4_Complex SMAD3(smad4_bs!1).SMAD4(smad3_bs!1)
+  Molecules STAT3dimer_SMAD3_Complex STAT3(dimer_site!1,smad3_bs!3).STAT3(dimer_site!1).SMAD3(stat3_bs!3) # Check binding representation
+  Molecules PKA_Active      PKA(act~A)
+  Molecules CSK_Active      CSK(act~A)
+  Molecules P85_P           P85(phos~P)
+  Molecules PI3K_Active_Complex P85(phos~U,p110_bs!1).P110(p85_bs!1) # Unphosphorylated P85 in complex
+  Molecules PIP3_conc       PIP3()
+  Molecules AKT_pS473       AKT(pS473~P)
+  
+  # ### REFINED: Added observable for SOCS3
+  Molecules SOCS3_total     SOCS3()
+end observables
+
+
+begin reaction rules
+  # — ligand binding
+  Ligand_TGFbR: TGFbR(l)+TGFb(r) <-> TGFbR(l!1).TGFb(r!1)                           kf_tgfb_bind,kr_tgfb_bind
+  Ligand_IL6R:  IL6R(l)+IL6(r)   <-> IL6R(l!1).IL6(r!1)                             kf_il6_bind,kr_il6_bind
+
+  # — receptor activation
+  Act_TGFbR:   TGFbR(l!+,act~I) -> TGFbR(l!+,act~A)                                 k_act_tgfbr
+  Deact_TGFbR: TGFbR(act~A)     -> TGFbR(act~I)                                     k_inact_tgfbr
+  Act_IL6R:    IL6R(l!+,act~I)  -> IL6R(l!+,act~A)                                  k_act_il6r
+  Deact_IL6R:  IL6R(act~A)      -> IL6R(act~I)                                      k_inact_il6r
+  # — IL-6R ⟷ JAK2 (with SOCS3 inhibition)
+  Bind_JAK2_IL6R: IL6R(jak2)+JAK2(il6r_site) <-> IL6R(jak2!1).JAK2(il6r_site!1)              kf_il6r_jak2,kr_il6r_jak2
+  Act_JAK2:       IL6R(act~A,jak2!1).JAK2(il6r_site!1,act~I) -> IL6R(act~A,jak2!1).JAK2(il6r_site!1,act~A) k_act_jak2
+  Deact_JAK2:     JAK2(act~A) -> JAK2(act~I) k_inact_jak2
+
+  # ### REFINED: Added SOCS3 negative feedback loop
+  # STAT3 dimer induces production of SOCS3
+  Produce_SOCS3: STAT3(dimer_site!+) -> STAT3(dimer_site!+) + SOCS3(jak_bs)                  k_prod_socs3
+  # SOCS3 binds to active JAK2 to inhibit it
+  Bind_SOCS3_to_JAK2: SOCS3(jak_bs) + JAK2(act~A,socs_bs) <-> SOCS3(jak_bs!1).JAK2(act~A,socs_bs!1) kf_socs3_bind,kr_socs3_bind
+  # SOCS3 degradation
+  Degrade_SOCS3: SOCS3() -> 0                                                               k_deg_socs3
+
+  # — STAT3 phospho-cycle & dimerization
+  # ### REFINED: JAK2 can only phosphorylate STAT3 if SOCS3 is NOT bound
+  Phos_STAT3:     JAK2(act~A,socs_bs!?) + STAT3(pY~U) -> JAK2(act~A,socs_bs!?) + STAT3(pY~P) k_phos_stat3
+  Dephos_STAT3:   STAT3(pY~P) -> STAT3(pY~U)                                                 k_dephos_stat3
+  Dimerize_STAT3: STAT3(pY~P,dimer_site) + STAT3(pY~P,dimer_site) <-> STAT3(pY~P,dimer_site!1).STAT3(pY~P,dimer_site!1) kf_stat3_dimer,kr_stat3_dimer
+
+  # — SMAD3 phosphorylation / complexes
+  Phos_SMAD3:   TGFbR(act~A)+SMAD3(pS~U) -> TGFbR(act~A)+SMAD3(pS~P)                 k_phos_smad3
+  Dephos_SMAD3: SMAD3(pS~P) -> SMAD3(pS~U)                                          k_dephos_smad3
+  # SMAD3/SMAD4 complex
+  Bind_SMAD3_SMAD4: SMAD3(pS~P,smad4_bs) + SMAD4(smad3_bs) <-> SMAD3(pS~P,smad4_bs!1).SMAD4(smad3_bs!1) kf_s3s4,kr_s3s4
+  # STAT3_Dimer/SMAD3 complex (STAT3 dimer binds pSMAD3)
+  Bind_STAT3dimer_SMAD3: STAT3(pY~P,dimer_site!1,smad3_bs).STAT3(pY~P,dimer_site!1) + SMAD3(pS~P,stat3_bs) <-> STAT3(pY~P,dimer_site!1,smad3_bs!2).STAT3(pY~P,dimer_site!1).SMAD3(pS~P,stat3_bs!2) kf_st3dimer_s3,kr_st3dimer_s3
+
+  # — PKA / CSK Activation (downstream of SMAD3/SMAD4)
+  Bind_PKA_SMAD3_SMAD4: SMAD3(smad4_bs!1,pka_bs).SMAD4(smad3_bs!1) + PKA(smad3_4_bs,act~I) <-> SMAD3(smad4_bs!1,pka_bs!2).SMAD4(smad3_bs!1).PKA(smad3_4_bs!2,act~I) kf_pka_s3s4,kr_pka_s3s4
+  Act_PKA:       PKA(smad3_4_bs!+,act~I) -> PKA(smad3_4_bs!+,act~A)                   k_act_pka # PKA activates when bound to SMAD3/4
+  Deact_PKA:     PKA(act~A) -> PKA(act~I)                                             k_inact_pka
+  Act_CSK:       PKA(act~A)+CSK(act~I) -> PKA(act~A)+CSK(act~A)                        k_act_csk
+  Deact_CSK:     CSK(act~A) -> CSK(act~I)                                             k_inact_csk
+  # — PI3K / AKT Pathway (regulated by CSK)
+  PI3K_Complex_Formation: P85(p110_bs) + P110(p85_bs) <-> P85(p110_bs!1).P110(p85_bs!1) kf_pi3k_bind,kr_pi3k_bind
+  Bind_PIP2_To_PI3K: P85(p110_bs!1).P110(p85_bs!1,pip2_bs) + PIP2(pi3k_bs) <-> P85(p110_bs!1).P110(p85_bs!1,pip2_bs!2).PIP2(pi3k_bs!2) kf_pip2_pi3k,kr_pip2_pi3k
+  PI3K_Catalysis: P85(phos~U,p110_bs!1).P110(p85_bs!1,pip2_bs!2).PIP2(pi3k_bs!2) -> P85(phos~U,p110_bs!1).P110(p85_bs!1,pip2_bs) + PIP3(akt_bs) k_cat_pi3k
+  Phosphorylate_P85_by_CSK: CSK(act~A) + P85(phos~U) -> CSK(act~A) + P85(phos~P)              k_phos_p85
+
+  # ### REFINED: Added a specific dephosphorylation rule for p85
+  Dephosphorylate_P85: P85(phos~P) -> P85(phos~U)                                           k_dephos_p85
+
+  Bind_PIP3_AKT: PIP3(akt_bs) + AKT(pip3_bs) <-> PIP3(akt_bs!1).AKT(pip3_bs!1) kf_pip3_akt,kr_pip3_akt
+  Act_AKT:       AKT(pip3_bs!+,pS473~U) -> AKT(pip3_bs!+,pS473~P)                           k_act_akt
+
+  # ### REFINED: AKT is only dephosphorylated when NOT bound to PIP3
+  Dephos_AKT:    AKT(pS473~P,pip3_bs) -> AKT(pS473~U,pip3_bs)                             k_dephos_akt
+  Degrade_PIP3_by_PTEN: PIP3() -> PIP2(pi3k_bs)                                           k_pten
+  Degrade_P85_Phos:     P85(phos~P) -> 0                                                  k_deg_p85P
+
+  # — IL-6 clearance
+  Degrade_IL6: IL6(r) -> 0 k_deg_il6
+
+  # — Constitutive Turnover Rules
+  Prod_TGFbR: 0 -> TGFbR(l,act~I)            k_prod_rec
+  Deg_TGFbR: TGFbR() -> 0                    k_deg_rec
+  Prod_IL6R: 0 -> IL6R(l,act~I,jak2)         k_prod_rec
+  Deg_IL6R: IL6R() -> 0                      k_deg_rec
+  Prod_JAK2: 0 -> JAK2(act~I,il6r_site,socs_bs)      k_prod_kin_adapt  # ### REFINED: Added socs_bs site
+  Deg_JAK2: JAK2() -> 0                             k_deg_kin_adapt
+  Prod_PKA: 0 -> PKA(smad3_4_bs,act~I)      k_prod_kin_adapt
+  Deg_PKA: PKA() -> 0                        k_deg_kin_adapt
+  Prod_CSK: 0 -> CSK(act~I)                 k_prod_kin_adapt
+  Deg_CSK: CSK() -> 0                        k_deg_kin_adapt
+  Prod_P85: 0 -> P85(phos~U,p110_bs)        k_prod_kin_adapt
+  Deg_P85_Total: P85() -> 0                  k_deg_kin_adapt # Assuming P85(phos~P) also degrades or is dephosphorylated
+  Prod_P110: 0 -> P110(p85_bs,pip2_bs)     k_prod_kin_adapt
+  Deg_P110: P110() -> 0                     k_deg_kin_adapt
+  Prod_AKT: 0 -> AKT(pS473~U,pip3_bs)     k_prod_kin_adapt
+  Deg_AKT: AKT() -> 0                      k_deg_kin_adapt
+
+  Prod_SMAD3: 0 -> SMAD3(pS~U,smad4_bs,pka_bs,stat3_bs) k_prod_smad
+  Deg_SMAD3: SMAD3() -> 0                   k_deg_smad
+  Prod_SMAD4: 0 -> SMAD4(smad3_bs)         k_prod_smad
+  Deg_SMAD4: SMAD4() -> 0                   k_deg_smad
+  Prod_STAT3: 0 -> STAT3(pY~U,dimer_site,smad3_bs) k_prod_stat3
+  Deg_STAT3: STAT3() -> 0                   k_deg_stat3
+
+  Prod_PIP2: 0 -> PIP2(pi3k_bs)            k_prod_lipid
+  # Note: Degradation of PIP2 is implicitly through its conversion or other pathways not modeled.
+
+end reaction rules
+end model
+
+generate_network({overwrite=>1,verbose=>0,max_agg=>4})
+simulate({method=>"ode",t_end=>100,n_steps=>1000})
+visualize({type=>"contactmap",suffix=>"all"})

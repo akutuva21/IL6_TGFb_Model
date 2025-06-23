@@ -1,0 +1,190 @@
+# Expanded BNGL model based on Prado et al. (2021) JBC - Rev 4
+
+begin model
+
+begin parameters
+    # --- Binding Rates ---
+    kf_tcr_bind 1.0
+    kr_tcr_bind 0.1
+    kf_tgfb_bind 1.0
+    kr_tgfb_bind 0.1
+    kf_il6_bind 1.0
+    kr_il6_bind 0.1
+
+    # --- Receptor Activation ---
+    k_act_tcr 1.0
+    k_inact_tcr 0.1
+    k_act_tgfbr 1.0
+    k_inact_tgfbr 0.1
+    k_act_il6r 1.0
+    k_inact_il6r 0.1
+
+    # --- JAK/STAT3 Pathway ---
+    k_act_jak 1.0
+    k_inact_jak 0.1
+    k_phos_stat3 1.0
+    k_dephos_stat3 0.1
+
+    # --- SMAD Pathway ---
+    k_phos_smad3 1.0
+    k_dephos_smad3 0.1
+    kf_s3s4 1.0
+    kr_s3s4 0.1
+    kf_st3s3 1.0
+    kr_st3s3 0.1
+
+    # --- PKA/CSK Feedback Pathway ---
+    kf_pka_s3s4 1.0
+    kr_pka_s3s4 0.1
+    k_act_pka 1.0
+    k_inact_pka 0.1
+    k_act_csk 1.0
+    k_inact_csk 0.1
+    k_inhib_tcr_by_csk 10.0
+
+    # --- TF Activation/Inactivation ---
+    k_act_foxp3 1.0
+    k_inact_foxp3 0.1
+    k_act_rorgt 1.0
+    k_inact_rorgt 0.1
+
+    # --- Production/Degradation ---
+    k_prod_tf 0.01
+    k_deg_tf 0.01
+    k_prod_smad 0.1 # Example
+    k_deg_smad 0.01  # Example
+    k_prod_stat3 0.1 # Example
+    k_deg_stat3 0.01 # Example
+
+    # --- Mutual Inhibition ---
+    k_inhibit 1.0
+
+end parameters
+
+begin molecule types
+    # Receptors
+    TCR(l,act~I~A)
+    TGFbR(l,act~I~A)
+    IL6R(l,act~I~A)
+
+    # Ligands
+    TCR_L(r)
+    TGFb(r)
+    IL6(r)
+
+    # Signaling Intermediates
+    JAK(act~I~A)
+    STAT3(pY~U~P,s3)
+    SMAD3(pS~U~P,s4,st3,pka_site)
+    SMAD4(s3)
+    PKA(smad,act~I~A)
+    CSK(act~I~A)
+
+    # Master Regulators
+    FOXP3(act~I~A)
+    RORgt(act~I~A)
+end molecule types
+
+# species and initial amoutns
+begin seed species
+    TCR(l,act~I) 100
+    TGFbR(l,act~I) 100
+    IL6R(l,act~I) 100
+    JAK(act~I) 100
+    STAT3(pY~U,s3) 100
+    SMAD3(pS~U,s4,st3,pka_site) 100
+    SMAD4(s3) 100
+    PKA(smad,act~I) 100
+    CSK(act~I) 100
+    FOXP3(act~I) 100
+    RORgt(act~I) 100
+    TCR_L(r) 100
+    TGFb(r) 100
+    IL6(r) 100 # Set to 0 for Treg simulation condition
+end seed species
+
+begin observables
+    Molecules TCR_Active TCR(act~A)
+    Molecules TGFbR_Active TGFbR(act~A)
+    Molecules IL6R_Active IL6R(act~A)
+    Molecules JAK_Active JAK(act~A)
+    Molecules STAT3_P STAT3(pY~P)
+    Molecules SMAD3_P SMAD3(pS~P)
+    Molecules SMAD3_SMAD4_Complex SMAD3(s4!1).SMAD4(s3!1)
+    Molecules STAT3_SMAD3_Complex SMAD3(st3!1).STAT3(s3!1)
+    Molecules PKA_Active PKA(act~A)
+    Molecules CSK_Active CSK(act~A)
+    Molecules FOXP3_Active FOXP3(act~A)
+    Molecules RORgt_Active RORgt(act~A)
+end observables
+
+begin reaction rules
+
+    # 1. Ligand Binding (Reversible)
+    Rule_TCR_Bind: TCR(l) + TCR_L(r) <-> TCR(l!1).TCR_L(r!1) kf_tcr_bind, kr_tcr_bind
+    Rule_TGFb_Bind: TGFbR(l) + TGFb(r) <-> TGFbR(l!1).TGFb(r!1) kf_tgfb_bind, kr_tgfb_bind
+    Rule_IL6_Bind: IL6R(l) + IL6(r) <-> IL6R(l!1).IL6(r!1) kf_il6_bind, kr_il6_bind
+
+    # 2. Receptor Activation (Irreversible)
+    Rule_TCR_Activate: TCR(l!+,act~I) -> TCR(l!+,act~A) k_act_tcr
+    Rule_TCR_Inactivate: TCR(act~A) -> TCR(act~I) k_inact_tcr
+    Rule_TGFbR_Activate: TGFbR(l!+,act~I) -> TGFbR(l!+,act~A) k_act_tgfbr
+    Rule_TGFbR_Inactivate: TGFbR(act~A) -> TGFbR(act~I) k_inact_tgfbr
+    Rule_IL6R_Activate: IL6R(l!+,act~I) -> IL6R(l!+,act~A) k_act_il6r
+    Rule_IL6R_Inactivate: IL6R(act~A) -> IL6R(act~I) k_inact_il6r
+
+    # 3. IL6 -> JAK -> STAT3 Pathway (Irreversible)
+    Rule_Activate_JAK: IL6R(act~A) + JAK(act~I) -> IL6R(act~A) + JAK(act~A) k_act_jak
+    Rule_Inactivate_JAK: JAK(act~A) -> JAK(act~I) k_inact_jak
+    Rule_Phosphorylate_STAT3: JAK(act~A) + STAT3(pY~U) -> JAK(act~A) + STAT3(pY~P) k_phos_stat3
+    Rule_Dephosphorylate_STAT3: STAT3(pY~P) -> STAT3(pY~U) k_dephos_stat3
+
+    # 4. TGFb -> SMAD3 Phosphorylation Pathway (Irreversible)
+    Rule_SMAD3_Phos: TGFbR(act~A) + SMAD3(pS~U) -> TGFbR(act~A) + SMAD3(pS~P) k_phos_smad3
+    Rule_SMAD3_Dephos: SMAD3(pS~P) -> SMAD3(pS~U) k_dephos_smad3
+
+    # 5. Competitive Complex Formation (SMAD3 Core)
+    Rule_SMAD3_SMAD4_Bind: SMAD3(pS~P,s4) + SMAD4(s3) <-> SMAD3(pS~P,s4!1).SMAD4(s3!1) kf_s3s4, kr_s3s4
+    Rule_STAT3_SMAD3_Bind: SMAD3(pS~P,st3) + STAT3(pY~P,s3) <-> SMAD3(pS~P,st3!1).STAT3(pY~P,s3!1) kf_st3s3, kr_st3s3
+
+    # 6. PKA-CSK Feedback Loop Activation
+    # PKA binds to the pka_site on SMAD3 within the SMAD3/4 complex
+    Rule_PKA_Bind_S3S4: SMAD3(s4!1,pka_site).SMAD4(s3!1) + PKA(smad,act~I) <-> SMAD3(s4!1,pka_site!2).SMAD4(s3!1).PKA(smad!2,act~I) kf_pka_s3s4, kr_pka_s3s4
+    # Bound PKA becomes active
+    Rule_PKA_Activate: PKA(smad!+,act~I) -> PKA(smad!+,act~A) k_act_pka
+    Rule_PKA_Inactivate: PKA(act~A) -> PKA(act~I) k_inact_pka
+    # Active PKA activates CSK
+    Rule_CSK_Activate: PKA(act~A) + CSK(act~I) -> PKA(act~A) + CSK(act~A) k_act_csk
+    Rule_CSK_Inactivate: CSK(act~A) -> CSK(act~I) k_inact_csk
+
+    # 7. CSK Negative Feedback on TCR Activation
+    Rule_CSK_Inhib_TCR: CSK(act~A) + TCR(act~A) -> CSK(act~A) + TCR(act~I) k_inhib_tcr_by_csk
+
+    # 8. Master Regulator Activation
+    Rule_FOXP3_Activate: TCR(act~A) + SMAD3(pS~P) + FOXP3(act~I) -> TCR(act~A) + SMAD3(pS~P) + FOXP3(act~A) k_act_foxp3
+    Rule_FOXP3_Inactivate: FOXP3(act~A) -> FOXP3(act~I) k_inact_foxp3
+    Rule_RORgt_Activate: TCR(act~A) + SMAD3(pS~P) + STAT3(pY~P) + RORgt(act~I) -> TCR(act~A) + SMAD3(pS~P) + STAT3(pY~P) + RORgt(act~A) k_act_rorgt
+    Rule_RORgt_Inactivate: RORgt(act~A) -> RORgt(act~I) k_inact_rorgt
+
+    # 9. Optional: Production/Degradation of TFs
+    Rule_Prod_FOXP3: 0 -> FOXP3(act~I) k_prod_tf
+    Rule_Deg_FOXP3: FOXP3() -> 0 k_deg_tf
+    Rule_Prod_RORgt: 0 -> RORgt(act~I) k_prod_tf
+    Rule_Deg_RORgt: RORgt() -> 0 k_deg_tf
+    Rule_Prod_SMAD3: 0 -> SMAD3(pS~U,s4,st3,pka_site) k_prod_smad
+    Rule_Deg_SMAD3: SMAD3() -> 0 k_deg_smad
+    Rule_Prod_STAT3: 0 -> STAT3(pY~U,s3) k_prod_stat3
+    Rule_Deg_STAT3: STAT3() -> 0 k_deg_stat3
+
+    # 10. Optional: Mutual Inhibition between FOXP3 and RORgt
+    Rule_Inhib_RORgt: FOXP3(act~A) + RORgt(act~A) -> FOXP3(act~A) + RORgt(act~I) k_inhibit
+    Rule_Inhib_FOXP3: RORgt(act~A) + FOXP3(act~A) -> RORgt(act~A) + FOXP3(act~I) k_inhibit
+
+end reaction rules
+
+end model
+
+# Actions
+generate_network({overwrite=>1})
+simulate_ode({t_end=>1000, n_steps=>1000})
+# simulate_ssa({t_end=>1000, n_steps=>1000})
