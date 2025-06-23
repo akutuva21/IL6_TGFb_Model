@@ -3,13 +3,14 @@
 using Pkg
 Pkg.activate("bngl_julia/")
 
+include("src/parameter_utils.jl") 
 include("src/model_param_est.jl")
 include("src/visualization.jl")
 
 using Distributed
 using LinearAlgebra
 using ArgParse
-using JLD2 
+using JLD2
 using ComponentArrays
 using Plots
 
@@ -88,160 +89,112 @@ function parse_commandline()
     return parse_args(s)
 end
 
-function run_parameter_estimation(parsed_args)
+# NEW MAIN WORKFLOW
+function run_analysis()
+    parsed_args = parse_commandline()
+    output_filename = parsed_args["output"]
     use_parallel = parsed_args["parallel"]
     optimizer_choice_str = parsed_args["optimizer"]
     abstol = parsed_args["abstol"]
     reltol = parsed_args["reltol"]
-
-    n_starts = parsed_args["n-starts"]
-    if n_starts == 0
-        n_starts = use_parallel ? length(procs()) : 1
-    end
-
-    if !haskey(SUPPORTED_OPTIMIZERS, optimizer_choice_str)
-        @error "Unsupported optimizer '$optimizer_choice_str'. Please choose from $(keys(SUPPORTED_OPTIMIZERS))"
-        return nothing, nothing
-    end
+    n_starts = parsed_args["n-starts"] == 0 ? (use_parallel ? length(procs()) : 1) : parsed_args["n-starts"]
     optimizer = SUPPORTED_OPTIMIZERS[optimizer_choice_str]
-    optim_options = Optim.Options(time_limit=600.0)
+    optim_options = Optim.Options(time_limit=1800.0) # Increased time limit for stages
 
-    println("No valid saved results found. Running parameter estimation..."); flush(stdout)
+    println("--- Starting Staged Fitting Analysis ---"); flush(stdout)
+
+    # ==========================
+    # --- STAGE 1: Fit TREG ----
+    # ==========================
+    println("\n\n--- STAGE 1: FITTING TREG DATA ---"); flush(stdout)
+    setup_stage1 = setup_petab_problem(stage=:TREG)
+    petab_problem_stage1 = PEtabODEProblem(setup_stage1.petab_model;
+                                           gradient_method=:Adjoint,
+                                           sensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)),
+                                           odesolver=ODESolver(CVODE_BDF(linear_solver=:GMRES), abstol=abstol, reltol=reltol),
+                                           sparse_jacobian=false, verbose=false)
+
+    println("Calibrating TREG pathway parameters with $n_starts starts..."); flush(stdout)
+    multi_start_res_s1 = calibrate_multistart(petab_problem_stage1, optimizer, n_starts; nprocs=length(procs()), options=optim_options)
+    best_run_s1 = multi_start_res_s1.runs[argmin([r.fmin for r in multi_start_res_s1.runs])]
     
-    local setup_results
-    println("\n[Timing] Setting up PEtab Model..."); flush(stdout)
-    @time setup_results = setup_petab_problem()
-    if isnothing(setup_results)
-        @error "Failed to build PEtabModel. Cannot proceed."
-        return nothing, nothing
-    end
+    # Untransform the best parameters from this stage to be used in the next
+    params_s1_dict = untransform_parameters(best_run_s1.xmin, petab_problem_stage1.petab_model.parameter_map)
+    println("✅ Stage 1 complete. Best cost: $(best_run_s1.fmin)")
 
-    # --- FINAL RECOMMENDED CONFIGURATION ---
-    # Reverting to the original :GMRES solver, but making it compatible by using a dense Jacobian.
-    # This is the most robust combination and avoids all previously seen errors.
-    println("\n[Timing] Building PEtabODEProblem..."); flush(stdout)
-    local petab_problem
-    @time petab_problem = PEtabODEProblem(setup_results.petab_model;
-                                          gradient_method=:Adjoint,
-                                          sensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)),
-                                          odesolver=ODESolver(CVODE_BDF(linear_solver=:GMRES), abstol=abstol, reltol=reltol),
-                                          sparse_jacobian=false, # <-- The key fix
-                                          verbose=false)
-    # --- END FIX ---                                     
 
-    local saved_results = nothing
-    println("\n[Timing] Calibrating parameters..."); flush(stdout)
-    @time if use_parallel
-        println("Mode: PARALLEL using $(length(procs())) processes, $n_starts starts, and optimizer $optimizer_choice_str")
-        multi_start_res = calibrate_multistart(petab_problem, optimizer, n_starts;
-                                               nprocs=length(procs()),
-                                               dirsave=joinpath(pwd(), "Intermediate_results"),
-                                               options=optim_options)
-        valid_runs = filter(r -> !isnothing(r) && !isnan(r.fmin) && isfinite(r.fmin), multi_start_res.runs)
+    # ==========================
+    # --- STAGE 2: Fit TH17 ---
+    # ==========================
+    println("\n\n--- STAGE 2: FITTING TH17 DATA (fixing TREG params) ---"); flush(stdout)
+    # Pass the optimized TREG params to be fixed
+    setup_stage2 = setup_petab_problem(stage=:TH17, params_to_fix=params_s1_dict)
+    petab_problem_stage2 = PEtabODEProblem(setup_stage2.petab_model;
+                                           gradient_method=:Adjoint,
+                                           sensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)),
+                                           odesolver=ODESolver(CVODE_BDF(linear_solver=:GMRES), abstol=abstol, reltol=reltol),
+                                           sparse_jacobian=false, verbose=false)
 
-        if isempty(valid_runs)
-            @warn "All $n_starts optimization starts failed to produce a valid solution."
-            return nothing, setup_results
-        else
-            println("INFO: Found $(length(valid_runs)) valid solution(s) out of $n_starts starts.")
-            best_run = valid_runs[argmin([r.fmin for r in valid_runs])]
-            saved_results = (theta_optim=best_run.xmin, cost=best_run.fmin,
-                             names_est_opt=string.(propertynames(best_run.xmin)))
-        end
-    else
-        println("Mode: SERIAL with optimizer $optimizer_choice_str, $n_starts start(s)")
-        start_guesses = get_startguesses(petab_problem, n_starts)
-        best_res = nothing
-        for i in 1:n_starts
-            println("  Serial Start $i/$n_starts...")
-            res = calibrate(petab_problem, optimizer, start_guesses[i]; options=optim_options)
-            if isnothing(best_res) || res.fmin < best_res.fmin
-                best_res = res
-            end
-        end
-        saved_results = (theta_optim=best_res.xmin, cost=best_res.fmin,
-                         names_est_opt=string.(propertynames(best_res.xmin)))
-    end
-
-    return saved_results, setup_results
-end
-
-function run_analysis()
-    parsed_args = parse_commandline()
-    output_filename = parsed_args["output"]
-
-    println("--- Starting Full Analysis ---"); flush(stdout)
-    println("Using output file: '$output_filename'"); flush(stdout)
-
-    local saved_results = nothing
-
-    if isfile(output_filename)
-        println("Found existing '$output_filename'. Attempting to load results..."); flush(stdout)
-        try
-            JLD2.@load output_filename saved_results
-            println("Successfully loaded 'saved_results' key!"); flush(stdout)
-        catch e
-            if e isa KeyError
-                println("Warning: File is old or malformed (KeyError). Will re-run estimation."); flush(stdout)
-            else
-                rethrow(e)
-            end
-        end
-    end
-
-    local setup_results
+    println("Calibrating TH17 pathway parameters with $n_starts starts..."); flush(stdout)
+    multi_start_res_s2 = calibrate_multistart(petab_problem_stage2, optimizer, n_starts; nprocs=length(procs()), options=optim_options)
+    best_run_s2 = multi_start_res_s2.runs[argmin([r.fmin for r in multi_start_res_s2.runs])]
     
-    if isnothing(saved_results)
-        saved_results, setup_results = run_parameter_estimation(parsed_args)
+    params_s2_dict = untransform_parameters(best_run_s2.xmin, petab_problem_stage2.petab_model.parameter_map)
+    println("✅ Stage 2 complete. Best cost: $(best_run_s2.fmin)")
 
-        if isnothing(saved_results)
-            @error "Parameter estimation failed. Cannot proceed."
-            return
-        end
 
-        try
-            JLD2.@save output_filename saved_results
-            println("INFO: New estimation output saved to '$output_filename'"); flush(stdout)
-        catch e
-            @error "Failed to save new '$output_filename'. Error: $e"
-        end
+    # =================================
+    # --- STAGE 3: Global Fine-Tune ---
+    # =================================
+    println("\n\n--- STAGE 3: FITTING ALL DATA (global fine-tuning) ---"); flush(stdout)
+    # Combine the best parameters from both stages to use as an excellent starting guess
+    combined_params = merge(params_s1_dict, params_s2_dict)
+
+    setup_stage3 = setup_petab_problem(stage=:ALL, params_to_fix=nothing) # estimate all
+    petab_problem_stage3 = PEtabODEProblem(setup_stage3.petab_model;
+                                            gradient_method=:Adjoint,
+                                            sensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)),
+                                            odesolver=ODESolver(CVODE_BDF(linear_solver=:GMRES), abstol=abstol, reltol=reltol),
+                                            sparse_jacobian=false, verbose=false)
+
+    # Create the single best start-guess for the final run
+    start_guess_s3 = get_startguess(combined_params, petab_problem_stage3.petab_model.parameter_map)
+
+    println("Performing final fine-tuning calibration..."); flush(stdout)
+    # For the final stage, a single run from our excellent start-guess is often sufficient
+    final_res = calibrate(petab_problem_stage3, optimizer, start_guess_s3; options=optim_options)
+    println("✅ Stage 3 complete. Final best cost: $(final_res.fmin)")
+
+    # --- Save final results ---
+    saved_results = (theta_optim=final_res.xmin, cost=final_res.fmin,
+                     names_est_opt=string.(propertynames(final_res.xmin)))
+
+    try
+        JLD2.@save output_filename saved_results
+        println("INFO: Final staged fitting output saved to '$output_filename'"); flush(stdout)
+    catch e
+        @error "Failed to save final results to '$output_filename'. Error: $e"
     end
 
-    println("\n--- Setting up objects for Visualization ---"); flush(stdout)
-    if !@isdefined(setup_results) || isnothing(setup_results)
-        println("\n[Timing] Setting up PEtab Model for visualization..."); flush(stdout)
-        @time setup_results = setup_petab_problem()
-        if isnothing(setup_results)
-            @error "Failed to setup problem for visualization."
-            return
-        end
-    end
+
+    # --- Visualization ---
+    println("\n\n--- Starting Final Visualization ---"); flush(stdout)
     
-    local vis_petab_problem
-    println("\n[Timing] Building PEtabODEProblem for visualization..."); flush(stdout)
-    @time vis_petab_problem = PEtabODEProblem(setup_results.petab_model, verbose=false)
-
-    println("\n--- Starting Visualization ---"); flush(stdout)
-    println("\n[Timing] Running visualization..."); flush(stdout)
-    @time try
+    println("Visualizing final results using the PEtab-aware simulation engine...")
+    try
+        # The `petab_problem_stage3` is the full problem definition used for the final fit.
+        # We pass it along with the final optimized parameters to the new visualization function,
+        # which correctly handles pre-equilibration.
         run_visualization(
-            collect(saved_results.theta_optim),
-            collect(saved_results.names_est_opt),
-            setup_results.petab_params_list,
-            setup_results.meas,
-            vis_petab_problem,
-            setup_results.observables_petab_dict,
-            setup_results.sf_param_map,
-            setup_results.rsys,
-            setup_results.prn,
-            setup_results.il6_species_name
+            final_res.xmin,       # The final optimized parameter vector
+            petab_problem_stage3  # The full problem definition for simulation
         )
         println("✅ Visualization completed successfully!"); flush(stdout)
     catch e
         @error "Visualization failed" exception=(e, catch_backtrace())
     end
 
-    println("\n--- Full Analysis Complete ---"); flush(stdout)
+    println("\n--- Staged Fitting Analysis Complete ---"); flush(stdout)
 end
 
 run_analysis()
