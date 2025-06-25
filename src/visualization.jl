@@ -1,117 +1,95 @@
 # src/visualization.jl
 
-Pkg.add("CSV")
-
 # 1. Import Dependencies
 using Plots; gr()
 using DataFrames
-using DifferentialEquations # For ReturnCode
+using DifferentialEquations
 using PEtab
 using Printf
 using CSV
 
-# Helper function for consistent naming
-function safe_name_initializer(sym_or_var)
-    s = string(sym_or_var)
-    s_name = first(split(s, "(t)"))
-    return Symbol(s_name)
-end
-
 # 2. Main Visualization Function
 function run_visualization(
     theta_optim::Vector{Float64},
-    petab_prob # This is the PEtabODEProblem
-    )
+    petab_prob::PEtabODEProblem
+)
+    println("\n--- Starting Visualization ---")
 
-    println("\n--- Starting Visualization (with PEtab pre-equilibration) ---")
-
-    # Extract necessary components directly from the PEtabODEProblem
-    meas = petab_prob.petab_model.measurement_df
-    observables_petab_dict = petab_prob.petab_model.observables
+    parameter_names_on_scale = petab_prob.model_info.xindices.xids[:estimate_ps]
+    p_est = ComponentArray(; (parameter_names_on_scale .=> theta_optim)...)
     
-    cond_ids_for_plot = unique(meas.simulation_id)
-    unique_obs_ids_plot = unique(meas.observableId) 
+    println("Calculating simulated values for all conditions...")
+    simulated_vals = petab_prob.simulated_values(p_est)
 
-    all_simulations_df_list = []
+    # Get the measurement data table, which now has the standardized column names
+    results_df = deepcopy(petab_prob.model_info.model.petab_tables[:measurements])
+    results_df[!, :simulated] = simulated_vals
 
-    # Loop over each observable to create a separate plot
-    for obs_id_str_plot in unique_obs_ids_plot
-        base_name_plot = replace(obs_id_str_plot, "obs_" => "") 
-        println("\n--- Plotting for observable: $base_name_plot ---")
+    plot_path = joinpath(pwd(), "final_results_plots")
+    if !isdir(plot_path); mkpath(plot_path); end
 
-        plt = plot(title="Biochemical Dynamics: $base_name_plot", xlabel="Time (min)", ylabel="Concentration (a.u.)", legend=:outertopright, framestyle=:box)
-        plot!(plt, ymin=0) 
+    # Create one plot for each observable
+    for obs_id in unique(results_df.observableId)
+        
+        plt = plot(title="Observable: $obs_id", xlabel="Time", ylabel="Value", legend=:outertopright)
+        
+        # Filter the results for the current observable
+        obs_df = filter(:observableId => ==(obs_id), results_df)
 
-        # PEtab's observable dictionary uses Symbols for keys
-        obs_id_sym = Symbol(obs_id_str_plot)
-        if !haskey(observables_petab_dict, obs_id_sym)
-            @error "Observable ID '$obs_id_str_plot' not found in observables_petab_dict. Skipping."
-            continue
+        # For each condition, plot the experimental data and the simulated model output
+        for condition_id in unique(obs_df.simulationConditionId)
+            cond_df = filter(:simulationConditionId => ==(condition_id), obs_df)
+            
+            # Plot experimental data as scatter points
+            plot!(plt, cond_df.time, cond_df.measurement, seriestype=:scatter, label="Data: $condition_id", markersize=4)
+
+            # Plot simulated data as a line
+            sort!(cond_df, :time)
+            plot!(plt, cond_df.time, cond_df.simulated, seriestype=:line, label="Model: $condition_id", linewidth=2)
         end
         
-        # Loop over each experimental condition (e.g., TREG, TH17)
-        for ext_cond in cond_ids_for_plot
-            println(" 🔬 Simulating condition: $ext_cond for observable $base_name_plot")
-            
-            # Filter and plot the experimental data for the current condition
-            df_exp_cond = filter(row -> row.simulation_id == ext_cond && row.observableId == obs_id_str_plot, meas)
-            if !isempty(df_exp_cond)
-                plot!(plt, df_exp_cond.Time, df_exp_cond.measurement, 
-                      seriestype=:scatter, 
-                      label="Data: $ext_cond",
-                      markersize=4, markerstrokewidth=0.5)
-            end
-
-            try
-                # This correctly handles pre-equilibration and condition-specific parameters.
-                t_max_sim = isempty(df_exp_cond) ? 120.0 : ceil(maximum(df_exp_cond.Time))
-                
-                sol = petab_prob.compute_solution(
-                    theta_optim;
-                    condition_id=ext_cond,
-                    tmax=t_max_sim
-                )
-
-                if sol.retcode == ReturnCode.Success
-                    # Use PEtab's function to calculate observables from the solution object
-                    observables = petab_prob.compute_observables(sol)
-                    final_obs_sim = observables[obs_id_sym] 
-
-                    # Plot the simulated trajectory
-                    plot!(plt, sol.t, final_obs_sim,
-                          label="Model: $ext_cond",
-                          seriestype=:line, linewidth=2.5)
-                    
-                    # Store simulation results for later saving
-                    df_sim = DataFrame(time=sol.t, measurement=final_obs_sim, 
-                                       simulation_id=ext_cond, observableId=obs_id_str_plot)
-                    push!(all_simulations_df_list, df_sim)
-                else
-                    @warn "   ODE solution failed for condition '$ext_cond' with retcode $(sol.retcode)."
-                end
-
-            catch e_solve
-                @error "   Error during simulation for visualization: $e_solve" exception=(e_solve, catch_backtrace())
-            end
-        end
-
-        # Save the completed plot for the current observable
-        plot_path = joinpath(pwd(), "final_results_plots")
-        if !isdir(plot_path); mkpath(plot_path); end
-        plot_filename = joinpath(plot_path, "$base_name_plot.png")
+        # Save the plot for the current observable
+        plot_filename = joinpath(plot_path, "$(obs_id).png")
         savefig(plt, plot_filename)
         println("✅ Plot saved to: $plot_filename")
     end
 
-    # Save all simulated data to a single CSV file
-    if !isempty(all_simulations_df_list)
-        full_sim_df = vcat(all_simulations_df_list...)
-        csv_path = joinpath(pwd(), "final_results_csv")
-        if !isdir(csv_path); mkpath(csv_path); end
-        csv_filename = joinpath(csv_path, "simulated_trajectories.csv")
-        CSV.write(csv_filename, full_sim_df)
-        println("✅ All simulation data saved to: $csv_filename")
+    println("\n--- Visualization Complete ---")
+end
+
+function plot_waterfall(multistart_result::PEtabMultistartResult)
+    
+    # Define the output directory and create it if it doesn't exist
+    plot_dir = joinpath(pwd(), "final_results_plots")
+    if !isdir(plot_dir); mkpath(plot_dir); end
+    save_path = joinpath(plot_dir, "waterfall_plot.png")
+
+    # Extract the final cost (fmin) from each successful run
+    fmin_values = [run.fmin for run in multistart_result.runs if isfinite(run.fmin)]
+
+    if isempty(fmin_values)
+        @warn "No successful runs found to create a waterfall plot."
+        return
     end
 
-    println("\n--- Visualization Complete ---")
+    # Sort the values from best to worst
+    sort!(fmin_values)
+
+    # Create the plot
+    plt = plot(
+        1:length(fmin_values),
+        fmin_values,
+        seriestype=:path,
+        marker=:circle,
+        title="Waterfall Plot",
+        xlabel="Sorted Optimization Run Index",
+        ylabel="Final Objective Value (log scale)",
+        legend=false,
+        yscale=:log10,
+        framestyle=:box,
+        grid=true
+    )
+
+    savefig(plt, save_path)
+    println("✅ Waterfall plot saved to: $save_path")
 end

@@ -1,0 +1,9 @@
+# Mapping from sheet names in the data file to observable IDs in the model
+observables_mapping:
+  Free_IL6_obs: Free_IL6_obs
+  IL6R_Active: IL6R_Active
+  PKA_active: PKA_Active
+  S3S4_complex_obs: S3S4_complex_obs
+  S3STAT3d_complex_obs: S3STAT3d_complex_obs
+  STAT3d_active_obs: STAT3d_active_obs
+  pSMAD3_obs: pSMAD3_obs

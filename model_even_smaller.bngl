@@ -1,35 +1,50 @@
 begin model
 
 begin parameters
-    # Signal strength for TGF-beta (can be set to 0 or 1,or varied)
-    TGFb_signal 1.0 
+    # Initial amounts of molecules
+    TGFb_0            1.0         # Initial amount of TGF-beta ligand (set to 0 if no TGF-beta stimulus)
+    IL6_0             100.0       # Initial amount of IL-6 ligand (set to 0 if no IL-6 stimulus)
 
     # IL-6 Pathway
-    kf_il6_bind     0.1 # IL6 binding to IL6R
-    kr_il6_bind     0.01
-    k_act_il6r      0.5 # Activation of IL6R when IL6 is bound
-    k_inact_il6r    0.05 # Inactivation/dissociation of active IL6-IL6R complex
+    kf_il6_bind       0.1         # IL6 binding to IL6R
+    kr_il6_bind       0.01        # Dissociation of IL6-IL6R complex
+    k_act_il6r        0.5         # Activation of IL6R when IL6 is bound
+    k_inact_il6r      0.05        # Inactivation/dissociation of active IL6-IL6R complex
 
     # SMAD3 dynamics
-    k_phos_smad3    0.1 # Rate of SMAD3 phosphorylation driven by TGFb_signal
-    k_dephos_smad3  0.05 # Basal dephosphorylation of pSMAD3
+    k_phos_smad3      0.1         # Rate of SMAD3 phosphorylation driven by TGFb
+    k_dephos_smad3    0.05        # Basal dephosphorylation of pSMAD3
 
     # STAT3 dynamics (simplified phosphorylation and dimerization)
-    k_act_stat3_by_il6r 0.2 # Rate of STAT3 activation catalyzed by active IL6R complex
-    k_deact_stat3       0.05 # Basal deactivation/dissociation of active STAT3 dimer
+    k_act_stat3_by_il6r 0.2       # Rate of STAT3 activation catalyzed by active IL6R complex
+    k_deact_stat3       0.05        # Basal deactivation/dissociation of active STAT3 dimer
 
     # Complex formation
-    kf_s3s4         1.0 # pSMAD3 + SMAD4 -> S3S4_complex
-    kr_s3s4         0.1
-    kf_s3stat3d     1.0 # pSMAD3 + STAT3d_active -> S3STAT3d_complex
-    kr_s3stat3d     0.1
+    kf_s3s4           1.0         # pSMAD3 + SMAD4 -> S3S4_complex
+    kr_s3s4           0.1         # Dissociation of S3S4_complex
+    kf_s3stat3d       1.0         # pSMAD3 + STAT3d_active -> S3STAT3d_complex
+    kr_s3stat3d       0.1         # Dissociation of S3STAT3d_complex
 
     # PKA activation (simplified)
-    k_act_pka       0.2 # Activation of PKA by S3S4_complex
-    k_deact_pka     0.05 # Basal deactivation of PKA_active
+    k_act_pka         0.2         # Activation of PKA by S3S4_complex
+    k_deact_pka       0.05        # Basal deactivation of PKA_active
+
+    # Initial amounts of cellular components
+    IL6R_0            100.0       # Initial amount of inactive IL6 receptor
+    SMAD3_0           100.0       # Initial amount of unphosphorylated SMAD3
+    SMAD4_0           50.0        # Initial amount of SMAD4
+    STAT3m_0          100.0       # Initial amount of inactive STAT3 monomers
+    PKA_0             50.0        # Initial amount of inactive PKA
+    SMAD3_phos_P_0    0.0         # Initial amount of phosphorylated SMAD3
+    STAT3d_active_0   0.0         # Initial amount of active STAT3 dimers
+    PKA_active_0      0.0         # Initial amount of active PKA
+
 end parameters
 
 begin molecule types
+    # TGF-beta Signaling
+    TGFb(r)
+
     # IL-6 Signaling
     IL6(r)
     IL6R(l_bind,activity~I~A) # I=inactive,A=active
@@ -43,24 +58,31 @@ begin molecule types
 end molecule types
 
 begin seed species
-    # IL-6 Pathway
-    IL6(r)                            10 # Initial amount of IL-6 ligand (set to 0 if no IL-6 stimulus)
-    IL6R(l_bind,activity~I)               50 # Initial amount of inactive IL6 receptor
+    # Ligands
+    TGFb(r)                                     TGFb_0
+    IL6(r)                                      IL6_0
 
-    # Core Components
-    SMAD3(phos~U,smad4_site,stat3_site)  100
-    SMAD4(s3_site)                         50
-    STAT3m()                               100
-    PKA(activity~I)                        50
-    # Initially no phosphorylated/active forms from these pathways
-    SMAD3(phos~P,smad4_site,stat3_site)  0
-    STAT3d_active(s3_site)                 0
-    PKA(activity~A)                        0
+    # IL-6 Pathway Components
+    IL6R(l_bind,activity~I)                     IL6R_0
+
+    # Core Cellular Components
+    SMAD3(phos~U,smad4_site,stat3_site)         SMAD3_0
+    SMAD4(s3_site)                              SMAD4_0
+    STAT3m()                                    STAT3m_0
+    PKA(activity~I)                             PKA_0
+
+    # Initially no phosphorylated/active forms
+    SMAD3(phos~P,smad4_site,stat3_site)         SMAD3_phos_P_0
+    STAT3d_active(s3_site)                      STAT3d_active_0
+    PKA(activity~A)                             PKA_active_0
 end seed species
 
 begin observables
+    # TGF-beta Pathway
+    Molecules Free_TGFb_obs TGFb(r)
+
     # IL-6 Pathway
-    Molecules IL6R_Active IL6(r_bind!+).IL6R(l_bind!+,activity~A)
+    Molecules IL6R_Active IL6(r!+).IL6R(l_bind!+,activity~A)
     Molecules Free_IL6_obs IL6(r)
 
     # Core Components
@@ -73,19 +95,18 @@ end observables
 
 begin reaction rules
     # 0. IL-6 Signaling Pathway
-    R0a_IL6_Bind_Receptor: IL6(r) + IL6R(l_bind,activity~I) <-> IL6(r_bind!1).IL6R(l_bind!1,activity~I) kf_il6_bind,kr_il6_bind
-    R0b_Activate_IL6R: IL6(r_bind!+).IL6R(l_bind!+,activity~I) -> IL6(r_bind!+).IL6R(l_bind!+,activity~A) k_act_il6r
-    R0c_Inactivate_IL6R_Complex: IL6(r_bind!1).IL6R(l_bind!1,activity~A) -> IL6(r) + IL6R(l_bind,activity~I) k_inact_il6r
-    # ^ This rule represents dissociation leading to inactivation,or active complex turnover.
+    R0a_IL6_Bind_Receptor: IL6(r) + IL6R(l_bind,activity~I) <-> IL6(r!1).IL6R(l_bind!1,activity~I) kf_il6_bind,kr_il6_bind
+    R0b_Activate_IL6R: IL6(r!+).IL6R(l_bind!+,activity~I) -> IL6(r!+).IL6R(l_bind!+,activity~A) k_act_il6r
+    R0c_Inactivate_IL6R_Complex: IL6(r!1).IL6R(l_bind!1,activity~A) -> IL6(r) + IL6R(l_bind,activity~I) k_inact_il6r
 
-    # 1. SMAD3 Phosphorylation by TGF-beta signal
-    R1_Phos_SMAD3: SMAD3(phos~U) -> SMAD3(phos~P) k_phos_smad3 * TGFb_signal
+    # 1. SMAD3 Phosphorylation by TGF-beta signal (catalytic)
+    R1_Phos_SMAD3: SMAD3(phos~U) + TGFb(r) -> SMAD3(phos~P) + TGFb(r) k_phos_smad3
+
     # 2. pSMAD3 Dephosphorylation
     R2_Dephos_SMAD3: SMAD3(phos~P) -> SMAD3(phos~U) k_dephos_smad3
 
-    # 3. STAT3 Monomer Activation to Dimer,catalyzed by active IL6R complex
-    R3_Act_STAT3: STAT3m() + STAT3m() + IL6(r_bind!+).IL6R(l_bind!+,activity~A) -> STAT3d_active(s3_site) + IL6(r_bind!+).IL6R(l_bind!+,activity~A) k_act_stat3_by_il6r
-    # Note: Using the corrected STAT3d_active(s3_site) on RHS
+    # 3. STAT3 Monomer Activation to Dimer, catalyzed by active IL6R complex
+    R3_Act_STAT3: STAT3m() + STAT3m() + IL6(r!+).IL6R(l_bind!+,activity~A) -> STAT3d_active(s3_site) + IL6(r!+).IL6R(l_bind!+,activity~A) k_act_stat3_by_il6r
 
     # 4. Active STAT3 Dimer Deactivation
     R4_Deact_STAT3: STAT3d_active() -> STAT3m() + STAT3m() k_deact_stat3
@@ -107,6 +128,6 @@ end reaction rules
 end model
 
 # Actions
-generate_network({overwrite=>1,verbose=>0,max_agg=>4})
+generate_network({overwrite=>1,verbose=>0})
 simulate({method=>"ode",t_end=>100,n_steps=>1000})
 visualize({type=>"contactmap",suffix=>"all"})
