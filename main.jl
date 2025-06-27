@@ -16,7 +16,7 @@ using Plots
 using PEtab
 
 # Define defaults for model and data files
-const DEFAULT_MODEL_NET = "model_even_smaller/2025_06_24__14_43_19/model_even_smaller.net"
+const DEFAULT_MODEL_NET = "model_even_smaller/2025_06_26__19_02_01/model_even_smaller.net"
 const DEFAULT_DATA_XLSX = "SimData/simulation_results.xlsx"
 
 function get_slurm_cpus()
@@ -113,6 +113,10 @@ function run_analysis()
     enable_preeq = parsed_args["with-preeq"]
     output_filename = parsed_args["output"]
 
+    # --- ADD THIS LINE FOR DEBUGGING ---
+    println("INFO: The script will use the following output file: '", output_filename, "'")
+    flush(stdout)
+
     println("--- Starting Full Analysis ---"); flush(stdout)
     println("Using output file: '$output_filename'"); flush(stdout)
 
@@ -160,6 +164,8 @@ function run_analysis()
     if !isnothing(multi_start_res)
         println("\n--- Generating Waterfall Plot ---"); flush(stdout)
         plot_waterfall(multi_start_res)
+        println("\n-- Print Parameter Distribution Plot ---"); flush(stdout)
+        plot_parameter_distribution(multi_start_res)
     end
 
     saved_results = (

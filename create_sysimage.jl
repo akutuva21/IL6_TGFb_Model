@@ -6,6 +6,7 @@ Pkg.activate("bngl_julia/")
 using PackageCompiler
 
 pkgs = [
+    "CSV",
     "DataFrames",
     "DifferentialEquations",
     "ModelingToolkit",
@@ -24,7 +25,8 @@ pkgs = [
     "ArgParse",
     "JLD2", 
     "ComponentArrays",
-    "XLSX"
+    "XLSX",
+    "YAML"
 ]
 
 sysimage_path = "bngl_sysimage.so"

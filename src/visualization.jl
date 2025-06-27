@@ -8,7 +8,8 @@ using PEtab
 using Printf
 using CSV
 
-# 2. Main Visualization Function
+export run_visualization, plot_waterfall, plot_parameter_distribution
+
 function run_visualization(
     theta_optim::Vector{Float64},
     petab_prob::PEtabODEProblem
@@ -59,23 +60,19 @@ end
 
 function plot_waterfall(multistart_result::PEtabMultistartResult)
     
-    # Define the output directory and create it if it doesn't exist
     plot_dir = joinpath(pwd(), "final_results_plots")
     if !isdir(plot_dir); mkpath(plot_dir); end
     save_path = joinpath(plot_dir, "waterfall_plot.png")
 
-    # Extract the final cost (fmin) from each successful run
-    fmin_values = [run.fmin for run in multistart_result.runs if isfinite(run.fmin)]
+    fmin_values = [run.fmin for run in multistart_result.runs if isfinite(run.fmin) && run.fmin > 0]
 
     if isempty(fmin_values)
-        @warn "No successful runs found to create a waterfall plot."
+        @warn "No positive, finite objective function values found to create a waterfall plot."
         return
     end
 
-    # Sort the values from best to worst
     sort!(fmin_values)
 
-    # Create the plot
     plt = plot(
         1:length(fmin_values),
         fmin_values,
@@ -92,4 +89,83 @@ function plot_waterfall(multistart_result::PEtabMultistartResult)
 
     savefig(plt, save_path)
     println("✅ Waterfall plot saved to: $save_path")
+end
+
+
+"""
+    plot_parameter_distribution(multistart_result::PEtabMultistartResult)
+
+Creates a parameter distribution plot (parallel coordinates) similar to
+pyPESTO's `visualize.parameters`, based on the provided Julia multi-start result.
+
+Each line represents a single optimization run. The best overall run is
+highlighted in red.
+"""
+function plot_parameter_distribution(multistart_result::PEtabMultistartResult)
+    println("\n--- Generating Parameter Distribution Plot (Julia) ---")
+    plot_dir = joinpath(pwd(), "final_results_plots")
+    if !isdir(plot_dir); mkpath(plot_dir); end
+    save_path = joinpath(plot_dir, "parameter_distribution_plot.png")
+
+    # --- 1. Extract necessary data from the result object ---
+    petab_prob = multistart_result.petab_problem
+    
+    param_names = string.(petab_prob.model_info.xindices.xids[:estimate_ps])
+    n_params = length(param_names)
+    
+    lower_bounds = petab_prob.lower_bounds
+    upper_bounds = petab_prob.upper_bounds
+
+    # Get all parameter estimates and filter out any failed runs
+    all_p_estimates = [run.pmin for run in multistart_result.runs if !isempty(run.pmin)]
+    if isempty(all_p_estimates)
+        @warn "No valid parameter estimates found to create a distribution plot."
+        return
+    end
+
+    # Get the single best parameter vector
+    best_p = multistart_result.pmin
+
+    # --- 2. Create the plot canvas ---
+    plt = plot(
+        title="Estimated parameters",
+        xlabel="Parameter value (log10)",
+        ylabel="Parameter",
+        legend=false,
+        yticks=(1:n_params, param_names), # Set y-axis ticks to parameter names
+        yflip=true, # Match pyPESTO style (first param at top)
+        framestyle=:box
+    )
+
+    # --- 3. Plot all optimization runs as faint gray lines ---
+    # The y-axis values are just the integer indices of the parameters
+    y_values = 1:n_params
+    for p_vec in all_p_estimates
+        # Check if the vector is the best one to avoid plotting it twice
+        if p_vec != best_p
+            plot!(plt, p_vec, y_values, seriestype=:path, color=:gray, alpha=0.3, linewidth=1)
+        end
+    end
+    
+    # --- 4. Plot the parameter bounds as black '+' markers ---
+    # We plot these as a scatter plot for clarity, mimicking the pyPESTO look
+    bounds_y = vcat(y_values, y_values)
+    bounds_x = vcat(lower_bounds, upper_bounds)
+    scatter!(plt, bounds_x, bounds_y, marker=:+, color=:black, markersize=4, label="")
+
+    # --- 5. Highlight the single best run in red ---
+    if !isempty(best_p)
+        plot!(plt, best_p, y_values, 
+              seriestype=:path, 
+              color=:red, 
+              alpha=0.9,
+              linewidth=2,
+              marker=:circle,
+              markersize=3,
+              label="Best Run") # Label for clarity, though legend is off
+    end
+    
+    # Save the final plot
+    savefig(plt, save_path)
+    println("✅ Parameter distribution plot saved to: $save_path")
 end
