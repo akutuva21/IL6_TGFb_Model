@@ -1,3 +1,33 @@
+# Main configuration for the data generation script.
+
+# --- General Settings & Mode Selection ---
+model_path: "model_even_smaller.bngl"
+output_dir: "SimData" # Directory to save the generated CSV/Excel files
+random_seed: 42
+
+# Set the desired mode: "dose_response" or "time_course"
+# "time_course": Generates dynamic data over a time period.
+# "dose_response": Generates or processes steady-state data at different stimulus levels.
+run_mode: "time_course"
+
+# --------------------------------------------------------------------------
+#                   SETTINGS FOR "time_course" MODE
+# --------------------------------------------------------------------------
+time_course_settings:
+  # Define the experimental conditions using BNGL parameter names.
+  # The script will automatically find the corresponding internal simulator IDs.
+  conditions:
+    Treg: {IL6_0: 0.0, TGFb_0: 1.0}
+    TH17: {IL6_0: 100.0, TGFb_0: 1.0}
+  
+  simulation:
+    duration: 100.0
+    steps: 1000
+
+  noise:
+    add: true
+    level_percent: 10.0
+
 # Mapping from sheet names in the data file to observable IDs in the model
 observables_mapping:
   Free_IL6_obs: Free_IL6_obs
@@ -7,3 +37,44 @@ observables_mapping:
   S3STAT3d_complex_obs: S3STAT3d_complex_obs
   STAT3d_active_obs: STAT3d_active_obs
   pSMAD3_obs: pSMAD3_obs
+
+# --------------------------------------------------------------------------
+#                   SETTINGS FOR "dose_response" MODE
+# --------------------------------------------------------------------------
+dose_response_settings:
+  # The parameter you are varying for the dose response.
+  # This must match a parameter in your BNGL model.
+  dose_parameter: "IL6_0"
+  
+  # Define any other parameters that should be held constant during the dose response.
+  constant_parameters:
+    TGFb_0: 1.0
+  
+  # --- Settings to read your existing Excel data file ---
+  input_data:
+    # Set to true if you want to load data from an Excel file.
+    # If false, the script will generate new data based on the 'generation' settings below.
+    load_from_file: true
+    filepath: "Data/IL_6_SMAD_COmplex_dose_response.xlsx" # Using existing file from workspace
+    # The name of the column in your Excel file that contains the dose values.
+    dose_column_name: "IL6"
+    # A mapping from the column names in your Excel file to the 
+    # observableId you want to use in the PEtab format.
+    column_to_observable_map:
+      "SMAD4_A": "SMAD4"
+      "SMAD4_B": "SMAD4"
+      "SMAD4_C": "SMAD4"
+      "STAT3_A": "STAT3_active" # Use descriptive PEtab-friendly names
+      "STAT3_B": "STAT3_active"
+      "STAT3_C": "STAT3_active"
+
+  # --- Settings for generating new data (if load_from_file is false) ---
+  generation:
+    dose_values: [0.01, 0.1, 0.2, 0.5, 1, 5, 10, 25, 50]
+    observables_to_record:
+      - "pSMAD3_obs"
+      - "STAT3d_active_obs"
+    noise:
+      add: true
+      level_percent: 5.0
+    replicates: 3

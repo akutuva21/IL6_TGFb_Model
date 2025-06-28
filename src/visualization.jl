@@ -101,15 +101,13 @@ pyPESTO's `visualize.parameters`, based on the provided Julia multi-start result
 Each line represents a single optimization run. The best overall run is
 highlighted in red.
 """
-function plot_parameter_distribution(multistart_result::PEtabMultistartResult)
+function plot_parameter_distribution(multistart_result::PEtabMultistartResult, petab_prob::PEtabODEProblem)
     println("\n--- Generating Parameter Distribution Plot (Julia) ---")
     plot_dir = joinpath(pwd(), "final_results_plots")
     if !isdir(plot_dir); mkpath(plot_dir); end
     save_path = joinpath(plot_dir, "parameter_distribution_plot.png")
 
     # --- 1. Extract necessary data from the result object ---
-    petab_prob = multistart_result.petab_problem
-    
     param_names = string.(petab_prob.model_info.xindices.xids[:estimate_ps])
     n_params = length(param_names)
     
@@ -117,15 +115,16 @@ function plot_parameter_distribution(multistart_result::PEtabMultistartResult)
     upper_bounds = petab_prob.upper_bounds
 
     # Get all parameter estimates and filter out any failed runs
-    all_p_estimates = [run.pmin for run in multistart_result.runs if !isempty(run.pmin)]
-    if isempty(all_p_estimates)
+    all_x_estimates = [run.xmin for run in multistart_result.runs if !isempty(run.xmin)]
+    if isempty(all_x_estimates)
         @warn "No valid parameter estimates found to create a distribution plot."
         return
     end
 
     # Get the single best parameter vector
-    best_p = multistart_result.pmin
+    best_x = multistart_result.xmin
 
+    plot_height = max(400, n_params * 30) # 30 pixels per parameter, with a minimum of 400
     # --- 2. Create the plot canvas ---
     plt = plot(
         title="Estimated parameters",
@@ -134,16 +133,17 @@ function plot_parameter_distribution(multistart_result::PEtabMultistartResult)
         legend=false,
         yticks=(1:n_params, param_names), # Set y-axis ticks to parameter names
         yflip=true, # Match pyPESTO style (first param at top)
-        framestyle=:box
+        framestyle=:box,
+        size=(800, plot_height)
     )
 
     # --- 3. Plot all optimization runs as faint gray lines ---
     # The y-axis values are just the integer indices of the parameters
     y_values = 1:n_params
-    for p_vec in all_p_estimates
+    for x_vec in all_x_estimates
         # Check if the vector is the best one to avoid plotting it twice
-        if p_vec != best_p
-            plot!(plt, p_vec, y_values, seriestype=:path, color=:gray, alpha=0.3, linewidth=1)
+        if x_vec != best_x
+            plot!(plt, x_vec, y_values, seriestype=:path, color=:gray, alpha=0.3, linewidth=1)
         end
     end
     
@@ -154,8 +154,8 @@ function plot_parameter_distribution(multistart_result::PEtabMultistartResult)
     scatter!(plt, bounds_x, bounds_y, marker=:+, color=:black, markersize=4, label="")
 
     # --- 5. Highlight the single best run in red ---
-    if !isempty(best_p)
-        plot!(plt, best_p, y_values, 
+    if !isempty(best_x)
+        plot!(plt, best_x, y_values, 
               seriestype=:path, 
               color=:red, 
               alpha=0.9,

@@ -14,6 +14,8 @@ using JLD2
 using ComponentArrays
 using Plots
 using PEtab
+using SciMLSensitivity
+using ReverseDiff
 
 # Define defaults for model and data files
 const DEFAULT_MODEL_NET = "model_even_smaller/2025_06_26__19_02_01/model_even_smaller.net"
@@ -58,6 +60,8 @@ end
 @everywhere using PEtab
 @everywhere using Optim
 @everywhere using Sundials
+@everywhere using SciMLSensitivity
+@everywhere using ReverseDiff
 
 function parse_commandline()
     s = ArgParseSettings(description="Run parameter estimation and visualization.")
@@ -113,7 +117,6 @@ function run_analysis()
     enable_preeq = parsed_args["with-preeq"]
     output_filename = parsed_args["output"]
 
-    # --- ADD THIS LINE FOR DEBUGGING ---
     println("INFO: The script will use the following output file: '", output_filename, "'")
     flush(stdout)
 
@@ -144,7 +147,12 @@ function run_analysis()
         end
 
         println("\n[Timing] Building PEtabODEProblem..."); flush(stdout)
-        @time petab_problem = PEtabODEProblem(setup_results, verbose=false)
+        @time petab_problem = PEtabODEProblem(
+            setup_results,
+            gradient_method=:Adjoint,
+            sensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)),
+            verbose=false
+        )
 
         multi_start_res = run_parameter_estimation(parsed_args, petab_problem)
          
@@ -161,20 +169,7 @@ function run_analysis()
         end
     end
 
-    if !isnothing(multi_start_res)
-        println("\n--- Generating Waterfall Plot ---"); flush(stdout)
-        plot_waterfall(multi_start_res)
-        println("\n-- Print Parameter Distribution Plot ---"); flush(stdout)
-        plot_parameter_distribution(multi_start_res)
-    end
-
-    saved_results = (
-        theta_optim=multi_start_res.xmin, 
-        cost=multi_start_res.fmin,
-        names_est_opt=string.(propertynames(multi_start_res.xmin))
-    )
-    
-    println("\n--- Setting up objects for Visualization ---"); flush(stdout)
+    # Ensure the PEtab problem is set up for visualization, whether we loaded results or ran a new estimation.
     if !@isdefined(setup_results) || isnothing(setup_results)
         println("\n[Timing] Setting up PEtab Model for visualization..."); flush(stdout)
         @time setup_results = setup_petab_problem(enable_preeq, net_file, data_file, config_file)
@@ -184,10 +179,27 @@ function run_analysis()
         end
     end
     
-    local vis_petab_problem
     println("\n[Timing] Building PEtabODEProblem for visualization..."); flush(stdout)
-    @time vis_petab_problem = PEtabODEProblem(setup_results, verbose=false)
+    @time vis_petab_problem = PEtabODEProblem(
+        setup_results,
+        gradient_method=:Adjoint,
+        sensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)),
+        verbose=false
+    )
 
+    if !isnothing(multi_start_res)
+        println("\n--- Generating Waterfall Plot ---"); flush(stdout)
+        plot_waterfall(multi_start_res)
+        println("\n-- Print Parameter Distribution Plot ---"); flush(stdout)
+        plot_parameter_distribution(multi_start_res, vis_petab_problem)
+    end
+
+    saved_results = (
+        theta_optim=multi_start_res.xmin, 
+        cost=multi_start_res.fmin,
+        names_est_opt=string.(propertynames(multi_start_res.xmin))
+    )
+    
     println("\n--- Starting Visualization ---"); flush(stdout)
     println("\n[Timing] Running visualization..."); flush(stdout)
     @time try
@@ -197,7 +209,7 @@ function run_analysis()
         )
         println("✅ Visualization completed successfully!"); flush(stdout)
     catch e
-        @error "Visualization failed" exception=(e, catch_backtrace())
+        @error "Failed to generate visualization plots." exception=(e, catch_backtrace())
     end
 
     println("\n--- Full Analysis Complete ---"); flush(stdout)
