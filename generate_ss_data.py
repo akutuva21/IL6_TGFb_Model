@@ -24,6 +24,83 @@ def get_args():
 #                   HELPER AND SIMULATION FUNCTIONS
 # --------------------------------------------------------------------------
 
+def get_true_parameters(model: bionetgen.bngmodel, exclude_params: set) -> dict:
+    """Extracts the default parameter values from the model, excluding condition parameters."""
+    print("--- Extracting true kinetic parameters from BNGL model ---")
+    true_params = {}
+    # Iterate over parameter NAMES (which are strings)
+    for param_name in model.parameters:
+        if param_name not in exclude_params:
+            # Access the parameter object from the model using its name
+            param_obj = model.parameters[param_name]
+            true_params[param_name] = float(param_obj.value)
+    print(f"  Found {len(true_params)} kinetic parameters.")
+    return true_params
+
+def calculate_preeq_steadystate(model: bionetgen.bngmodel, true_params: dict, stimuli_to_zero: dict) -> np.ndarray:
+    """
+    Calculates the pre-equilibration steady-state using true kinetic parameters
+    and zero stimulus, via a long simulation.
+    """
+    print("--- Calculating single pre-equilibration steady-state ---")
+    simulator = model.setup_simulator()
+
+    # Set all kinetic parameters to their "true" default values
+    for name, value in true_params.items():
+        simulator.model[name] = value
+    
+    # Set all stimuli parameters to 0 for pre-equilibration
+    for sbml_id in stimuli_to_zero.values():
+        simulator.model[sbml_id] = 0.0
+
+    print("    1. Solving for steady-state via long simulation...")
+    simulator.simulate(start=0, end=1e8, steps=2)
+    
+    ss_concentrations = simulator.model.getFloatingSpeciesConcentrations()
+    print("    ...Correct pre-equilibrium state calculated and saved.")
+    return ss_concentrations
+
+def run_simulation_from_preeq(
+    model: bionetgen.bngmodel, 
+    ss_concentrations: np.ndarray,
+    true_params: dict,
+    stimuli: dict,
+    sim_duration: float,
+    sim_steps: int
+) -> pd.DataFrame:
+    """
+    Runs a single time-course simulation starting from a pre-calculated
+    steady-state.
+    """
+    simulator = model.setup_simulator()
+
+    # 1. Set all model parameters to their true values
+    for name, value in true_params.items():
+        simulator.model[name] = value
+
+    # 2. Set the initial concentrations to the provided steady-state vector
+    simulator.model.setFloatingSpeciesConcentrations(ss_concentrations)
+
+    # 3. Apply the specific stimuli for the current experimental condition
+    for species_id, value in stimuli.items():
+        simulator.model[species_id] = value
+    
+    # 4. Apply robust integrator settings
+    simulator.integrator.stiff = True
+    simulator.integrator.absolute_tolerance = 1e-8
+    simulator.integrator.relative_tolerance = 1e-6
+    simulator.integrator.maximum_num_steps = 50000
+    
+    # 5. Simulate the dynamic response
+    print("    Simulating dynamic response...")
+    result = simulator.simulate(start=0, end=sim_duration, steps=sim_steps)
+    
+    if result is None:
+        raise RuntimeError("Simulation failed to produce results.")
+
+    return pd.DataFrame(result, columns=result.colnames)
+
+
 def discover_species_map(model: bionetgen.bngmodel, params_to_trace: list) -> dict:
     """Uses a tracer method to find the mapping from BNGL parameters to simulator species IDs."""
     print("--- Discovering species mapping with tracer method ---")
@@ -57,58 +134,16 @@ def add_noise(data_series: pd.Series, noise_level: float, rng: np.random.Generat
     noisy_series = data_series + noise
     return noisy_series.clip(lower=0)
 
-def run_simulation_for_condition(
-    model: bionetgen.bngmodel, 
-    stimuli: dict,
-    sim_duration: float,
-    sim_steps: int
-) -> pd.DataFrame:
-    """
-    Runs the full pre-equilibration and main simulation for a single condition.
-    Uses a long simulation to reliably find the steady state.
-    """
-    simulator = model.setup_simulator()
-
-    print("    1. Solving for pre-equilibration steady-state via long simulation...")
-    simulator.resetAll()
-    for species_id in stimuli.keys():
-        simulator.model[species_id] = 0.0
-    
-    simulator.simulate(start=0, end=1e8, steps=2)
-    
-    ss_concentrations = simulator.model.getFloatingSpeciesConcentrations()
-    print("       ...Steady-state vector saved.")
-
-    print("    2. Preparing main simulation...")
-    simulator.resetAll()
-    simulator.model.setFloatingSpeciesConcentrations(ss_concentrations)
-    for species_id, value in stimuli.items():
-        simulator.model[species_id] = value
-    
-    print("    3. Applying robust integrator settings...")
-    simulator.integrator.stiff = True
-    simulator.integrator.absolute_tolerance = 1e-8
-    simulator.integrator.relative_tolerance = 1e-6
-    simulator.integrator.maximum_num_steps = 50000
-    
-    print("    4. Simulating dynamic response...")
-    result = simulator.simulate(start=0, end=sim_duration, steps=sim_steps)
-    
-    if result is None:
-        raise RuntimeError("Simulation failed to produce results.")
-
-    return pd.DataFrame(result, columns=result.colnames)
-
 # --------------------------------------------------------------------------
 #                   TIME-COURSE WORKFLOW WITH CORRECT SAVING
 # --------------------------------------------------------------------------
 
 def generate_time_course_excel(config):
     """
-    Generates time-course data and saves it to a single Excel file with one
-    sheet per observable, in the desired "wide" format.
+    Generates time-course data with a consistent pre-equilibration step
+    and saves it to a single Excel file in "wide" format.
     """
-    print(f"--- Running Time-Course Data Generation ---")
+    print(f"--- Running Time-Course Data Generation (Consistent Preeq) ---")
     
     # 1. Load settings and model
     tc_settings = config['time_course_settings']
@@ -120,25 +155,31 @@ def generate_time_course_excel(config):
     bng_model = bionetgen.bngmodel(model_path)
     os.makedirs(output_dir, exist_ok=True)
 
-    # 2. Discover mappings for all stimulus parameters
+    # 2. Discover mappings and get true parameters
     all_stimuli_params = set(k for v in tc_settings['conditions'].values() for k in v.keys())
     param_to_sbml_id = discover_species_map(bng_model, list(all_stimuli_params))
+    true_kinetic_params = get_true_parameters(bng_model, all_stimuli_params)
 
-    # 3. Run simulation for each condition and store results
+    # 3. Calculate the single, shared pre-equilibration steady state
+    ss_concentrations = calculate_preeq_steadystate(bng_model, true_kinetic_params, param_to_sbml_id)
+
+    # 4. Run simulation for each condition from the shared steady state
     time_course_results = {}
     for condition_name, stimuli_values in tc_settings['conditions'].items():
         print(f"\n--- Processing Condition: {condition_name} ---")
         stimuli_with_ids = {param_to_sbml_id[p]: v for p, v in stimuli_values.items()}
         
-        df_sim = run_simulation_for_condition(
+        df_sim = run_simulation_from_preeq(
             bng_model, 
+            ss_concentrations,
+            true_kinetic_params,
             stimuli_with_ids,
             tc_settings['simulation']['duration'],
             tc_settings['simulation']['steps']
         )
         time_course_results[condition_name] = df_sim
 
-    # 4. Save the results to a single Excel file in the correct "wide" format
+    # 5. Save the results to a single Excel file in the correct "wide" format
     noise_conf = tc_settings['noise']
     noise_str = f"_noise{int(noise_conf['level_percent'])}" if noise_conf['add'] else ""
     filename = os.path.join(output_dir, f"preeq{noise_str}.xlsx")
@@ -151,12 +192,14 @@ def generate_time_course_excel(config):
 
     with pd.ExcelWriter(filename) as writer:
         for obs_name in sorted(all_observables):
+            # Check if the observable column exists in the first simulation result
             if obs_name not in time_course_results[list(tc_settings['conditions'].keys())[0]].columns:
                 print(f"WARNING: Observable '{obs_name}' not found in simulation output. Skipping.")
                 continue
 
             # Create a new DataFrame for this observable's sheet
             sheet_df = pd.DataFrame()
+            # Use the time column from the first condition's results
             sheet_df['Time'] = time_course_results[list(tc_settings['conditions'].keys())[0]]['time']
 
             # Add a column for each condition

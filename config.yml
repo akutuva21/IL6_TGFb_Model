@@ -25,7 +25,7 @@ time_course_settings:
     steps: 1000
 
   noise:
-    add: true
+    add: false
     level_percent: 10.0
 
 # Mapping from sheet names in the data file to observable IDs in the model

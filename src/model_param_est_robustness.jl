@@ -98,25 +98,29 @@ function setup_petab_problem(enable_preeq::Bool, model_net_path::String, data_xl
         end
     end
     
+    # Define parameters that specify experimental conditions and should not be estimated.
+    condition_params = Set([:IL6_0, :TGFb_0])
+
     # Build the list of PEtab parameters to be estimated
     petab_params_list = PEtabParameter[]
     
     # Add kinetic parameters and initial concentration parameters from your BNGL file
     for (param_symbol, default_val) in p_map_defaults
-        should_estimate = true # Or your specific logic
+        # Determine if the parameter should be estimated.
+        # It should NOT be estimated if it's a condition-defining parameter.
+        should_estimate = !(param_symbol in condition_params)
         
-        # --- THIS IS THE CORRECTED LOGIC ---
         if endswith(string(param_symbol), "_0")
-            # Use wide, permissive bounds for initial concentrations that
-            # encompass all possible experimental conditions (including zero).
-            # A small non-zero value like 1e-9 is good for a log-scale lower bound.
+            # For all initial concentrations (e.g., SMAD3_0, IL6_0)
             push!(petab_params_list, PEtabParameter(param_symbol; value=default_val, scale=:log10, lb=1e-9, ub=1e4, estimate=should_estimate))
-            println("Setting wide bounds for initial condition parameter: $param_symbol")
+            if !should_estimate
+                println("INFO: Treating '$param_symbol' as a fixed condition parameter (not estimated).")
+            end
         else
-            # Bounds for kinetic rates can be tighter around their default values
+            # For kinetic parameters (e.g., kf_il6_bind)
             lower_bound = max(1e-9, default_val / 10.0)
             upper_bound = default_val * 10.0
-            push!(petab_params_list, PEtabParameter(param_symbol; value=default_val, scale=:log10, lb=lower_bound, ub=upper_bound, estimate=should_estimate))
+            push!(petab_params_list, PEtabParameter(param_symbol; value=default_val, scale=:log10, lb=lower_bound, ub=upper_bound, estimate=true))
         end
     end
 

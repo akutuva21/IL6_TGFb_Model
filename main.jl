@@ -3,6 +3,8 @@
 using Pkg
 Pkg.activate("bngl_julia/")
 
+Pkg.add("ReverseDiff")
+
 include("src/model_param_est_robustness.jl")
 include("src/visualization.jl")
 include("src/optimization.jl")
@@ -19,7 +21,7 @@ using ReverseDiff
 
 # Define defaults for model and data files
 const DEFAULT_MODEL_NET = "model_even_smaller/2025_06_26__19_02_01/model_even_smaller.net"
-const DEFAULT_DATA_XLSX = "SimData/simulation_results.xlsx"
+const DEFAULT_DATA_XLSX = "SimData/preeq.xlsx"
 
 function get_slurm_cpus()
     if haskey(ENV, "SLURM_CPUS_PER_TASK")
