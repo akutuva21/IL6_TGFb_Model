@@ -111,15 +111,15 @@ function setup_petab_problem(enable_preeq::Bool, model_net_path::String, data_xl
         should_estimate = !(param_symbol in condition_params)
         
         if endswith(string(param_symbol), "_0")
-            # For all initial concentrations (e.g., SMAD3_0, IL6_0)
+            # For all initial concentrations, use wider, more permissive bounds
             push!(petab_params_list, PEtabParameter(param_symbol; value=default_val, scale=:log10, lb=1e-9, ub=1e4, estimate=should_estimate))
             if !should_estimate
                 println("INFO: Treating '$param_symbol' as a fixed condition parameter (not estimated).")
             end
         else
-            # For kinetic parameters (e.g., kf_il6_bind)
-            lower_bound = max(1e-9, default_val / 10.0)
-            upper_bound = default_val * 10.0
+            # For kinetic parameters, use tighter bounds around the default value
+            lower_bound = max(1e-9, default_val / 100.0) # Tighter lower bound
+            upper_bound = default_val * 100.0           # Tighter upper bound
             push!(petab_params_list, PEtabParameter(param_symbol; value=default_val, scale=:log10, lb=lower_bound, ub=upper_bound, estimate=true))
         end
     end

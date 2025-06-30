@@ -26,7 +26,10 @@ pkgs = [
     "JLD2", 
     "ComponentArrays",
     "XLSX",
-    "YAML"
+    "YAML",
+    "ReverseDiff",
+    "OrdinaryDiffEq",
+    "Sundials"
 ]
 
 sysimage_path = "bngl_sysimage.so"

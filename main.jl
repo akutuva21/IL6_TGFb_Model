@@ -3,8 +3,6 @@
 using Pkg
 Pkg.activate("bngl_julia/")
 
-Pkg.add("ReverseDiff")
-
 include("src/model_param_est_robustness.jl")
 include("src/visualization.jl")
 include("src/optimization.jl")
@@ -18,6 +16,7 @@ using Plots
 using PEtab
 using SciMLSensitivity
 using ReverseDiff
+using OrdinaryDiffEq
 
 # Define defaults for model and data files
 const DEFAULT_MODEL_NET = "model_even_smaller/2025_06_26__19_02_01/model_even_smaller.net"
@@ -148,9 +147,15 @@ function run_analysis()
             return
         end
 
-        println("\n[Timing] Building PEtabODEProblem..."); flush(stdout)
+        println("\n[Timing] Building PEtabODEProblem with a stiff solver..."); flush(stdout)
+        
+        # Define a robust, stiff solver
+        stiff_solver = ODESolver(Rodas5P(), abstol=parsed_args["abstol"], reltol=parsed_args["reltol"])
+
         @time petab_problem = PEtabODEProblem(
             setup_results,
+            odesolver = stiff_solver,
+            odesolver_gradient = stiff_solver, # Use for gradients too
             gradient_method=:Adjoint,
             sensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)),
             verbose=false
@@ -182,8 +187,14 @@ function run_analysis()
     end
     
     println("\n[Timing] Building PEtabODEProblem for visualization..."); flush(stdout)
+    
+    # Also use the stiff solver for visualization to ensure consistency
+    vis_solver = ODESolver(Rodas5P(), abstol=parsed_args["abstol"], reltol=parsed_args["reltol"])
+
     @time vis_petab_problem = PEtabODEProblem(
         setup_results,
+        odesolver = vis_solver,
+        odesolver_gradient = vis_solver,
         gradient_method=:Adjoint,
         sensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)),
         verbose=false
