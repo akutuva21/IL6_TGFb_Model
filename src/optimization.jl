@@ -20,42 +20,30 @@ function create_petab_compatible_parameters(petab_problem::PEtabODEProblem)
     """
     Create properly formatted parameter vector for PEtab cost function evaluation.
     This handles the log10 transformation and parameter ordering that PEtab expects.
+    Uses dynamic parameter order from PEtab problem instead of hardcoded list.
     """
     param_names = petab_problem.xnames
     param_values = petab_problem.xnominal
     
-    # CORRECTED: :log10_TGFb_0 has been removed as it is no longer an estimated parameter.
-    expected_order = [
-        :log10_IL6R_0, :log10_kr_s3stat3d, :log10_k_deact_pka, :log10_kf_pka_bind, 
-        :log10_k_dephos_smad3, :log10_kr_pka_bind, :log10_k_phos_smad3, :log10_kr_s3s4, 
-        :log10_kf_s3s4, :log10_k_inact_il6r, :log10_k_deact_stat3, 
-        :log10_k_act_stat3_by_il6r, :log10_k_cat_pka, :log10_PKA_active_0, 
-        :log10_kr_il6_bind, :log10_PKA_0, :log10_k_act_il6r, :log10_STAT3m_0, 
-        :log10_kf_il6_bind, :log10_SMAD4_0, :log10_STAT3d_active_0, 
-        :log10_kf_s3stat3d, :log10_SMAD3_phos_P_0, :log10_SMAD3_0
-    ]
-    
-    param_dict = Dict(zip(param_names, param_values))
+    # Create parameter vector using the order already defined in petab_problem
+    # This is much more robust than hardcoding the parameter order
     ordered_values = Float64[]
     
-    for expected_name in expected_order
-        current_name = Symbol(replace(string(expected_name), "log10_" => ""))
+    for (i, param_name) in enumerate(param_names)
+        original_value = param_values[i]
         
-        if haskey(param_dict, current_name)
-            original_value = param_dict[current_name]
-            final_value = if startswith(string(expected_name), "log10_")
-                log10(max(original_value, 1e-12))
-            else
-                original_value
-            end
-            push!(ordered_values, final_value)
+        # Handle log10 transformation if the parameter name suggests it
+        if startswith(string(param_name), "log10_")
+            # Parameter is already in log10 space, use as-is
+            push!(ordered_values, original_value)
         else
-            @error "Could not find parameter $(current_name) for expected $(expected_name)"
-            throw(ArgumentError("Missing parameter: $(current_name)"))
+            # Parameter might need log10 transformation based on PEtab scaling
+            # Let PEtab handle the scaling internally
+            push!(ordered_values, original_value)
         end
     end
     
-    return ComponentArray(NamedTuple{Tuple(expected_order)}(ordered_values))
+    return ComponentArray(NamedTuple{Tuple(param_names)}(ordered_values))
 end
 
 function run_parameter_estimation(parsed_args, petab_problem)

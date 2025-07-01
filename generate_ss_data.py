@@ -316,6 +316,136 @@ def excel_to_petab_dose_response(config):
 
 
 # --------------------------------------------------------------------------
+#                   TIME-COURSE WORKFLOW WITH PEtab TSV OUTPUT
+# --------------------------------------------------------------------------
+
+def generate_time_course_petab(config):
+    """
+    Generates time-course data with consistent pre-equilibration step
+    and saves it in PEtab-standard TSV format (long format).
+    This is the recommended method for PEtab compliance.
+    """
+    print(f"--- Running Time-Course Data Generation (PEtab TSV Format) ---")
+    
+    # 1. Load settings and model
+    tc_settings = config['time_course_settings']
+    output_dir = config['output_dir']
+    os.makedirs(output_dir, exist_ok=True)
+    
+    model_path = tc_settings['model_file']
+    model = bionetgen.bngmodel(model_path)
+    
+    # 2. Extract parameters
+    conditions_list = tc_settings['conditions'].keys()
+    print("  Identified conditions:", list(conditions_list))
+    
+    condition_params = set()
+    for condition_config in tc_settings['conditions'].values():
+        condition_params.update(condition_config.get('stimulus_conditions', {}).keys())
+    print("  Identified stimulus (condition) parameters:", list(condition_params))
+    
+    true_params = get_true_parameters(model, condition_params)
+    
+    # 3. Get pre-equilibration steady-state
+    stimuli_to_zero = {}
+    for param in condition_params:
+        stimuli_to_zero[param] = 0.0
+    
+    preeq_ss = calculate_preeq_steadystate(model, true_params, stimuli_to_zero)
+    print(f"  Pre-equilibration steady-state calculated.")
+    
+    # 4. Simulation settings
+    sim_confs = tc_settings['simulation']
+    t_end = sim_confs['time_end']
+    n_points = sim_confs['time_points']
+    
+    # 5. Species mapping for setting initial concentrations
+    params_to_trace = [param for param in model.parameters.keys() if param.endswith('_0')]
+    param_to_sbml_id = discover_species_map(model, params_to_trace)
+    
+    # 6. Run simulations for each condition
+    time_course_results = {}
+    
+    for condition_name, condition_config in tc_settings['conditions'].items():
+        print(f"  Simulating condition: {condition_name}")
+        stimulus_conditions = condition_config.get('stimulus_conditions', {})
+        
+        result_df = run_simulation_from_preeq(
+            model, preeq_ss, true_params, stimulus_conditions, t_end, n_points
+        )
+        time_course_results[condition_name] = result_df
+    
+    # 7. Convert to PEtab long format
+    print("  Converting data to PEtab long format...")
+    
+    # Create noise generator
+    noise_conf = tc_settings['noise']
+    seed = tc_settings.get('random_seed', 42)
+    rng = np.random.default_rng(seed)
+    
+    # Prepare measurement and condition DataFrames
+    measurement_rows = []
+    condition_rows = []
+    
+    # Get observable names from config
+    observables = tc_settings.get('observables', [])
+    
+    # Add pre-equilibration condition
+    preeq_condition = {'conditionId': 'preeq_ss'}
+    for param in condition_params:
+        preeq_condition[param] = 0.0
+    condition_rows.append(preeq_condition)
+    
+    # Process each condition
+    for condition_name, condition_config in tc_settings['conditions'].items():
+        result_df = time_course_results[condition_name]
+        stimulus_conditions = condition_config.get('stimulus_conditions', {})
+        
+        # Add condition to conditions table
+        condition_row = {'conditionId': condition_name}
+        condition_row.update(stimulus_conditions)
+        condition_rows.append(condition_row)
+        
+        # Add measurements for each observable and time point
+        for _, row in result_df.iterrows():
+            time_val = row['time']
+            for obs_name in observables:
+                if obs_name in row:
+                    measurement_val = row[obs_name]
+                    
+                    # Add noise if configured
+                    if noise_conf['add']:
+                        noise_fraction = noise_conf['level_percent'] / 100.0
+                        noise = rng.normal(loc=0.0, scale=noise_fraction * abs(measurement_val))
+                        measurement_val = max(0, measurement_val + noise)  # Clip to non-negative
+                    
+                    measurement_rows.append({
+                        'observableId': obs_name,
+                        'simulationConditionId': condition_name,
+                        'time': time_val,
+                        'measurement': measurement_val,
+                        'preequilibrationConditionId': 'preeq_ss'
+                    })
+    
+    # 8. Create DataFrames and save
+    measurement_df = pd.DataFrame(measurement_rows)
+    condition_df = pd.DataFrame(condition_rows)
+    
+    # Save to TSV files
+    measurement_path = os.path.join(output_dir, "measurements_time_course.tsv")
+    condition_path = os.path.join(output_dir, "conditions_time_course.tsv")
+    
+    measurement_df.to_csv(measurement_path, index=False, sep='\t')
+    condition_df.to_csv(condition_path, index=False, sep='\t')
+    
+    print(f"✅ PEtab TSV files created successfully:")
+    print(f"   - Measurements: {measurement_path}")
+    print(f"   - Conditions:   {condition_path}")
+    print(f"   - Total measurements: {len(measurement_df)}")
+    print(f"   - Total conditions: {len(condition_df)}")
+
+
+# --------------------------------------------------------------------------
 #                   MAIN EXECUTION LOGIC
 # --------------------------------------------------------------------------
 
@@ -343,8 +473,11 @@ def main():
     elif run_mode == "time_course":
         generate_time_course_excel(config)
         
+    elif run_mode == "time_course_petab":
+        generate_time_course_petab(config)
+        
     else:
-        print(f"ERROR: Unknown run_mode '{run_mode}'. Please choose 'dose_response' or 'time_course'.")
+        print(f"ERROR: Unknown run_mode '{run_mode}'. Please choose 'dose_response', 'time_course', or 'time_course_petab'.")
 
 if __name__ == "__main__":
     main()
