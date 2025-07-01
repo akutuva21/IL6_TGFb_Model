@@ -16,99 +16,44 @@ const OPTIMIZER_GUIDANCE = Dict(
     "IPNewton" => "More robust for constrained/stiff problems, slower but more reliable"
 )
 
-function create_petab_compatible_parameters(petab_problem::PEtabODEProblem)
-    """
-    Create properly formatted parameter vector for PEtab cost function evaluation.
-    This handles the log10 transformation and parameter ordering that PEtab expects.
-    Uses dynamic parameter order from PEtab problem instead of hardcoded list.
-    """
-    param_names = petab_problem.xnames
-    param_values = petab_problem.xnominal
-    
-    # Create parameter vector using the order already defined in petab_problem
-    # This is much more robust than hardcoding the parameter order
-    ordered_values = Float64[]
-    
-    for (i, param_name) in enumerate(param_names)
-        original_value = param_values[i]
-        
-        # Handle log10 transformation if the parameter name suggests it
-        if startswith(string(param_name), "log10_")
-            # Parameter is already in log10 space, use as-is
-            push!(ordered_values, original_value)
-        else
-            # Parameter might need log10 transformation based on PEtab scaling
-            # Let PEtab handle the scaling internally
-            push!(ordered_values, original_value)
-        end
-    end
-    
-    return ComponentArray(NamedTuple{Tuple(param_names)}(ordered_values))
-end
-
 function run_parameter_estimation(parsed_args, petab_problem)
     println("\n🧪 Testing cost function before optimization...")
     
-    # Test the cost function with properly formatted parameters
+    # --- This block is now corrected ---
     try
-        # Create properly formatted parameters for PEtab
-        x_test = create_petab_compatible_parameters(petab_problem)
-        println("Created properly formatted parameter vector with $(length(x_test)) parameters")
+        # Get a single, correctly scaled start-guess using the correct function
+        x_test = get_startguesses(petab_problem, 1)
+        println("Testing cost function with a single start-guess vector.")
         
-        # Create a safe wrapper for the cost function that handles 'nothing' values
+        # Restore your safe_cost_function that uses .nllh, which is correct
         function safe_cost_function(x)
             try
                 result = petab_problem.nllh(x)
-                
-                # Check if result is nothing and return a large penalty instead
-                if result === nothing
-                    println("⚠️  Cost function returned 'nothing', using penalty value")
-                    return 1e10  # Large penalty value
-                elseif isnan(result) || isinf(result)
-                    println("⚠️  Cost function returned invalid value: $result, using penalty")
+                if result === nothing || isinf(result) || isnan(result)
+                    println("⚠️  Cost function returned an invalid value ($result), using penalty.")
                     return 1e10
                 else
                     return result
                 end
             catch e
-                if isa(e, MethodError) && e.f == convert && length(e.args) == 2 && e.args[2] === nothing
-                    println("⚠️  Caught 'convert nothing to Real' error, using penalty value")
-                    return 1e10  # Large penalty value instead of crashing
-                else
-                    println("⚠️  Cost function error: $e, using penalty value")
-                    return 1e10
-                end
+                println("⚠️  An error occurred in the cost function: $e. Using penalty.")
+                return 1e10
             end
         end
-        
-        # Test the safe cost function
+
         cost_test = safe_cost_function(x_test)
         println("✅ Safe cost function test successful. Initial cost: $cost_test")
-        
+
         if cost_test >= 1e10
-            println("⚠️  Warning: Using penalty value due to cost function issues")
-        elseif isinf(cost_test) || isnan(cost_test)
-            println("⚠️  Warning: Initial cost is infinite or NaN - this may cause optimization issues")
+            @warn "Initial cost is a penalty value. Check model parameters and solver options."
         end
-        
-        # Store the safe cost function for use in optimization
         println("✅ Cost function test passed. Proceeding with optimization using safe wrapper.")
-        
+
     catch e
-        println("❌ Cost function test failed: $e")
-        
-        # Check if this is the specific 'convert nothing to Real' error
-        if isa(e, MethodError) && e.f == convert && length(e.args) == 2 && e.args[2] === nothing
-            println("🔍 Detected the 'convert nothing to Real' error!")
-            println("This means an observable function is returning 'nothing' instead of a number.")
-            println("This is likely due to steady-state solving issues when all species concentrations are zero.")
-            println("❌ Parameter estimation cannot proceed until this issue is resolved.")
-        else
-            println("This explains the original parameter estimation failure.")
-        end
-        
+        println("❌ Cost function test or start-guess generation failed: $e")
         return nothing
     end
+    # --- End of corrected block ---
 
     use_parallel = parsed_args["parallel"]
     optimizer_choice_str = parsed_args["optimizer"]
@@ -122,23 +67,20 @@ function run_parameter_estimation(parsed_args, petab_problem)
         return nothing
     end
     
-    # Print optimizer guidance
     if haskey(OPTIMIZER_GUIDANCE, optimizer_choice_str)
         println("INFO: Using $optimizer_choice_str - $(OPTIMIZER_GUIDANCE[optimizer_choice_str])")
     end
     optimizer = SUPPORTED_OPTIMIZERS[optimizer_choice_str]
-    # Increase time limit and make optimization more robust for stiff systems
-    # Check if this is a debug run (short time limit)
     debug_mode = get(parsed_args, "debug", false)
-    time_limit = debug_mode ? 30.0 : 600.0   # 30 seconds for debug, 10 min for full run
-    max_iterations = debug_mode ? 10 : 10000   # Very few iterations for debug
+    time_limit = debug_mode ? 30.0 : 600.0
+    max_iterations = debug_mode ? 10 : 10000
     
     optim_options = Optim.Options(
         time_limit=time_limit,
         iterations=max_iterations,
-        g_tol=debug_mode ? 1e-2 : 1e-6,        # Very loose tolerance for debug
-        f_tol=debug_mode ? 1e-4 : 1e-8,        # Very loose tolerance for debug
-        show_trace=debug_mode,                  # Show progress in debug mode
+        g_tol=debug_mode ? 1e-2 : 1e-6,
+        f_reltol=debug_mode ? 1e-4 : 1e-8,
+        show_trace=debug_mode,
         allow_f_increases=true
     )
     
@@ -147,7 +89,6 @@ function run_parameter_estimation(parsed_args, petab_problem)
     end
 
     println("\n[Timing] Calibrating parameters..."); flush(stdout)
-    calibration_start_time = time()
     
     if use_parallel
         println("Mode: PARALLEL using $(length(procs())) processes, $n_starts starts, and optimizer $optimizer_choice_str")
@@ -160,11 +101,7 @@ function run_parameter_estimation(parsed_args, petab_problem)
         println("Mode: SERIAL with optimizer $optimizer_choice_str, $n_starts start(s)")
         println("Getting start guesses...")
         
-        # Declare start_guesses in outer scope
         local start_guesses
-        
-        # Use PEtab's default start guess generation
-        # The robust steady-state solver should prevent 'nothing' returns
         try
             _start_guesses_raw = get_startguesses(petab_problem, n_starts)
             start_guesses = (n_starts == 1) ? [_start_guesses_raw] : _start_guesses_raw
@@ -175,7 +112,7 @@ function run_parameter_estimation(parsed_args, petab_problem)
             return nothing
         end
         
-        all_runs = PEtabOptimisationResult[]
+        all_runs = PEtab.PEtabOptimisationResult[]
         for (i, x0) in enumerate(start_guesses)
             println("  Serial Start $i/$n_starts...")
             try
@@ -192,8 +129,7 @@ function run_parameter_estimation(parsed_args, petab_problem)
             catch e
                 error_msg = sprint(showerror, e)
                 if contains(error_msg, "maxiters") || contains(error_msg, "Interrupted")
-                    @warn "    � Optimization start $i hit solver maxiters limit - this is expected for very stiff systems"
-                    # Try to extract any partial result if available
+                    @warn "    ∇ Optimization start $i hit solver maxiters limit - this is expected for very stiff systems"
                     @warn "    Consider using a different optimizer or increasing solver maxiters further"
                 elseif isa(e, InterruptException)
                     @error "    🛑 Optimization interrupted for start $i" 
@@ -215,7 +151,7 @@ function run_parameter_estimation(parsed_args, petab_problem)
         end
         best_res = valid_runs[argmin([r.fmin for r in valid_runs])]
 
-        return PEtabMultistartResult(best_res.xmin, best_res.fmin, best_res.alg, n_starts, 
-                                     "LatinHypercubeSample", nothing, all_runs)
+        return PEtab.PEtabMultistartResult(best_res.xmin, best_res.fmin, best_res.alg, n_starts, 
+                                            "LatinHypercubeSample", nothing, all_runs)
     end
 end

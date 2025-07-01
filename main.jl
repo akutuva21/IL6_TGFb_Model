@@ -276,8 +276,7 @@ function run_analysis()
         println("INFO: Building PEtabODEProblem for visualization..."); flush(stdout)
         @time petab_problem = PEtabODEProblem(
             setup_results,
-            ode_solver = odesol,
-            ode_solver_gradient = odesol,
+            odesolver = odesol,
             ss_solver = steadystate_solver,
             gradient_method=gradient_method,
             sensealg = gradient_method == :Adjoint ? InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)) : nothing,
