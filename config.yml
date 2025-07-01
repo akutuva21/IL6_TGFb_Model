@@ -1,7 +1,7 @@
 # Main configuration for the data generation script.
 
 # --- General Settings & Mode Selection ---
-model_path: "model_even_smaller.bngl"
+model_path: "model_even_smaller.bngl"  # Back to full model
 output_dir: "SimData" # Directory to save the generated CSV/Excel files
 random_seed: 42
 
@@ -22,21 +22,29 @@ time_course_settings:
   
   simulation:
     duration: 100.0
-    steps: 1000
+    steps: 200
 
   noise:
     add: false
     level_percent: 10.0
 
-# Mapping from sheet names in the data file to observable IDs in the model
+# Mapping from observable names in the data file to observable IDs in the BNGL model
 observables_mapping:
+  # For time-course data (Excel format) - Map Excel sheet names to BNGL observables
   Free_IL6_obs: Free_IL6_obs
+  Free_TGFb_obs: Free_TGFb_obs
   IL6R_Active: IL6R_Active
   PKA_active: PKA_active
   S3S4_complex_obs: S3S4_complex_obs
   S3STAT3d_complex_obs: S3STAT3d_complex_obs
   STAT3d_active_obs: STAT3d_active_obs
   pSMAD3_obs: pSMAD3_obs
+
+# Separate mapping for dose-response TSV data
+dose_response_observables_mapping:
+  # For dose-response data (TSV format) - Map TSV observable names to BNGL observables
+  SMAD4: S3S4_complex_obs
+  STAT3_active: S3STAT3d_complex_obs
 
 # --------------------------------------------------------------------------
 #                   SETTINGS FOR "dose_response" MODE

@@ -217,6 +217,105 @@ def generate_time_course_excel(config):
 
 
 # --------------------------------------------------------------------------
+#                   DOSE-RESPONSE WORKFLOW
+# --------------------------------------------------------------------------
+
+def excel_to_petab_dose_response(config):
+    """
+    Reads a dose-response Excel file, converts it to PEtab format,
+    and saves the measurement and condition files.
+    """
+    print("--- Running Dose-Response Data Processing ---")
+    
+    # 1. Load settings
+    dr_settings = config['dose_response_settings']
+    input_conf = dr_settings['input_data']
+    output_dir = config['output_dir']
+    os.makedirs(output_dir, exist_ok=True)
+
+    if not input_conf['load_from_file']:
+        print("This script is configured to process an existing file. Skipping.")
+        return
+
+    # 2. Read the Excel data
+    filepath = input_conf['filepath']
+    dose_col = input_conf['dose_column_name']
+    col_map = input_conf['column_to_observable_map']
+    
+    print(f"  Reading data from '{filepath}'...")
+    try:
+        df_wide = pd.read_excel(filepath)
+    except FileNotFoundError:
+        print(f"ERROR: Data file not found at '{filepath}'")
+        return
+
+    # 3. Convert from wide to long format (PEtab measurements table)
+    print("  Converting data to PEtab long format...")
+    
+    # Melt the DataFrame to turn it into a long format
+    df_long = df_wide.melt(
+        id_vars=[dose_col],
+        var_name="measurement_col",
+        value_name="measurement"
+    )
+    
+    # Map the original measurement columns to PEtab observableIds
+    df_long['observableId'] = df_long['measurement_col'].map(col_map)
+    
+    # Drop rows where the mapping didn't exist (e.g., columns not in the map)
+    df_long.dropna(subset=['observableId'], inplace=True)
+
+    # 4. Create PEtab DataFrames
+    
+    # --- Measurement DataFrame ---
+    measurement_df = pd.DataFrame()
+    measurement_df['observableId'] = df_long['observableId']
+    
+    # Create a unique simulation condition for each dose level
+    measurement_df['simulationConditionId'] = [f"dose_{d}" for d in df_long[dose_col]]
+    
+    # For steady-state, time is infinite
+    measurement_df['time'] = np.inf
+    measurement_df['measurement'] = df_long['measurement']
+    
+    # Add placeholder for preequilibration (can be defined later if needed)
+    measurement_df['preequilibrationConditionId'] = 'preeq_ss'
+    
+    # --- Condition DataFrame ---
+    dose_parameter = dr_settings['dose_parameter']
+    constant_params = dr_settings['constant_parameters']
+    
+    unique_doses = df_wide[dose_col].unique()
+    condition_ids = [f"dose_{d}" for d in unique_doses]
+    
+    condition_df = pd.DataFrame({
+        'conditionId': condition_ids,
+        dose_parameter: unique_doses
+    })
+    
+    # Add any constant parameters
+    for param, value in constant_params.items():
+        condition_df[param] = value
+        
+    # Add the preequilibration condition
+    preeq_cond = {'conditionId': 'preeq_ss', dose_parameter: 0.0}
+    for param, value in constant_params.items():
+        preeq_cond[param] = value
+    condition_df = pd.concat([condition_df, pd.DataFrame([preeq_cond])], ignore_index=True)
+
+    # 5. Save to CSV
+    measurement_path = os.path.join(output_dir, "measurements_dose_response.tsv")
+    condition_path = os.path.join(output_dir, "conditions_dose_response.tsv")
+    
+    measurement_df.to_csv(measurement_path, index=False, sep='\t')
+    condition_df.to_csv(condition_path, index=False, sep='\t')
+    
+    print(f"✅ PEtab files created successfully:")
+    print(f"   - Measurements: {measurement_path}")
+    print(f"   - Conditions:   {condition_path}")
+
+
+# --------------------------------------------------------------------------
 #                   MAIN EXECUTION LOGIC
 # --------------------------------------------------------------------------
 
@@ -239,8 +338,7 @@ def main():
     print(f"Selected run mode: '{run_mode}'")
 
     if run_mode == "dose_response":
-        # excel_to_petab_dose_response(config) # This function is still available if needed
-        print("Dose-response mode selected, but no action is defined for it in this version.")
+        excel_to_petab_dose_response(config)
             
     elif run_mode == "time_course":
         generate_time_course_excel(config)

@@ -2,7 +2,7 @@
 
 using ReactionNetworkImporters, Catalyst
 using DifferentialEquations, ModelingToolkit
-using PEtab, DataFrames, XLSX
+using PEtab, DataFrames, XLSX, CSV
 using Optimization, Optim, OptimizationOptimJL
 using DiffEqCallbacks
 using SymbolicUtils, Symbolics
@@ -40,43 +40,95 @@ function setup_petab_problem(enable_preeq::Bool, model_net_path::String, data_xl
 
     # --- 0. Load configuration from YAML file ---
     config = YAML.load_file(config_path)
-    observables_mapping = config["observables_mapping"]
+    
+    # Choose the appropriate observables mapping based on data format
+    if endswith(lowercase(data_xlsx_path), ".tsv") || endswith(lowercase(data_xlsx_path), ".csv")
+        # For TSV/CSV dose-response data
+        observables_mapping = get(config, "dose_response_observables_mapping", config["observables_mapping"])
+        println("INFO: Using dose-response observables mapping for TSV/CSV data")
+    else
+        # For Excel time-course data
+        observables_mapping = config["observables_mapping"]
+        println("INFO: Using time-course observables mapping for Excel data")
+    end
 
     # --- 1. Load BNGL model and parse experimental data ---
     prn = loadrxnetwork(BNGNetwork(), model_net_path)
     rsys = complete(prn.rn)
     println("Loaded BNGL model with $(length(species(rsys))) species and $(length(parameters(rsys))) parameters.")
 
-    wb = XLSX.readxlsx(data_xlsx_path)
-    meas_rows_list = []
-    used_bng_groups = String[] 
-    for (sheet_key, bng_group_name) in observables_mapping
-        if !(bng_group_name in used_bng_groups); push!(used_bng_groups, bng_group_name); end
-        petab_obs_id = "obs_" * replace(bng_group_name, r"[^A-Za-z0-9_]" => "_")
-        df_sheet = DataFrame(XLSX.gettable(wb[sheet_key]))
-        if !hasproperty(df_sheet, :Time); @error "Sheet '$sheet_key' missing 'Time'. Skipping."; continue; end
-        for col_name_excel in names(df_sheet)
-            col_name_str = strip(String(col_name_excel))
-            if lowercase(col_name_str) == "time"; continue; end
-            condition_id_str = ""
-            if occursin(r"(?i)^treg", col_name_str); condition_id_str = "TREG";
-            elseif occursin(r"(?i)^th17", col_name_str); condition_id_str = "TH17";
-            else continue; end
-            for r_idx in 1:nrow(df_sheet)
-                measurement_val = df_sheet[r_idx, col_name_excel]
-                if !ismissing(measurement_val) 
-                    push!(meas_rows_list, (simulation_id=condition_id_str, observableId=petab_obs_id,
-                                        time=df_sheet[r_idx, :Time], measurement=measurement_val))
+    # Determine file format and load data accordingly
+    if endswith(lowercase(data_xlsx_path), ".tsv") || endswith(lowercase(data_xlsx_path), ".csv")
+        # Load TSV/CSV file (PEtab format)
+        meas_df = CSV.read(data_xlsx_path, DataFrame, delim='\t')
+        
+        # Rename columns to match expected format
+        if hasproperty(meas_df, :simulationConditionId)
+            rename!(meas_df, :simulationConditionId => :simulation_id)
+        end
+        
+        # Ensure required columns exist
+        if !hasproperty(meas_df, :observableId) || !hasproperty(meas_df, :time) || !hasproperty(meas_df, :measurement)
+            @error "TSV/CSV file missing required columns: observableId, time, measurement"
+            return nothing
+        end
+        
+        # Extract unique observable IDs from the data and map them to BNGL observables
+        raw_observable_ids = String.(unique(meas_df.observableId))
+        used_bng_groups = String[]
+        
+        # Map TSV observable IDs to BNGL observable names using the config
+        for obs_id in raw_observable_ids
+            if haskey(observables_mapping, obs_id)
+                mapped_obs = observables_mapping[obs_id]
+                if !(mapped_obs in used_bng_groups)
+                    push!(used_bng_groups, mapped_obs)
+                end
+                println("INFO: Mapped TSV observable '$obs_id' to BNGL observable '$mapped_obs'")
+            else
+                @warn "No mapping found for TSV observable '$obs_id' in config file"
+                # Still add it to try direct matching
+                if !(obs_id in used_bng_groups)
+                    push!(used_bng_groups, obs_id)
                 end
             end
         end
+        
+        println("Loaded $(nrow(meas_df)) measurement data points.")
+        
+    else
+        # Load Excel file (legacy format)
+        wb = XLSX.readxlsx(data_xlsx_path)
+        meas_rows_list = []
+        used_bng_groups = String[] 
+        for (sheet_key, bng_group_name) in observables_mapping
+            if !(bng_group_name in used_bng_groups); push!(used_bng_groups, bng_group_name); end
+            petab_obs_id = "obs_" * replace(bng_group_name, r"[^A-Za-z0-9_]" => "_")
+            df_sheet = DataFrame(XLSX.gettable(wb[sheet_key]))
+            if !hasproperty(df_sheet, :Time); @error "Sheet '$sheet_key' missing 'Time'. Skipping."; continue; end
+            for col_name_excel in names(df_sheet)
+                col_name_str = strip(String(col_name_excel))
+                if lowercase(col_name_str) == "time"; continue; end
+                condition_id_str = ""
+                if occursin(r"(?i)^treg", col_name_str); condition_id_str = "TREG";
+                elseif occursin(r"(?i)^th17", col_name_str); condition_id_str = "TH17";
+                else continue; end
+                for r_idx in 1:nrow(df_sheet)
+                    measurement_val = df_sheet[r_idx, col_name_excel]
+                    if !ismissing(measurement_val) 
+                        push!(meas_rows_list, (simulation_id=condition_id_str, observableId=petab_obs_id,
+                                            time=df_sheet[r_idx, :Time], measurement=measurement_val))
+                    end
+                end
+            end
+        end
+        if isempty(meas_rows_list); @error "No measurement data parsed. Aborting."; return nothing; end
+        meas_df = DataFrame(meas_rows_list)
+        meas_df.time = Float64.(meas_df.time)
+        meas_df.measurement = Float64.(meas_df.measurement)
+        meas_df.simulation_id = String.(meas_df.simulation_id) 
+        println("Loaded $(nrow(meas_df)) measurement data points.")
     end
-    if isempty(meas_rows_list); @error "No measurement data parsed. Aborting."; return nothing; end
-    meas_df = DataFrame(meas_rows_list)
-    meas_df.time = Float64.(meas_df.time)
-    meas_df.measurement = Float64.(meas_df.measurement)
-    meas_df.simulation_id = String.(meas_df.simulation_id) 
-    println("Loaded $(nrow(meas_df)) measurement data points.")
     
     # --- 2. Build Correct Parameter and Initial Condition Maps ---
     
@@ -99,7 +151,18 @@ function setup_petab_problem(enable_preeq::Bool, model_net_path::String, data_xl
     end
     
     # Define parameters that specify experimental conditions and should not be estimated.
-    condition_params = Set([:IL6_0, :TGFb_0])
+    # For dose-response mode, we vary IL6_0 as the condition but estimate TGFb_0 as background
+          
+    if endswith(lowercase(data_xlsx_path), ".tsv") || endswith(lowercase(data_xlsx_path), ".csv")
+        # In dose-response mode, both IL6_0 (the dose) and TGFb_0 (the required co-stimulus)
+        # are condition parameters and should NOT be estimated.
+        condition_params = Set([:IL6_0, :TGFb_0])
+        println("INFO: Dose-response mode - IL6_0 is the dose parameter, TGFb_0 is a fixed condition parameter")
+    else
+        # In time-course mode (Excel), both are condition parameters
+        condition_params = Set([:IL6_0, :TGFb_0])
+        println("INFO: Time-course mode - both IL6_0 and TGFb_0 are condition parameters")
+    end
 
     # Build the list of PEtab parameters to be estimated
     petab_params_list = PEtabParameter[]
@@ -107,20 +170,34 @@ function setup_petab_problem(enable_preeq::Bool, model_net_path::String, data_xl
     # Add kinetic parameters and initial concentration parameters from your BNGL file
     for (param_symbol, default_val) in p_map_defaults
         # Determine if the parameter should be estimated.
-        # It should NOT be estimated if it's a condition-defining parameter.
         should_estimate = !(param_symbol in condition_params)
         
+        # --- THIS IS THE FIX ---
+        # We are setting uniform, biochemically plausible bounds for all parameters to ensure
+        # that the initial guesses for the optimizer are in a numerically stable region.
+        # This is the standard approach when default parameters are unknown or unstable.
+
         if endswith(string(param_symbol), "_0")
-            # For all initial concentrations, use wider, more permissive bounds
-            push!(petab_params_list, PEtabParameter(param_symbol; value=default_val, scale=:log10, lb=1e-9, ub=1e4, estimate=should_estimate))
+            # For initial concentrations, use the actual value from BNGL file
+            # Handle special case where initial concentration is 0 (like TGFb_0, IL6_0)
+            actual_value = default_val > 0 ? default_val : 0.01  # Use small positive value for zero initial conditions
+            push!(petab_params_list, PEtabParameter(param_symbol; 
+                                                    value=actual_value,
+                                                    scale=:log10, 
+                                                    lb=1e-3,     # Lower bound for small initial amounts
+                                                    ub=1000.0,   # Upper bound of 1000 molecules
+                                                    estimate=should_estimate))
             if !should_estimate
                 println("INFO: Treating '$param_symbol' as a fixed condition parameter (not estimated).")
             end
         else
-            # For kinetic parameters, use tighter bounds around the default value
-            lower_bound = max(1e-9, default_val / 100.0) # Tighter lower bound
-            upper_bound = default_val * 100.0           # Tighter upper bound
-            push!(petab_params_list, PEtabParameter(param_symbol; value=default_val, scale=:log10, lb=lower_bound, ub=upper_bound, estimate=true))
+            # For kinetic rates, use the actual value from BNGL file
+            push!(petab_params_list, PEtabParameter(param_symbol; 
+                                                    value=default_val,  # Use actual value from BNGL
+                                                    scale=:log10, 
+                                                    lb=1e-6,     # Lower bound for very slow rates
+                                                    ub=10.0,     # Upper bound for fast rates (increased from 1.0)
+                                                    estimate=true))
         end
     end
 
@@ -153,13 +230,17 @@ function setup_petab_problem(enable_preeq::Bool, model_net_path::String, data_xl
             @warn "Could not find Catalyst mapping for '$bng_group_name'. Placeholder used."
             catalyst_model_expr = species(rsys)[1] 
         end
-        initial_sf_val = 1.0
+        
+        # For robustness testing, scaling factors and noise are known and fixed.
         if !any(p -> p.parameter == sf_param_sym, petab_params_list)
-            push!(petab_params_list, PEtabParameter(sf_param_sym; value=initial_sf_val, scale=:log10, estimate=true, lb=1e-3, ub=1e3))
+            push!(petab_params_list, PEtabParameter(sf_param_sym; value=1.0, scale=:lin, estimate=false))
         end
         if !any(p -> p.parameter == sigma_param_sym, petab_params_list)
-            push!(petab_params_list, PEtabParameter(sigma_param_sym; value=0.1, scale=:lin, estimate=true, lb=1e-3, ub=5.0))
+            # Set sigma to a reasonable value for biological data (5% of typical signal range)
+            # For data ranging 0-100, sigma=5.0 represents ~5% measurement noise
+            push!(petab_params_list, PEtabParameter(sigma_param_sym; value=5.0, scale=:lin, estimate=false))
         end
+
         numeric_catalyst_model_expr = catalyst_model_expr isa ModelingToolkit.Num ? catalyst_model_expr : 1.0 * catalyst_model_expr
         symbolic_sf_param = sf_param_map[sf_param_sym] 
         observables_petab_dict[petab_obs_id_for_df] = PEtabObservable(symbolic_sf_param * numeric_catalyst_model_expr, string(sigma_param_sym))
@@ -168,66 +249,64 @@ function setup_petab_problem(enable_preeq::Bool, model_net_path::String, data_xl
     println("Defined $(length(petab_params_list)) PEtabParameters.")
     
     # --- 3. Define Simulation Conditions (Conditional pre-equilibration) ---
-    il6_stimulus_bngl_name = "IL6(r)"
-    il6_catalyst_internal_sym = nothing
-    for (cat_sym, bngl_name_str) in prn.varstonames
-        if string(bngl_name_str) == il6_stimulus_bngl_name
-            il6_catalyst_internal_sym = cat_sym
-            println("INFO: Identified IL6 species '$il6_stimulus_bngl_name' as Catalyst symbol: $il6_catalyst_internal_sym"); break
-        end
-    end
-    if isnothing(il6_catalyst_internal_sym); @error "Critical: Could not find IL6 species '$il6_stimulus_bngl_name'."; return nothing; end
-    il6_condition_key_symbol = Symbolics.getname(il6_catalyst_internal_sym)
+    il6_condition_key_symbol = :IL6_0
+    tgfb_condition_key_symbol = :TGFb_0
     
-    tgfb_signal_bngl_name = "TGFb(r)"
-    tgfb_catalyst_internal_sym = nothing
-    for (cat_sym, bngl_name_str) in prn.varstonames
-        if string(bngl_name_str) == tgfb_signal_bngl_name
-            tgfb_catalyst_internal_sym = cat_sym
-            println("INFO: Identified TGFb signal species '$tgfb_signal_bngl_name' as Catalyst symbol: $tgfb_catalyst_internal_sym"); break
+    println("INFO: Using parameter-based condition overrides: IL6_0 and TGFb_0")
+
+    unique_conditions = unique(meas_df.simulation_id)
+    simconds = Dict{String, Dict{Symbol, Float64}}()
+    
+    # --- THIS IS THE FIX ---
+    # We now correctly set the fixed value for TGFb_0 for all dose-response conditions.
+    if any(startswith.(unique_conditions, "dose_"))
+        # Get the constant TGFb_0 value from the config YAML
+        tgfb_value = config["dose_response_settings"]["constant_parameters"]["TGFb_0"]
+
+        for condition in unique_conditions
+            if startswith(condition, "dose_")
+                dose_str = replace(condition, "dose_" => "")
+                il6_dose = parse(Float64, dose_str)
+                # Set both IL6_0 and the constant TGFb_0 for each condition
+                simconds[condition] = Dict(il6_condition_key_symbol => il6_dose,
+                                           tgfb_condition_key_symbol => tgfb_value)
+                println("INFO: Created condition '$condition' with IL6=$il6_dose and fixed TGFb=$tgfb_value")
+            end
         end
+    else
+        # Legacy time-course format
+        simconds["TREG"] = Dict(il6_condition_key_symbol => 0.0, tgfb_condition_key_symbol => 1.0)
+        simconds["TH17"] = Dict(il6_condition_key_symbol => 100.0, tgfb_condition_key_symbol => 1.0)
     end
-    if isnothing(tgfb_catalyst_internal_sym); @error "Critical: Could not find TGFb signal species '$tgfb_signal_bngl_name'."; return nothing; end
-    tgfb_condition_key_symbol = Symbolics.getname(tgfb_catalyst_internal_sym)
 
     if enable_preeq
         println("--- PEtab Setup: Pre-equilibration ENABLED ---")
-        simconds = Dict(
-            "TREG" => Dict(il6_condition_key_symbol => 0.0, tgfb_condition_key_symbol => 1.0),
-            "TH17" => Dict(il6_condition_key_symbol => 100.0, tgfb_condition_key_symbol => 1.0),
-            "preeq_cond" => Dict(il6_condition_key_symbol => 0.0, tgfb_condition_key_symbol => 0.0)
-        )
-        meas_df[!, :preequilibrationConditionId] .= "preeq_cond"
+        if any(startswith.(unique_conditions, "dose_"))
+            # For pre-equilibration, IL6 is 0 and TGFb is at its constant background level.
+            tgfb_value = config["dose_response_settings"]["constant_parameters"]["TGFb_0"]
+            simconds["preeq_ss"] = Dict(il6_condition_key_symbol => 0.0,
+                                       tgfb_condition_key_symbol => tgfb_value)
+        else
+            simconds["preeq_ss"] = Dict(il6_condition_key_symbol => 0.0, tgfb_condition_key_symbol => 0.0)
+        end
+        
+        if hasproperty(meas_df, :preequilibrationConditionId)
+            # Keep existing preequilibrationConditionId values
+        else
+            meas_df[!, :preequilibrationConditionId] .= "preeq_ss"
+        end
         println("Set pre-equilibration condition for all $(nrow(meas_df)) measurements.")
     else
         println("--- PEtab Setup: Pre-equilibration DISABLED ---")
-        simconds = Dict(
-            "TREG" => Dict(il6_condition_key_symbol => 0.0, tgfb_condition_key_symbol => 1.0),
-            "TH17" => Dict(il6_condition_key_symbol => 100.0, tgfb_condition_key_symbol => 1.0)
-        )
-        if :preequilibrationConditionId in names(meas_df)
+        if hasproperty(meas_df, :preequilibrationConditionId)
             select!(meas_df, Not(:preequilibrationConditionId))
         end
     end
 
-    # --- 4. Finalize PEtab Problem Setup ---
-    petab_model = PEtabModel(
-        rsys,
-        observables_petab_dict,
-        meas_df,
-        petab_params_list;
-        simulation_conditions=simconds
-    )
+    # --- 4. Create PEtabModel ---
+    petab_model = PEtabModel(rsys, observables_petab_dict, meas_df, petab_params_list; 
+                            simulation_conditions=simconds, verbose=false)
 
-    # --- 5. Display Summary of Setup ---
-    println("\n--- PEtab Problem Setup Summary ---")
-    println("Model file: $model_net_path")
-    println("Data file: $data_xlsx_path")
-    println("Pre-equilibration: $(enable_preeq ? "Enabled" : "Disabled")")
-    println("Number of observables: $(length(observables_petab_dict))")
-    println("Number of parameters: $(length(petab_params_list))")
-    println("Number of measurement data points: $(nrow(meas_df))")
-    println("----------------------------------------")
-    
+    println("--- PEtab Problem Setup Complete ---")
     return petab_model
 end

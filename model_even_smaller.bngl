@@ -2,11 +2,11 @@ begin model
 
 begin parameters
     # Initial amounts of molecules
-    TGFb_0              1.0
-    IL6_0               100.0
+    TGFb_0              0.0
+    IL6_0               0.0
 
     # IL-6 Pathway
-    kf_il6_bind         0.01   # Was 0.1
+    kf_il6_bind         0.01
     kr_il6_bind         0.01
     k_act_il6r          0.5
     k_inact_il6r        0.05
@@ -16,7 +16,7 @@ begin parameters
     k_dephos_smad3      0.05
 
     # STAT3 dynamics
-    k_act_stat3_by_il6r 0.02   # Was 0.2
+    k_act_stat3_by_il6r 0.02
     k_deact_stat3       0.05
 
     # Complex formation
@@ -38,7 +38,7 @@ begin parameters
     STAT3m_0            100.0
     PKA_0               50.0
     SMAD3_phos_P_0      0.0
-    STAT3d_active_0     0.0
+    STAT3d_active_0     0.01
     PKA_active_0        0.0
 
 end parameters
