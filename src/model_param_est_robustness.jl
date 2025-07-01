@@ -286,8 +286,14 @@ function setup_petab_problem(enable_preeq::Bool, model_net_path::String, data_xl
             tgfb_value = config["dose_response_settings"]["constant_parameters"]["TGFb_0"]
             simconds["preeq_ss"] = Dict(il6_condition_key_symbol => 0.0,
                                        tgfb_condition_key_symbol => tgfb_value)
+            println("INFO: Dose-response pre-equilibration set to IL6=0, TGFb=$tgfb_value")
         else
-            simconds["preeq_ss"] = Dict(il6_condition_key_symbol => 0.0, tgfb_condition_key_symbol => 0.0)
+            # FIX: Use the correct baseline conditions for time-course mode
+            # The pre-equilibration should match the experimental baseline used in data generation
+            # Both TREG and TH17 conditions start from the same baseline: IL6=0, TGFb=1.0
+            simconds["preeq_ss"] = Dict(il6_condition_key_symbol => 0.0, 
+                                       tgfb_condition_key_symbol => 1.0)  # Changed from 0.0 to 1.0
+            println("INFO: Time-course pre-equilibration set to IL6=0, TGFb=1.0 (matches data generation baseline)")
         end
         
         if hasproperty(meas_df, :preequilibrationConditionId)
@@ -295,6 +301,18 @@ function setup_petab_problem(enable_preeq::Bool, model_net_path::String, data_xl
         else
             meas_df[!, :preequilibrationConditionId] .= "preeq_ss"
         end
+        
+        # Verification: Check that pre-equilibration conditions match experimental design
+        if !any(startswith.(unique_conditions, "dose_"))
+            treg_tgfb = simconds["TREG"][tgfb_condition_key_symbol]
+            preeq_tgfb = simconds["preeq_ss"][tgfb_condition_key_symbol]
+            if treg_tgfb != preeq_tgfb
+                @warn "Inconsistency detected: TREG TGFb ($treg_tgfb) ≠ Pre-eq TGFb ($preeq_tgfb)"
+            else
+                println("✅ Verified: Pre-equilibration baseline matches experimental design")
+            end
+        end
+        
         println("Set pre-equilibration condition for all $(nrow(meas_df)) measurements.")
     else
         println("--- PEtab Setup: Pre-equilibration DISABLED ---")
