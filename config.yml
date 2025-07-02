@@ -21,7 +21,7 @@ time_course_settings:
   # Define the experimental conditions using BNGL parameter names.
   # The script will automatically find the corresponding internal simulator IDs.
   conditions:
-    Treg: {IL6_0: 0.0, TGFb_0: 1.0}
+    TREG: {IL6_0: 0.0, TGFb_0: 1.0}
     TH17: {IL6_0: 100.0, TGFb_0: 1.0}
   
   simulation:
@@ -30,7 +30,7 @@ time_course_settings:
 
   noise:
     add: false
-    level_percent: 10.0
+    level_percent: 5.0
 
 # Mapping from observable names in the data file to observable IDs in the BNGL model
 observables_mapping:
