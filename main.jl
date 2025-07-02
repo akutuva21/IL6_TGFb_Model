@@ -132,7 +132,7 @@ function run_analysis()
         println("INFO: Debug mode enabled - using faster, less accurate settings")
         parsed_args["abstol"] = 1e-4
         parsed_args["reltol"] = 1e-4
-        parsed_args["n-starts"] = min(parsed_args["n-starts"], 2)
+        parsed_args["n-starts"] = parsed_args["n-starts"] # min(parsed_args["n-starts"], 2)
         println("INFO: Debug tolerances set to abstol=$(parsed_args["abstol"]), reltol=$(parsed_args["reltol"])")
     end
 
