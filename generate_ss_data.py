@@ -37,10 +37,15 @@ def get_true_parameters(model: bionetgen.bngmodel, exclude_params: set) -> dict:
     print(f"  Found {len(true_params)} kinetic parameters.")
     return true_params
 
-def calculate_preeq_steadystate(model: bionetgen.bngmodel, true_params: dict, stimuli_to_zero: dict) -> np.ndarray:
+def calculate_preeq_steadystate(
+    model: bionetgen.bngmodel, 
+    true_params: dict, 
+    stimuli_to_zero: dict,
+    constant_stimuli: dict
+) -> np.ndarray:
     """
-    Calculates the pre-equilibration steady-state using true kinetic parameters
-    and zero stimulus, via a long simulation.
+    Calculates the pre-equilibration steady-state.
+    Sets variable stimuli to zero but maintains constant background stimuli.
     """
     print("--- Calculating single pre-equilibration steady-state ---")
     simulator = model.setup_simulator()
@@ -49,9 +54,15 @@ def calculate_preeq_steadystate(model: bionetgen.bngmodel, true_params: dict, st
     for name, value in true_params.items():
         simulator.model[name] = value
     
-    # Set all stimuli parameters to 0 for pre-equilibration
+    # Set variable stimuli parameters to 0 for pre-equilibration
     for sbml_id in stimuli_to_zero.values():
         simulator.model[sbml_id] = 0.0
+        print(f"    Setting variable stimulus {sbml_id} to 0.0 for pre-equilibration.")
+
+    # Set constant background stimuli to their defined values
+    for sbml_id, value in constant_stimuli.items():
+        simulator.model[sbml_id] = value
+        print(f"    Setting constant stimulus {sbml_id} to {value} for pre-equilibration.")
 
     print("    1. Solving for steady-state via long simulation...")
     simulator.simulate(start=0, end=1e8, steps=2)
@@ -156,12 +167,27 @@ def generate_time_course_excel(config):
     os.makedirs(output_dir, exist_ok=True)
 
     # 2. Discover mappings and get true parameters
-    all_stimuli_params = set(k for v in tc_settings['conditions'].values() for k in v.keys())
+    variable_stimuli = set(tc_settings.get('variable_stimuli', []))
+    constant_stimuli_names = set(tc_settings.get('constant_stimuli', []))
+    all_stimuli_params = variable_stimuli.union(constant_stimuli_names)
+
     param_to_sbml_id = discover_species_map(bng_model, list(all_stimuli_params))
     true_kinetic_params = get_true_parameters(bng_model, all_stimuli_params)
 
     # 3. Calculate the single, shared pre-equilibration steady state
-    ss_concentrations = calculate_preeq_steadystate(bng_model, true_kinetic_params, param_to_sbml_id)
+    # Separate the stimuli into those that should be zero vs constant
+    stimuli_to_zero_map = {p: i for p, i in param_to_sbml_id.items() if p in variable_stimuli}
+    
+    # Get the actual values for the constant stimuli from the TREG condition (or any baseline)
+    baseline_condition = tc_settings['conditions']['TREG']
+    constant_stimuli_map = {
+        param_to_sbml_id[p]: baseline_condition[p] 
+        for p in constant_stimuli_names if p in baseline_condition
+    }
+
+    ss_concentrations = calculate_preeq_steadystate(
+        bng_model, true_kinetic_params, stimuli_to_zero_map, constant_stimuli_map
+    )
 
     # 4. Run simulation for each condition from the shared steady state
     time_course_results = {}

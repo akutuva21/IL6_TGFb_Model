@@ -14,6 +14,10 @@ run_mode: "time_course"
 #                   SETTINGS FOR "time_course" MODE
 # --------------------------------------------------------------------------
 time_course_settings:
+  # NEW: Define which stimuli are variable vs. constant
+  variable_stimuli: ["IL6_0"]
+  constant_stimuli: ["TGFb_0"]
+
   # Define the experimental conditions using BNGL parameter names.
   # The script will automatically find the corresponding internal simulator IDs.
   conditions:
