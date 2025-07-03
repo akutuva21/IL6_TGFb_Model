@@ -393,12 +393,11 @@ def generate_time_course_petab(config):
     
     # 4. Simulation settings
     sim_confs = tc_settings['simulation']
-    t_end = sim_confs['time_end']
-    n_points = sim_confs['time_points']
+    t_end = sim_confs['duration']
+    n_points = sim_confs['steps']
     
     # 5. Species mapping for setting initial concentrations
-    params_to_trace = [param for param in model.parameters.keys() if param.endswith('_0')]
-    param_to_sbml_id = discover_species_map(model, params_to_trace)
+    param_to_sbml_id = discover_species_map(model, list(condition_params))
     
     # 6. Run simulations for each condition
     time_course_results = {}
@@ -406,9 +405,11 @@ def generate_time_course_petab(config):
     for condition_name, condition_values in tc_settings['conditions'].items():
         print(f"  Simulating condition: {condition_name}")
         
-        # The stimulus conditions are directly in condition_values (IL6_0, TGFb_0, etc.)
+        # Create the dictionary with the correct simulator IDs
+        stimuli_with_ids = {param_to_sbml_id[p]: v for p, v in condition_values.items()}
+        
         result_df = run_simulation_from_preeq(
-            model, preeq_ss, true_params, condition_values, t_end, n_points
+            model, preeq_ss, true_params, stimuli_with_ids, t_end, n_points
         )
         time_course_results[condition_name] = result_df
     

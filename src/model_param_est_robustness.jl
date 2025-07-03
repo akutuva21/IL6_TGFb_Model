@@ -341,17 +341,6 @@ function setup_petab_problem(enable_preeq::Bool, model_net_path::String, data_xl
             meas_df[!, :preequilibrationConditionId] .= "preeq_ss"
         end
         
-        # Verification: Check that pre-equilibration conditions match experimental design
-        if !any(startswith.(unique_conditions, "dose_"))
-            treg_tgfb = simconds["TREG"][tgfb_condition_key_symbol]
-            preeq_tgfb = simconds["preeq_ss"][tgfb_condition_key_symbol]
-            if treg_tgfb != preeq_tgfb
-                @warn "Inconsistency detected: TREG TGFb ($treg_tgfb) ≠ Pre-eq TGFb ($preeq_tgfb)"
-            else
-                println("✅ Verified: Pre-equilibration baseline matches experimental design")
-            end
-        end
-        
         println("Set pre-equilibration condition for all $(nrow(meas_df)) measurements.")
     else
         println("--- PEtab Setup: Pre-equilibration DISABLED ---")
