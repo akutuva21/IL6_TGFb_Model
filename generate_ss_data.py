@@ -358,7 +358,7 @@ def generate_time_course_petab(config):
     output_dir = config['output_dir']
     os.makedirs(output_dir, exist_ok=True)
     
-    model_path = tc_settings['model_file']
+    model_path = config['model_path']
     model = bionetgen.bngmodel(model_path)
     
     # 2. Extract parameters
@@ -373,11 +373,21 @@ def generate_time_course_petab(config):
     true_params = get_true_parameters(model, condition_params)
     
     # 3. Get pre-equilibration steady-state
+    variable_stimuli = set(tc_settings.get('variable_stimuli', []))
+    constant_stimuli_names = set(tc_settings.get('constant_stimuli', []))
+    
     stimuli_to_zero = {}
-    for param in condition_params:
+    for param in variable_stimuli:
         stimuli_to_zero[param] = 0.0
     
-    preeq_ss = calculate_preeq_steadystate(model, true_params, stimuli_to_zero)
+    # Get constant stimuli values from baseline condition
+    baseline_condition = tc_settings['conditions']['TREG']
+    constant_stimuli = {}
+    for param in constant_stimuli_names:
+        if param in baseline_condition:
+            constant_stimuli[param] = baseline_condition[param]
+    
+    preeq_ss = calculate_preeq_steadystate(model, true_params, stimuli_to_zero, constant_stimuli)
     print(f"  Pre-equilibration steady-state calculated.")
     
     # 4. Simulation settings

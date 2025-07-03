@@ -274,9 +274,17 @@ function setup_petab_problem(enable_preeq::Bool, model_net_path::String, data_xl
             end
         end
     else
-        # Legacy time-course format
-        simconds["TREG"] = Dict(il6_condition_key_symbol => 0.0, tgfb_condition_key_symbol => 1.0)
-        simconds["TH17"] = Dict(il6_condition_key_symbol => 100.0, tgfb_condition_key_symbol => 1.0)
+        # Time-course format - read conditions from config file
+        config = YAML.load_file(config_path)
+        tc_conditions = config["time_course_settings"]["conditions"]
+        
+        for (condition_name, condition_values) in tc_conditions
+            il6_val = get(condition_values, "IL6_0", 0.0)
+            tgfb_val = get(condition_values, "TGFb_0", 1.0)
+            simconds[condition_name] = Dict(il6_condition_key_symbol => il6_val, 
+                                          tgfb_condition_key_symbol => tgfb_val)
+            println("INFO: Created condition '$condition_name' with IL6=$il6_val, TGFb=$tgfb_val from config file")
+        end
     end
 
     if enable_preeq
@@ -288,12 +296,29 @@ function setup_petab_problem(enable_preeq::Bool, model_net_path::String, data_xl
                                        tgfb_condition_key_symbol => tgfb_value)
             println("INFO: Dose-response pre-equilibration set to IL6=0, TGFb=$tgfb_value")
         else
-            # FIX: Use the correct baseline conditions for time-course mode
-            # The pre-equilibration should match the experimental baseline used in data generation
-            # Both TREG and TH17 conditions start from the same baseline: IL6=0, TGFb=1.0
-            simconds["preeq_ss"] = Dict(il6_condition_key_symbol => 0.0, 
-                                       tgfb_condition_key_symbol => 1.0)  # Changed from 0.0 to 1.0
-            println("INFO: Time-course pre-equilibration set to IL6=0, TGFb=1.0 (matches data generation baseline)")
+            # Time-course format - read baseline from config file
+            config = YAML.load_file(config_path)
+            tc_settings = config["time_course_settings"]
+            variable_stimuli = Set(tc_settings["variable_stimuli"])
+            constant_stimuli = tc_settings["constant_stimuli"]
+            
+            # Get baseline values from TREG condition (or first condition)
+            baseline_condition = tc_settings["conditions"]["TREG"]
+            
+            # Create pre-equilibration condition: variable stimuli = 0, constant stimuli = baseline values
+            preeq_condition = Dict{Symbol, Float64}()
+            preeq_condition[il6_condition_key_symbol] = 0.0  # Variable stimulus set to 0
+            
+            for const_param in constant_stimuli
+                if haskey(baseline_condition, const_param)
+                    if const_param == "TGFb_0"
+                        preeq_condition[tgfb_condition_key_symbol] = baseline_condition[const_param]
+                    end
+                end
+            end
+            
+            simconds["preeq_ss"] = preeq_condition
+            println("INFO: Time-course pre-equilibration configured from config file")
         end
         
         if hasproperty(meas_df, :preequilibrationConditionId)
