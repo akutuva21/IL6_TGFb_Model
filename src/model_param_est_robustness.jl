@@ -299,26 +299,40 @@ function setup_petab_problem(enable_preeq::Bool, model_net_path::String, data_xl
             # Time-course format - read baseline from config file
             config = YAML.load_file(config_path)
             tc_settings = config["time_course_settings"]
-            variable_stimuli = Set(tc_settings["variable_stimuli"])
+            variable_stimuli = tc_settings["variable_stimuli"]
             constant_stimuli = tc_settings["constant_stimuli"]
             
             # Get baseline values from TREG condition (or first condition)
             baseline_condition = tc_settings["conditions"]["TREG"]
             
-            # Create pre-equilibration condition: variable stimuli = 0, constant stimuli = baseline values
+            # Create pre-equilibration condition dynamically based on config
             preeq_condition = Dict{Symbol, Float64}()
-            preeq_condition[il6_condition_key_symbol] = 0.0  # Variable stimulus set to 0
             
+            # Set all variable stimuli to 0
+            for var_param in variable_stimuli
+                if var_param == "IL6_0"
+                    preeq_condition[il6_condition_key_symbol] = 0.0
+                elseif var_param == "TGFb_0"
+                    preeq_condition[tgfb_condition_key_symbol] = 0.0
+                end
+                println("INFO: Setting variable stimulus '$var_param' to 0.0 for pre-equilibration")
+            end
+            
+            # Set all constant stimuli to their baseline values
             for const_param in constant_stimuli
                 if haskey(baseline_condition, const_param)
-                    if const_param == "TGFb_0"
-                        preeq_condition[tgfb_condition_key_symbol] = baseline_condition[const_param]
+                    baseline_val = baseline_condition[const_param]
+                    if const_param == "IL6_0"
+                        preeq_condition[il6_condition_key_symbol] = baseline_val
+                    elseif const_param == "TGFb_0"
+                        preeq_condition[tgfb_condition_key_symbol] = baseline_val
                     end
+                    println("INFO: Setting constant stimulus '$const_param' to $baseline_val for pre-equilibration")
                 end
             end
             
             simconds["preeq_ss"] = preeq_condition
-            println("INFO: Time-course pre-equilibration configured from config file")
+            println("INFO: Time-course pre-equilibration configured dynamically from config file")
         end
         
         if hasproperty(meas_df, :preequilibrationConditionId)

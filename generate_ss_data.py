@@ -365,9 +365,10 @@ def generate_time_course_petab(config):
     conditions_list = tc_settings['conditions'].keys()
     print("  Identified conditions:", list(conditions_list))
     
-    condition_params = set()
-    for condition_config in tc_settings['conditions'].values():
-        condition_params.update(condition_config.get('stimulus_conditions', {}).keys())
+    # Get stimulus parameters from the variable_stimuli and constant_stimuli lists
+    variable_stimuli = set(tc_settings.get('variable_stimuli', []))
+    constant_stimuli_names = set(tc_settings.get('constant_stimuli', []))
+    condition_params = variable_stimuli.union(constant_stimuli_names)
     print("  Identified stimulus (condition) parameters:", list(condition_params))
     
     true_params = get_true_parameters(model, condition_params)
@@ -402,12 +403,12 @@ def generate_time_course_petab(config):
     # 6. Run simulations for each condition
     time_course_results = {}
     
-    for condition_name, condition_config in tc_settings['conditions'].items():
+    for condition_name, condition_values in tc_settings['conditions'].items():
         print(f"  Simulating condition: {condition_name}")
-        stimulus_conditions = condition_config.get('stimulus_conditions', {})
         
+        # The stimulus conditions are directly in condition_values (IL6_0, TGFb_0, etc.)
         result_df = run_simulation_from_preeq(
-            model, preeq_ss, true_params, stimulus_conditions, t_end, n_points
+            model, preeq_ss, true_params, condition_values, t_end, n_points
         )
         time_course_results[condition_name] = result_df
     
@@ -428,18 +429,21 @@ def generate_time_course_petab(config):
     
     # Add pre-equilibration condition
     preeq_condition = {'conditionId': 'preeq_ss'}
-    for param in condition_params:
+    # Set variable stimuli to 0, constant stimuli to their baseline values
+    for param in variable_stimuli:
         preeq_condition[param] = 0.0
+    for param in constant_stimuli_names:
+        if param in baseline_condition:
+            preeq_condition[param] = baseline_condition[param]
     condition_rows.append(preeq_condition)
     
     # Process each condition
-    for condition_name, condition_config in tc_settings['conditions'].items():
+    for condition_name, condition_values in tc_settings['conditions'].items():
         result_df = time_course_results[condition_name]
-        stimulus_conditions = condition_config.get('stimulus_conditions', {})
         
-        # Add condition to conditions table
+        # Add condition to conditions table - use the actual stimulus values
         condition_row = {'conditionId': condition_name}
-        condition_row.update(stimulus_conditions)
+        condition_row.update(condition_values)  # This contains IL6_0, TGFb_0, etc.
         condition_rows.append(condition_row)
         
         # Add measurements for each observable and time point
