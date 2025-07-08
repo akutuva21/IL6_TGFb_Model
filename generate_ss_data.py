@@ -40,8 +40,9 @@ def get_true_parameters(model: bionetgen.bngmodel, exclude_params: set) -> dict:
 def calculate_preeq_steadystate(
     model: bionetgen.bngmodel, 
     true_params: dict, 
-    stimuli_to_zero: dict,
-    constant_stimuli: dict
+    stimuli_to_zero: dict,      # This should be a dict of {param_name: value}
+    constant_stimuli: dict,     # This should be a dict of {param_name: value}
+    param_to_sbml_id: dict      # Pass in the map
 ) -> np.ndarray:
     """
     Calculates the pre-equilibration steady-state.
@@ -55,18 +56,26 @@ def calculate_preeq_steadystate(
         simulator.model[name] = value
     
     # Set variable stimuli parameters to 0 for pre-equilibration
-    for sbml_id in stimuli_to_zero.values():
-        simulator.model[sbml_id] = 0.0
-        print(f"    Setting variable stimulus {sbml_id} to 0.0 for pre-equilibration.")
+    for param_name, value in stimuli_to_zero.items():
+        sbml_id = param_to_sbml_id[param_name] # Use the map to get the ID
+        simulator.model[sbml_id] = value
+        print(f"    Setting variable stimulus {param_name} ({sbml_id}) to {value} for pre-equilibration.")
 
     # Set constant background stimuli to their defined values
-    for sbml_id, value in constant_stimuli.items():
+    for param_name, value in constant_stimuli.items():
+        sbml_id = param_to_sbml_id[param_name] # Use the map to get the ID
         simulator.model[sbml_id] = value
-        print(f"    Setting constant stimulus {sbml_id} to {value} for pre-equilibration.")
+        print(f"    Setting constant stimulus {param_name} ({sbml_id}) to {value} for pre-equilibration.")
 
     print("    1. Solving for steady-state via long simulation...")
-    simulator.simulate(start=0, end=1e8, steps=2)
-    
+    # It's better to use the model's own steady state finder if available
+    try:
+        simulator.ss()
+        print("    ...Steady-state calculated via simulator's ss() method.")
+    except:
+        print("    ss() method failed, falling back to long simulation...")
+        simulator.simulate(start=0, end=1e8, steps=2)
+
     ss_concentrations = simulator.model.getFloatingSpeciesConcentrations()
     print("    ...Correct pre-equilibrium state calculated and saved.")
     return ss_concentrations
@@ -186,7 +195,7 @@ def generate_time_course_excel(config):
     }
 
     ss_concentrations = calculate_preeq_steadystate(
-        bng_model, true_kinetic_params, stimuli_to_zero_map, constant_stimuli_map
+        bng_model, true_kinetic_params, stimuli_to_zero_map, constant_stimuli_map, param_to_sbml_id
     )
 
     # 4. Run simulation for each condition from the shared steady state
@@ -373,6 +382,9 @@ def generate_time_course_petab(config):
     
     true_params = get_true_parameters(model, condition_params)
     
+    # 5. Discover the species map BEFORE you need it for pre-equilibration.
+    param_to_sbml_id = discover_species_map(model, list(condition_params))
+    
     # 3. Get pre-equilibration steady-state
     variable_stimuli = set(tc_settings.get('variable_stimuli', []))
     constant_stimuli_names = set(tc_settings.get('constant_stimuli', []))
@@ -388,16 +400,14 @@ def generate_time_course_petab(config):
         if param in baseline_condition:
             constant_stimuli[param] = baseline_condition[param]
     
-    preeq_ss = calculate_preeq_steadystate(model, true_params, stimuli_to_zero, constant_stimuli)
+    # Now this call will work because param_to_sbml_id is defined.
+    preeq_ss = calculate_preeq_steadystate(model, true_params, stimuli_to_zero, constant_stimuli, param_to_sbml_id)
     print(f"  Pre-equilibration steady-state calculated.")
     
     # 4. Simulation settings
     sim_confs = tc_settings['simulation']
     t_end = sim_confs['duration']
     n_points = sim_confs['steps']
-    
-    # 5. Species mapping for setting initial concentrations
-    param_to_sbml_id = discover_species_map(model, list(condition_params))
     
     # 6. Run simulations for each condition
     time_course_results = {}
@@ -425,9 +435,10 @@ def generate_time_course_petab(config):
     measurement_rows = []
     condition_rows = []
     
-    # Get observable names from config
-    observables = tc_settings.get('observables', [])
-    
+    # Get observable names from the model object
+    all_observables = [obs.name for obs_key in model.observables for obs in [model.observables[obs_key]]]
+    print(f"INFO: Found observables to save: {all_observables}")
+
     # Add pre-equilibration condition
     preeq_condition = {'conditionId': 'preeq_ss'}
     # Set variable stimuli to 0, constant stimuli to their baseline values
@@ -450,7 +461,7 @@ def generate_time_course_petab(config):
         # Add measurements for each observable and time point
         for _, row in result_df.iterrows():
             time_val = row['time']
-            for obs_name in observables:
+            for obs_name in all_observables:
                 if obs_name in row:
                     measurement_val = row[obs_name]
                     

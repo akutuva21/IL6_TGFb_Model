@@ -18,13 +18,13 @@ using SciMLSensitivity
 using ReverseDiff
 using OrdinaryDiffEq
 using Optim
+using Sundials
 
-# Define defaults for model and data files
+# --- NEW: Define defaults for PEtab TSV files ---
+const DEFAULT_TIME_COURSE_MEASUREMENTS = "SimData/measurements_time_course.tsv"
+const DEFAULT_DOSE_RESPONSE_MEASUREMENTS = "SimData/measurements_dose_response.tsv"
 const DEFAULT_MODEL_NET = "model_even_smaller/2025_06_29__23_19_55/model_even_smaller.net"
 
-# Define data files for different modes
-const TIME_COURSE_DATA = "SimData/preeq.xlsx"
-const DOSE_RESPONSE_DATA = "SimData/measurements_dose_response.tsv"
 
 function setup_multiprocessing()
     # Helper to get CPU info from Slurm or the system
@@ -100,26 +100,38 @@ function parse_commandline()
         "--abstol"
             help = "Absolute tolerance for the ODE solver."
             arg_type = Float64
-            default = 1e-6
+            default = 1e-8 # Tighter default tolerance
         "--reltol"
             help = "Relative tolerance for the ODE solver."
             arg_type = Float64
-            default = 1e-6
+            default = 1e-8 # Tighter default tolerance
         "--net-file"
             help = "Path to the BioNetGen .net file."
             arg_type = String
             default = DEFAULT_MODEL_NET
         "--config"
-            help = "Path to the YAML config file for observable mapping."
+            help = "Path to the YAML config file for observable mapping and bounds."
             arg_type = String
             default = "config.yml"
         "--debug"
             help = "Enable debug mode with shorter time limits and looser tolerances for faster testing."
             action = :store_true
-        "--data-file"
-            help = "Path to the data file. Overrides the default data file for the selected mode."
+        "--measurements-file"
+            help = "Path to the PEtab measurements file. Overrides the default for the selected mode."
             arg_type = String
-            default = "SimData/preeq.xlsx"
+            default = ""
+        "--conditions-file"
+            help = "Path to the PEtab conditions file. Required if using a custom measurements file."
+            arg_type = String
+            default = ""
+        "--observables-file"
+            help = "Path to the PEtab observables file. Optional."
+            arg_type = String
+            default = ""
+        "--parameters-file"
+            help = "Path to the PEtab parameters file. Optional."
+            arg_type = String
+            default = ""
     end
     return parse_args(s)
 end
@@ -132,7 +144,8 @@ function run_analysis()
         println("INFO: Debug mode enabled - using faster, less accurate settings")
         parsed_args["abstol"] = 1e-4
         parsed_args["reltol"] = 1e-4
-        parsed_args["n-starts"] = parsed_args["n-starts"] # min(parsed_args["n-starts"], 2)
+        # In debug mode, run only a few starts
+        parsed_args["n-starts"] = parsed_args["n-starts"] == 0 ? 5 : min(parsed_args["n-starts"], 10)  # Allow up to 10 starts
         println("INFO: Debug tolerances set to abstol=$(parsed_args["abstol"]), reltol=$(parsed_args["reltol"])")
     end
 
@@ -144,11 +157,11 @@ function run_analysis()
     # Dynamically set n_starts if not provided by the user
     if parsed_args["n-starts"] == 0
         if parsed_args["parallel"]
-            parsed_args["n-starts"] = min(nprocs(), 10)  # Cap at 10 to avoid overwhelming the system
-            println("INFO: --n-starts not provided, defaulting to min(nprocs(), 10): $(parsed_args["n-starts"])")
+            parsed_args["n-starts"] = nprocs()
+            println("INFO: --n-starts not provided, defaulting to nprocs(): $(parsed_args["n-starts"])")
         else
-            parsed_args["n-starts"] = 3  # Use 3 starts for serial to be more thorough
-            println("INFO: --n-starts not provided, defaulting to 3 for serial execution.")
+            parsed_args["n-starts"] = 10 # A reasonable number for a thorough serial run
+            println("INFO: --n-starts not provided, defaulting to 10 for serial execution.")
         end
     end
 
@@ -161,20 +174,22 @@ function run_analysis()
     # Determine data file based on the selected mode
     mode = parsed_args["mode"]
     local data_file::String
-    if !isempty(parsed_args["data-file"])
-        data_file = parsed_args["data-file"]
-        println("INFO: Using custom data file: '$data_file'")
+    # The --data-file argument is now the primary way to specify the data
+    if !isempty(parsed_args["measurements-file"])
+        data_file = parsed_args["measurements-file"]
+        println("INFO: Using custom measurements file: '$data_file'")
     elseif mode == "time-course"
-        data_file = TIME_COURSE_DATA
+        data_file = DEFAULT_TIME_COURSE_MEASUREMENTS
         println("INFO: Running in 'time-course' mode with default data: '$data_file'")
     elseif mode == "dose-response"
-        data_file = DOSE_RESPONSE_DATA
+        data_file = DEFAULT_DOSE_RESPONSE_MEASUREMENTS
         println("INFO: Running in 'dose-response' mode with default data: '$data_file'")
     else
         @error "Invalid mode: '$mode'. Must be 'time-course' or 'dose-response'."
         return
     end
     flush(stdout)
+
 
     println("INFO: The script will use the following output file: '$output_filename'")
     flush(stdout)
@@ -196,7 +211,8 @@ function run_analysis()
     end
 
     # --- 2. Setup the core PEtabModel (do this only ONCE) ---
-    println("INFO: Setting up PEtab Model..."); flush(stdout)
+    # THIS IS THE KEY CHANGE: We are now calling your original setup function again.
+    println("INFO: Setting up PEtab Model programmatically..."); flush(stdout)
     @time setup_results = setup_petab_problem(enable_preeq, net_file, data_file, config_file)
     if isnothing(setup_results)
         @error "Failed to build PEtabModel. Cannot proceed."
@@ -206,33 +222,35 @@ function run_analysis()
     # --- 3. Define robust solver options for simulation and steady-state ---
     println("INFO: Defining dedicated solvers for simulation and steady-state..."); flush(stdout)
     
-    # Use more robust solver settings for stiff systems
-    # CVODE_BDF works well with Adjoint mode, Rodas5P works well with ForwardDiff
+    local odesol, steadystate_solver, gradient_method
+
     if parsed_args["debug"]
-        # In debug mode, use Julia-native solver with ForwardDiff for speed
         println("INFO: Debug mode - using Rodas5P with ForwardDiff for faster compilation")
-        odesol = ODESolver(Rodas5P(), 
-            abstol=parsed_args["abstol"], 
-            reltol=parsed_args["reltol"],
-            maxiters=50_000
-        )
+        # Use a pure-Julia solver for the main problem
+        odesol = ODESolver(Rodas5P(), abstol=parsed_args["abstol"], reltol=parsed_args["reltol"])
+        
+        # THIS IS THE FIX: Use the :Simulate method for the steady-state problem in debug mode.
+        # It is universally compatible and avoids the TypeError.
+        steadystate_solver = SteadyStateSolver(:Simulate,
+                                               abstol=parsed_args["abstol"], 
+                                               reltol=parsed_args["reltol"])
         gradient_method = :ForwardDiff
-    else
-        # In normal mode, use CVODE_BDF with Adjoint for accuracy
+
+    else # Normal (non-debug) mode
         println("INFO: Normal mode - using CVODE_BDF with Adjoint for accuracy")
-        odesol = ODESolver(CVODE_BDF(), 
+        # Use the robust Sundials solver for the main problem
+        odesol = ODESolver(CVODE_BDF(linear_solver=:GMRES), 
             abstol=parsed_args["abstol"], 
             reltol=parsed_args["reltol"],
-            maxiters=50_000,
-            dtmin=1e-14
+            maxiters=200000
         )
+        
+        # Use the :Simulate method for steady-state as well to avoid rootfinding algorithm issues
+        steadystate_solver = SteadyStateSolver(:Simulate,
+                                               abstol=parsed_args["abstol"], 
+                                               reltol=parsed_args["reltol"])
         gradient_method = :Adjoint
     end
-    
-    # DEDICATED STEADY-STATE SOLVER. This uses the correct constructor syntax from the PEtab source code.
-    steadystate_solver = SteadyStateSolver(:Simulate,
-                                           abstol=parsed_args["abstol"], 
-                                           reltol=parsed_args["reltol"])
 
     # --- 4. Run estimation ONLY if no results were loaded ---
     local petab_problem # Declare here to have it in the outer scope
@@ -240,22 +258,16 @@ function run_analysis()
         println("INFO: Building PEtabODEProblem for estimation..."); flush(stdout)
         
         @time petab_problem = PEtabODEProblem(
-            setup_results,
+            setup_results, # Use the result from setup_petab_problem
             odesolver = odesol,
             ss_solver = steadystate_solver,
-            gradient_method=gradient_method,  # Use the appropriate gradient method
+            gradient_method=gradient_method,
             sensealg = gradient_method == :Adjoint ? InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)) : nothing,
             verbose=false
         )
         
         println("✅ PEtabODEProblem created successfully")
 
-        # Add optimizer options for better control
-        # optimizer_options = Dict(
-        #     :maxiter => parsed_args["debug"] ? 100 : 2000,
-        #     :f_reltol => 1e-6,
-        #     :g_tol => 1e-6
-        # )
         multi_start_res = run_parameter_estimation(parsed_args, petab_problem)
          
         if isnothing(multi_start_res)
@@ -291,7 +303,6 @@ function run_analysis()
         println("\n--- Generating Waterfall Plot ---"); flush(stdout)
         plot_waterfall(multi_start_res)
         println("\n-- Print Parameter Distribution Plot ---"); flush(stdout)
-        # Pass the single, unified petab_problem to the plotting function
         plot_parameter_distribution(multi_start_res, petab_problem)
     end
 
@@ -306,7 +317,7 @@ function run_analysis()
     @time try
         run_visualization(
             collect(saved_results.theta_optim),
-            petab_problem # Reuse the problem here as well
+            petab_problem
         )
         println("✅ Visualization completed successfully!"); flush(stdout)
     catch e

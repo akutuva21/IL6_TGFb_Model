@@ -8,7 +8,18 @@ random_seed: 42
 # Set the desired mode: "dose_response" or "time_course"
 # "time_course": Generates dynamic data over a time period.
 # "dose_response": Generates or processes steady-state data at different stimulus levels.
-run_mode: "time_course"
+run_mode: "time_course_petab" # New
+
+# --- Parameter Estimation Settings ---
+parameter_bounds:
+  # Default bounds for kinetic rates
+  default_kinetic: {lb: 1.0e-6, ub: 10.0}
+  # Default bounds for initial concentrations
+  default_initial_conc: {lb: 1.0e-3, ub: 1000.0}
+  # (Optional) Override bounds for specific parameters if needed
+  # overrides:
+  #   kf_s3s4: {lb: 1.0e-4, ub: 100.0}
+  #   kr_s3s4: {lb: 1.0e-4, ub: 100.0}
 
 # --------------------------------------------------------------------------
 #                   SETTINGS FOR "time_course" MODE
@@ -26,15 +37,15 @@ time_course_settings:
   
   simulation:
     duration: 100.0
-    steps: 200
+    steps: 20
 
   noise:
     add: false
-    level_percent: 5.0
+    level_percent: 10.0
 
-# Mapping from observable names in the data file to observable IDs in the BNGL model
+# UNIFIED MAPPING for all run modes
 observables_mapping:
-  # For time-course data (Excel format) - Map Excel sheet names to BNGL observables
+  # For time-course data (TSV observableId -> BNGL observable)
   Free_IL6_obs: Free_IL6_obs
   Free_TGFb_obs: Free_TGFb_obs
   IL6R_Active: IL6R_Active
@@ -43,10 +54,7 @@ observables_mapping:
   S3STAT3d_complex_obs: S3STAT3d_complex_obs
   STAT3d_active_obs: STAT3d_active_obs
   pSMAD3_obs: pSMAD3_obs
-
-# Separate mapping for dose-response TSV data
-dose_response_observables_mapping:
-  # For dose-response data (TSV format) - Map TSV observable names to BNGL observables
+  # For dose-response data (TSV observableId -> BNGL observable)
   SMAD4: S3S4_complex_obs
   STAT3_active: S3STAT3d_complex_obs
 
