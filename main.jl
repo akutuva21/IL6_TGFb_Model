@@ -23,8 +23,7 @@ using Sundials
 # --- NEW: Define defaults for PEtab TSV files ---
 const DEFAULT_TIME_COURSE_MEASUREMENTS = "SimData/measurements_time_course.tsv"
 const DEFAULT_DOSE_RESPONSE_MEASUREMENTS = "SimData/measurements_dose_response.tsv"
-const DEFAULT_MODEL_NET = "model_even_smaller/2025_06_29__23_19_55/model_even_smaller.net"
-
+const DEFAULT_MODEL_NET = "model_even_smaller/2025_07_08__12_31_42/model_even_smaller.net"
 
 function setup_multiprocessing()
     # Helper to get CPU info from Slurm or the system

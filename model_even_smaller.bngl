@@ -2,7 +2,7 @@ begin model
 
 begin parameters
     # Initial amounts of molecules
-    TGFb_0              0.0
+    TGFb_0              1.0
     IL6_0               0.0
 
     # IL-6 Pathway
@@ -37,9 +37,9 @@ begin parameters
     SMAD4_0             50.0
     STAT3m_0            100.0
     PKA_0               50.0
-    SMAD3_phos_P_0      0.0
-    STAT3d_active_0     0.01
-    PKA_active_0        0.0
+    SMAD3_phos_P_0      5.0
+    STAT3d_active_0     1.0
+    PKA_active_0        5.0
 
 end parameters
 

@@ -13,9 +13,9 @@ run_mode: "time_course_petab" # New
 # --- Parameter Estimation Settings ---
 parameter_bounds:
   # Default bounds for kinetic rates
-  default_kinetic: {lb: 1.0e-6, ub: 10.0}
+  default_kinetic: {lb: 1.0e-3, ub: 10.0}
   # Default bounds for initial concentrations
-  default_initial_conc: {lb: 1.0e-3, ub: 1000.0}
+  default_initial_conc: {lb: 1.0, ub: 100.0}
   # (Optional) Override bounds for specific parameters if needed
   # overrides:
   #   kf_s3s4: {lb: 1.0e-4, ub: 100.0}
