@@ -63,11 +63,15 @@ function setup_petab_problem(enable_preeq::Bool, model_net_path::String, data_pa
         
         local bounds
         if haskey(bounds_settings, "overrides") && haskey(bounds_settings["overrides"], string(param_symbol))
+            # Use explicit override bounds if provided
             bounds = bounds_settings["overrides"][string(param_symbol)]
-        elseif endswith(string(param_symbol), "_0")
-            bounds = bounds_settings["default_initial_conc"]
         else
-            bounds = bounds_settings["default_kinetic"]
+            # Calculate parameter-specific bounds: 100x above and below the default value
+            bounds = Dict(
+                "lb" => default_val / 100.0,
+                "ub" => default_val * 100.0
+            )
+            println("DEBUG: Parameter $(param_symbol) = $(default_val), bounds: [$(bounds["lb"]), $(bounds["ub"])]")
         end
 
         push!(petab_params_list, PEtabParameter(param_symbol; 
