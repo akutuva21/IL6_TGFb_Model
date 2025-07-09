@@ -143,5 +143,34 @@ function setup_petab_problem(enable_preeq::Bool, model_net_path::String, data_pa
     )
 
     println("--- PEtab Problem Setup Complete ---")
-    return petab_model
+    
+    # Extract true parameter values (log10 scale) for reference plotting
+    true_param_values = Dict{String, Float64}()
+    println("DEBUG: Extracting true parameter values...")
+    for param in petab_params_list
+        if param.estimate  # Only include estimated parameters
+            # Get the original parameter name without any prefix
+            original_param_name = string(param.parameter)
+            
+            # Create the log10-prefixed name that will be used in the plot
+            plot_param_name = if param.scale == :log10
+                "log10_" * original_param_name
+            else
+                original_param_name
+            end
+            
+            if param.scale == :log10
+                true_value = log10(param.value)
+                true_param_values[plot_param_name] = true_value
+                println("DEBUG: $original_param_name -> $plot_param_name = $(param.value) -> log10 = $true_value")
+            else
+                true_param_values[plot_param_name] = param.value
+                println("DEBUG: $original_param_name -> $plot_param_name = $(param.value) (linear scale)")
+            end
+        end
+    end
+    println("DEBUG: Total true parameter values extracted: $(length(true_param_values))")
+    println("DEBUG: True parameter keys: $(collect(keys(true_param_values)))")
+    
+    return (petab_model=petab_model, true_values=true_param_values)
 end

@@ -101,7 +101,7 @@ pyPESTO's `visualize.parameters`, based on the provided Julia multi-start result
 Each line represents a single optimization run. The best overall run is
 highlighted in red.
 """
-function plot_parameter_distribution(multistart_result::PEtabMultistartResult, petab_prob::PEtabODEProblem)
+function plot_parameter_distribution(multistart_result::PEtabMultistartResult, petab_prob::PEtabODEProblem; reference_values=nothing)
     println("\n--- Generating Parameter Distribution Plot (Julia) ---")
     plot_dir = joinpath(pwd(), "final_results_plots")
     if !isdir(plot_dir); mkpath(plot_dir); end
@@ -153,7 +153,69 @@ function plot_parameter_distribution(multistart_result::PEtabMultistartResult, p
     bounds_x = vcat(lower_bounds, upper_bounds)
     scatter!(plt, bounds_x, bounds_y, marker=:+, color=:black, markersize=4, label="")
 
-    # --- 5. Highlight the single best run in red ---
+    # --- 5. Add reference values if provided ---
+    if !isnothing(reference_values)
+        println("DEBUG: Reference values provided: $(length(reference_values)) values")
+        println("DEBUG: Parameter names in plot: $(param_names)")
+        println("DEBUG: Reference value keys: $(collect(keys(reference_values)))")
+        
+        ref_x_values = Float64[]
+        missing_params = String[]
+        
+        # Create reference parameter vector in the same order as param_names
+        for param_name in param_names
+            if haskey(reference_values, param_name)
+                push!(ref_x_values, reference_values[param_name])
+                println("DEBUG: Found reference for $param_name = $(reference_values[param_name])")
+            else
+                push!(missing_params, param_name)
+                println("DEBUG: Missing reference for $param_name")
+            end
+        end
+        
+        if !isempty(missing_params)
+            println("DEBUG: Missing reference values for: $(missing_params)")
+        end
+        
+        # Plot reference values even if we don't have all parameters
+        if length(ref_x_values) == n_params
+            println("DEBUG: Plotting complete reference line with $(length(ref_x_values)) values")
+            plot!(plt, ref_x_values, y_values, 
+                  seriestype=:path, 
+                  color=:blue, 
+                  alpha=0.9,
+                  linewidth=2,
+                  marker=:circle,
+                  markersize=3,
+                  label="Reference values")
+        else
+            println("DEBUG: Plotting partial reference points: $(length(ref_x_values)) out of $(n_params)")
+            # Plot individual reference points for parameters we do have
+            ref_x_partial = Float64[]
+            ref_y_partial = Int[]
+            
+            for (i, param_name) in enumerate(param_names)
+                if haskey(reference_values, param_name)
+                    push!(ref_x_partial, reference_values[param_name])
+                    push!(ref_y_partial, i)
+                end
+            end
+            
+            if !isempty(ref_x_partial)
+                scatter!(plt, ref_x_partial, ref_y_partial, 
+                        marker=:star, 
+                        color=:blue, 
+                        markersize=8, 
+                        markerstrokewidth=2,
+                        markerstrokecolor=:black,
+                        label="Reference values")
+            end
+        end
+    else
+        println("DEBUG: No reference values provided")
+    end
+
+    # --- 6. Highlight the single best run in red ---
     if !isempty(best_x)
         plot!(plt, best_x, y_values, 
               seriestype=:path, 

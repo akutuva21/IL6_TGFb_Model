@@ -1,7 +1,7 @@
 # main.jl
 
 using Pkg
-Pkg.activate("bngl_julia/")
+Pkg.activate("./bngl_julia")  # Explicit project path for main process
 
 include("src/model_param_est_robustness.jl")
 include("src/visualization.jl")
@@ -15,63 +15,16 @@ using ComponentArrays
 using Plots
 using PEtab
 using SciMLSensitivity
-using ReverseDiff
 using OrdinaryDiffEq
 using Optim
 using Sundials
 
-# --- NEW: Define defaults for PEtab TSV files ---
 const DEFAULT_TIME_COURSE_MEASUREMENTS = "SimData/measurements_time_course.tsv"
 const DEFAULT_DOSE_RESPONSE_MEASUREMENTS = "SimData/measurements_dose_response.tsv"
 const DEFAULT_MODEL_NET = "model_even_smaller/2025_07_08__12_31_42/model_even_smaller.net"
 
-function setup_multiprocessing()
-    # Helper to get CPU info from Slurm or the system
-    function get_slurm_cpus()
-        if haskey(ENV, "SLURM_CPUS_PER_TASK")
-            try
-                return parse(Int, ENV["SLURM_CPUS_PER_TASK"])
-            catch
-                @warn "Could not parse SLURM_CPUS_PER_TASK. Defaulting to system threads."
-                return Sys.CPU_THREADS
-            end
-        else
-            @info "Not running in a Slurm task. Defaulting to system threads."
-            return Sys.CPU_THREADS
-        end
-    end
-
-    try
-        num_procs_to_add = get_slurm_cpus() - 1
-        
-        if num_procs_to_add > 0
-            sysimage_path = unsafe_string(Base.JLOptions().image_file)
-            
-            if isempty(sysimage_path)
-                @warn "Main process was not started with a system image. Workers will also start without one."
-                addprocs(num_procs_to_add; exeflags=`--project=$(Base.active_project())`)
-            else
-                println("INFO: Main process using system image at '$sysimage_path'. Propagating to workers."); flush(stdout)
-                addprocs(num_procs_to_add; exeflags=`--project=$(Base.active_project()) -J$(sysimage_path)`)
-            end
-            println("INFO: Added $(num_procs_to_add) worker processes."); flush(stdout)
-        else
-            println("INFO: Running on a single process."); flush(stdout)
-        end
-    catch e
-        @warn "Could not add processes. Running in serial. Error: $e"
-        flush(stderr)
-    end
-end
-
-# Make sure all workers have the necessary packages (must be at top level)
-@everywhere using PEtab
-@everywhere using Optim
-@everywhere using Sundials
-@everywhere using SciMLSensitivity
-@everywhere using ReverseDiff
-
-function parse_commandline()
+# --- DEFINE AND PARSE ARGUMENTS (ONCE) ---
+function define_argument_parser()
     s = ArgParseSettings(description="Run parameter estimation and visualization.")
     @add_arg_table! s begin
         "--mode"
@@ -89,9 +42,9 @@ function parse_commandline()
             arg_type = String
             default = "estimation_output_small.jld"
         "--n-starts"
-            help = "Number of multi-starts. Defaults to the number of available processes in parallel mode, or 1 in serial mode."
+            help = "Number of multi-starts. Defaults to processes in parallel, or 10 in serial."
             arg_type = Int
-            default = 0 # Will be dynamically set later
+            default = 0
         "--optimizer"
             help = "Optimization algorithm to use. Options: " * join(keys(SUPPORTED_OPTIMIZERS), ", ")
             arg_type = String
@@ -99,11 +52,11 @@ function parse_commandline()
         "--abstol"
             help = "Absolute tolerance for the ODE solver."
             arg_type = Float64
-            default = 1e-8 # Tighter default tolerance
+            default = 1e-8
         "--reltol"
             help = "Relative tolerance for the ODE solver."
             arg_type = Float64
-            default = 1e-8 # Tighter default tolerance
+            default = 1e-8
         "--net-file"
             help = "Path to the BioNetGen .net file."
             arg_type = String
@@ -113,30 +66,85 @@ function parse_commandline()
             arg_type = String
             default = "config.yml"
         "--debug"
-            help = "Enable debug mode with shorter time limits and looser tolerances for faster testing."
+            help = "Enable debug mode for faster, less accurate testing."
             action = :store_true
         "--measurements-file"
-            help = "Path to the PEtab measurements file. Overrides the default for the selected mode."
+            help = "Custom measurements file. Overrides defaults."
             arg_type = String
             default = ""
         "--conditions-file"
-            help = "Path to the PEtab conditions file. Required if using a custom measurements file."
+            help = "Custom conditions file. Required if using custom measurements."
             arg_type = String
             default = ""
         "--observables-file"
-            help = "Path to the PEtab observables file. Optional."
+            help = "Custom observables file (optional)."
             arg_type = String
             default = ""
         "--parameters-file"
-            help = "Path to the PEtab parameters file. Optional."
+            help = "Custom parameters file (optional)."
             arg_type = String
             default = ""
     end
-    return parse_args(s)
+    return s
+end
+
+const PARSED_ARGS = parse_args(ARGS, define_argument_parser())
+
+# ===================================================================
+# --- 2. TOP-LEVEL DISTRIBUTED SETUP ---
+# ===================================================================
+if PARSED_ARGS["parallel"]
+    try
+        # Use the SLURM variable to determine how many processes to add
+        n_procs = haskey(ENV, "SLURM_CPUS_PER_TASK") ? parse(Int, ENV["SLURM_CPUS_PER_TASK"]) : Sys.CPU_THREADS
+        # Add n_procs-1 workers. The main process is already running.
+        addprocs(n_procs - 1)
+        println("INFO: Successfully added $(nworkers()) worker processes."); flush(stdout)
+    catch e
+        @warn "Could not add processes. Running in serial. Error: $e"
+        flush(stderr)
+    end
+end
+
+const PROJECT_PATH = abspath(dirname(Base.active_project()))
+println("INFO: Main process confirmed project path is $PROJECT_PATH")
+
+# --- 3. LOAD PACKAGES ON ALL PROCESSES ---
+if nworkers() > 0
+    # Get the absolute project path from the main process
+    const PROJECT_PATH = abspath(dirname(Base.active_project()))
+    println("INFO: Main process project path is $(PROJECT_PATH). Broadcasting to workers."); flush(stdout)
+
+    # This builds the code with the value of PROJECT_PATH before sending it.
+    @everywhere @eval Main begin
+        using Pkg
+        Pkg.activate($PROJECT_PATH)
+        
+        using PEtab
+        using Optim
+        using Sundials
+        using SciMLSensitivity
+    end
+    println("INFO: Packages loaded successfully on all workers."); flush(stdout)
+end
+
+if nworkers() > 0
+    println("INFO: Verifying system image on all processes..."); flush(stdout)
+    
+    # Check main process
+    main_sysimage = unsafe_string(Base.JLOptions().image_file)
+    println("      From Main (ID 1): System image is '$(main_sysimage)'"); flush(stdout)
+
+    # Check all workers
+    @everywhere begin
+        worker_sysimage = unsafe_string(Base.JLOptions().image_file)
+        println("      From Worker (ID $(myid())): System image is '$(worker_sysimage)'")
+    end
+    flush(stdout)
 end
 
 function run_analysis()
-    parsed_args = parse_commandline()
+    parsed_args = PARSED_ARGS  # Use globally parsed arguments
 
     # Apply debug mode adjustments
     if parsed_args["debug"]
@@ -144,22 +152,17 @@ function run_analysis()
         parsed_args["abstol"] = 1e-4
         parsed_args["reltol"] = 1e-4
         # In debug mode, run only a few starts
-        parsed_args["n-starts"] = parsed_args["n-starts"] == 0 ? 5 : min(parsed_args["n-starts"], 10)  # Allow up to 10 starts
+        parsed_args["n-starts"] = parsed_args["n-starts"] == 0 ? 5 : min(parsed_args["n-starts"], 50)  # Allow up to 10 starts
         println("INFO: Debug tolerances set to abstol=$(parsed_args["abstol"]), reltol=$(parsed_args["reltol"])")
-    end
-
-    # Setup multiprocessing based on environment
-    if parsed_args["parallel"]
-        setup_multiprocessing()
     end
 
     # Dynamically set n_starts if not provided by the user
     if parsed_args["n-starts"] == 0
-        if parsed_args["parallel"]
-            parsed_args["n-starts"] = nprocs()
-            println("INFO: --n-starts not provided, defaulting to nprocs(): $(parsed_args["n-starts"])")
+        if parsed_args["parallel"] && nworkers() > 0
+            parsed_args["n-starts"] = nworkers()
+            println("INFO: --n-starts not provided, defaulting to nworkers(): $(parsed_args["n-starts"])" )
         else
-            parsed_args["n-starts"] = 10 # A reasonable number for a thorough serial run
+            parsed_args["n-starts"] = 10
             println("INFO: --n-starts not provided, defaulting to 10 for serial execution.")
         end
     end
@@ -173,7 +176,6 @@ function run_analysis()
     # Determine data file based on the selected mode
     mode = parsed_args["mode"]
     local data_file::String
-    # The --data-file argument is now the primary way to specify the data
     if !isempty(parsed_args["measurements-file"])
         data_file = parsed_args["measurements-file"]
         println("INFO: Using custom measurements file: '$data_file'")
@@ -210,13 +212,17 @@ function run_analysis()
     end
 
     # --- 2. Setup the core PEtabModel (do this only ONCE) ---
-    # THIS IS THE KEY CHANGE: We are now calling your original setup function again.
     println("INFO: Setting up PEtab Model programmatically..."); flush(stdout)
     @time setup_results = setup_petab_problem(enable_preeq, net_file, data_file, config_file)
     if isnothing(setup_results)
         @error "Failed to build PEtabModel. Cannot proceed."
         return
     end
+    
+    # Extract the PEtab model and true parameter values
+    petab_model = setup_results.petab_model
+    true_param_values = setup_results.true_values
+    println("INFO: Extracted $(length(true_param_values)) true parameter values for reference plotting")
 
     # --- 3. Define robust solver options for simulation and steady-state ---
     println("INFO: Defining dedicated solvers for simulation and steady-state..."); flush(stdout)
@@ -228,17 +234,15 @@ function run_analysis()
         # Use a pure-Julia solver for the main problem
         odesol = ODESolver(Rodas5P(), abstol=parsed_args["abstol"], reltol=parsed_args["reltol"])
         
-        # THIS IS THE FIX: Use the :Simulate method for the steady-state problem in debug mode.
-        # It is universally compatible and avoids the TypeError.
         steadystate_solver = SteadyStateSolver(:Simulate,
                                                abstol=parsed_args["abstol"], 
                                                reltol=parsed_args["reltol"])
         gradient_method = :ForwardDiff
 
     else # Normal (non-debug) mode
-        println("INFO: Normal mode - using CVODE_BDF with Adjoint for accuracy")
-        # Use the robust Sundials solver for the main problem
-        odesol = ODESolver(CVODE_BDF(linear_solver=:GMRES), 
+        println("INFO: Normal mode - using Rodas5P with ForwardDiff for robust optimization")
+        # Use the robust pure-Julia solver for the main problem
+        odesol = ODESolver(Rodas5P(), 
             abstol=parsed_args["abstol"], 
             reltol=parsed_args["reltol"],
             maxiters=200000
@@ -247,8 +251,9 @@ function run_analysis()
         # Use the :Simulate method for steady-state as well to avoid rootfinding algorithm issues
         steadystate_solver = SteadyStateSolver(:Simulate,
                                                abstol=parsed_args["abstol"], 
-                                               reltol=parsed_args["reltol"])
-        gradient_method = :Adjoint
+                                               reltol=parsed_args["reltol"],
+                                               maxiters=200000)
+        gradient_method = :ForwardDiff
     end
 
     # --- 4. Run estimation ONLY if no results were loaded ---
@@ -257,11 +262,10 @@ function run_analysis()
         println("INFO: Building PEtabODEProblem for estimation..."); flush(stdout)
         
         @time petab_problem = PEtabODEProblem(
-            setup_results, # Use the result from setup_petab_problem
+            petab_model, # Use the extracted petab_model
             odesolver = odesol,
             ss_solver = steadystate_solver,
             gradient_method=gradient_method,
-            sensealg = gradient_method == :Adjoint ? InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)) : nothing,
             verbose=false
         )
         
@@ -286,11 +290,10 @@ function run_analysis()
     if !@isdefined(petab_problem)
         println("INFO: Building PEtabODEProblem for visualization..."); flush(stdout)
         @time petab_problem = PEtabODEProblem(
-            setup_results,
+            petab_model,
             odesolver = odesol,
             ss_solver = steadystate_solver,
             gradient_method=gradient_method,
-            sensealg = gradient_method == :Adjoint ? InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)) : nothing,
             verbose=false
         )
     else
@@ -301,8 +304,13 @@ function run_analysis()
     if !isnothing(multi_start_res)
         println("\n--- Generating Waterfall Plot ---"); flush(stdout)
         plot_waterfall(multi_start_res)
-        println("\n-- Print Parameter Distribution Plot ---"); flush(stdout)
-        plot_parameter_distribution(multi_start_res, petab_problem)
+        
+        println("\n--- Generating Parameter Distribution Plot ---"); flush(stdout)
+        
+        # Use the true parameter values from the BNGL model as reference
+        println("INFO: Using true parameter values from BNGL model as reference")
+        
+        plot_parameter_distribution(multi_start_res, petab_problem, reference_values=true_param_values)
     end
 
     saved_results = (

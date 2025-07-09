@@ -7,19 +7,24 @@ using Sundials
 # This dictionary is specific to the optimization process
 const SUPPORTED_OPTIMIZERS = Dict(
     "LBFGS" => LBFGS(),
-    "IPNewton" => IPNewton()
+    "IPNewton" => IPNewton(),
+    "BFGS" => BFGS(),                    # Often faster than LBFGS
+    "ConjugateGradient" => ConjugateGradient(),  # Good for large problems
+    "GradientDescent" => GradientDescent()       # Simple and fast
 )
 
 # Optimizer recommendations for different scenarios
 const OPTIMIZER_GUIDANCE = Dict(
-    "LBFGS" => "Good for smooth problems, but may struggle with very stiff systems",
-    "IPNewton" => "More robust for constrained/stiff problems, slower but more reliable"
+    "LBFGS" => "Good for smooth problems, memory efficient",
+    "BFGS" => "Often faster than LBFGS for medium-sized problems",
+    "ConjugateGradient" => "Fast for large parameter spaces",
+    "GradientDescent" => "Simple and fast, good for rough optimization",
+    "IPNewton" => "Most robust but slowest"
 )
 
 function run_parameter_estimation(parsed_args, petab_problem)
     println("\n🧪 Testing cost function before optimization...")
     
-    # --- This block is now corrected ---
     try
         # Get a single, correctly scaled start-guess using the correct function
         x_test = get_startguesses(petab_problem, 1)
@@ -53,9 +58,8 @@ function run_parameter_estimation(parsed_args, petab_problem)
         println("❌ Cost function test or start-guess generation failed: $e")
         return nothing
     end
-    # --- End of corrected block ---
 
-    use_parallel = parsed_args["parallel"]
+    use_parallel = parsed_args["parallel"] && nworkers() > 0
     optimizer_choice_str = parsed_args["optimizer"]
     n_starts = parsed_args["n-starts"]
     if n_starts == 0
@@ -72,15 +76,15 @@ function run_parameter_estimation(parsed_args, petab_problem)
     end
     optimizer = SUPPORTED_OPTIMIZERS[optimizer_choice_str]
     debug_mode = get(parsed_args, "debug", false)
-    time_limit = debug_mode ? 30.0 : 600.0
-    max_iterations = debug_mode ? 100 : 10000
+    time_limit = debug_mode ? 30.0 : 1000.0
+    max_iterations = debug_mode ? 100 : 20000
     
     optim_options = Optim.Options(
         time_limit=time_limit,
         iterations=max_iterations,
-        g_tol=debug_mode ? 1e-2 : 1e-6,
-        f_reltol=debug_mode ? 1e-4 : 1e-8,
-        show_trace=debug_mode,
+        g_tol=debug_mode ? 1e-2 : 1e-5,
+        f_reltol=debug_mode ? 1e-4 : 1e-9,
+        show_trace=true,
         allow_f_increases=true
     )
     

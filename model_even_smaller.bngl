@@ -37,9 +37,6 @@ begin parameters
     SMAD4_0             50.0
     STAT3m_0            100.0
     PKA_0               50.0
-    SMAD3_phos_P_0      5.0
-    STAT3d_active_0     1.0
-    PKA_active_0        5.0
 
 end parameters
 
@@ -55,16 +52,13 @@ begin molecule types
 end molecule types
 
 begin seed species
-    TGFb(r)                                     TGFb_0
-    IL6(r)                                      IL6_0
-    IL6R(l_bind,activity~I)                     IL6R_0
+    TGFb(r)                                           TGFb_0
+    IL6(r)                                            IL6_0
+    IL6R(l_bind,activity~I)                           IL6R_0
     SMAD3(phos~U,smad4_site,stat3_site,pka_site)      SMAD3_0
-    SMAD4(s3_site)                                      SMAD4_0
-    STAT3m()                                            STAT3m_0
-    PKA(activity~I,s3s4_site)                          PKA_0
-    SMAD3(phos~P,smad4_site,stat3_site,pka_site)      SMAD3_phos_P_0
-    STAT3d_active(s3_site)                              STAT3d_active_0
-    PKA(activity~A,s3s4_site)                          PKA_active_0
+    SMAD4(s3_site)                                    SMAD4_0
+    STAT3m()                                          STAT3m_0
+    PKA(activity~I,s3s4_site)                         PKA_0
 end seed species
 
 begin observables
