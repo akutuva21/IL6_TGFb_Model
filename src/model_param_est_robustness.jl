@@ -57,22 +57,16 @@ function setup_petab_problem(enable_preeq::Bool, model_net_path::String, data_pa
     condition_params = Set([Symbol(col) for col in names(conditions_df) if col != "conditionId"])
     
     petab_params_list = PEtabParameter[]
-    bounds_settings = config["parameter_bounds"] # Assumes bounds are in config
     for (param_symbol, default_val) in p_map_defaults
         should_estimate = !(param_symbol in condition_params)
         
-        local bounds
-        if haskey(bounds_settings, "overrides") && haskey(bounds_settings["overrides"], string(param_symbol))
-            # Use explicit override bounds if provided
-            bounds = bounds_settings["overrides"][string(param_symbol)]
-        else
-            # Calculate parameter-specific bounds: 100x above and below the default value
-            bounds = Dict(
-                "lb" => default_val / 100.0,
-                "ub" => default_val * 100.0
-            )
-            println("DEBUG: Parameter $(param_symbol) = $(default_val), bounds: [$(bounds["lb"]), $(bounds["ub"])]")
-        end
+        # For now, always use automatic bounds calculation
+        # This avoids all config file dependency issues
+        bounds = Dict(
+            "lb" => default_val / 100.0,
+            "ub" => default_val * 100.0
+        )
+        println("DEBUG: Parameter $(param_symbol) = $(default_val), bounds: [$(bounds["lb"]), $(bounds["ub"])]")
 
         push!(petab_params_list, PEtabParameter(param_symbol; 
                                                 value=default_val,
