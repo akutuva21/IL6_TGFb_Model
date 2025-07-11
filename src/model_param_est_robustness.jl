@@ -56,16 +56,16 @@ function setup_petab_problem(enable_preeq::Bool, model_net_path::String, data_pa
 
     condition_params = Set([Symbol(col) for col in names(conditions_df) if col != "conditionId"])
     
-    # Define parameters that should be shared across conditions (not condition-specific)
-    # These represent basal levels that should be the same in all experimental conditions
-    shared_basal_params = Set([:TGFb_0])  # TGFb_0 represents basal TGFb level
+    # Define parameters that should NOT be estimated (fixed external ligands)
+    # These are controlled by experimental conditions, not estimated
+    fixed_external_ligands = Set([:IL6_0, :TGFb_0])  # External stimuli controlled by conditions
     
     petab_params_list = PEtabParameter[]
     for (param_symbol, default_val) in p_map_defaults
-        # Ensure shared basal parameters are always estimated (not treated as condition-specific)
-        if param_symbol in shared_basal_params
-            should_estimate = true  # Always estimate shared basal parameters
-            println("DEBUG: $param_symbol marked as SHARED BASAL parameter - estimated globally (same across conditions)")
+        # Don't estimate external ligands - they are controlled by experimental conditions
+        if param_symbol in fixed_external_ligands
+            should_estimate = false  # External ligands are not estimated
+            println("DEBUG: $param_symbol marked as EXTERNAL LIGAND - not estimated (controlled by conditions)")
         else
             should_estimate = !(param_symbol in condition_params)
         end

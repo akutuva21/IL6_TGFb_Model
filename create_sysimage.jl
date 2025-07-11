@@ -6,9 +6,8 @@ Pkg.activate("bngl_julia/")
 using PackageCompiler
 
 pkgs = [
-    "CSV",
     "DataFrames",
-    "DifferentialEquations",
+    "DifferentialEquations", 
     "ModelingToolkit",
     "Catalyst",
     "SymbolicUtils",
@@ -22,14 +21,14 @@ pkgs = [
     "DiffEqCallbacks",
     "SciMLBase",
     "SciMLSensitivity",
-    "ArgParse",
-    "JLD2", 
+    "OrdinaryDiffEq",
+    "Sundials",
     "ComponentArrays",
     "XLSX",
+    "CSV",
     "YAML",
-    "ReverseDiff",
-    "OrdinaryDiffEq",
-    "Sundials"
+    "ArgParse",
+    "JLD2"
 ]
 
 sysimage_path = "bngl_sysimage.so"

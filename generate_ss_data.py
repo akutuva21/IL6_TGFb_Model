@@ -483,9 +483,16 @@ def generate_time_course_petab(config):
     measurement_df = pd.DataFrame(measurement_rows)
     condition_df = pd.DataFrame(condition_rows)
     
-    # Save to TSV files
-    measurement_path = os.path.join(output_dir, "measurements_time_course.tsv")
-    condition_path = os.path.join(output_dir, "conditions_time_course.tsv")
+    # Create filename suffix based on noise configuration
+    if noise_conf['add']:
+        noise_percent = int(noise_conf['level_percent'])
+        filename_suffix = f"_noise_{noise_percent}"
+    else:
+        filename_suffix = "_default"
+    
+    # Save to TSV files with appropriate naming
+    measurement_path = os.path.join(output_dir, f"measurements_time_course{filename_suffix}.tsv")
+    condition_path = os.path.join(output_dir, f"conditions_time_course{filename_suffix}.tsv")
     
     measurement_df.to_csv(measurement_path, index=False, sep='\t')
     condition_df.to_csv(condition_path, index=False, sep='\t')
