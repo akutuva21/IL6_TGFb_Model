@@ -187,6 +187,7 @@ julia main.jl [OPTIONS]
 - `--net-file FILE`: Path to BioNetGen .net file
 - `--config FILE`: Path to config.yml file
 - `--measurements-file FILE`: Custom measurements file path
+- `--profile`: Run likelihood profiling on the best-fit parameters after estimation. This is computationally intensive and requires a results file (`.jld`) to exist.
 
 ### Python Data Generation Script (`generate_ss_data.py`)
 
@@ -295,27 +296,23 @@ julia main.jl --optimizer NelderMead --output nelder_results.jld
 julia main.jl --optimizer IPNewton --output ipnewton_results.jld
 ```
 
-    ```bash
-    pip install -r requirements.txt
-    ```
+### Running Likelihood Profiling
 
-3.  **Set Up Julia Environment**
-    Start Julia in the project directory and activate the local environment.
+After obtaining a good set of best-fit parameters from a multi-start run, you can analyze parameter identifiability using likelihood profiling.
 
-    ```julia
-    # Press ']' to enter Pkg mode
-    pkg> activate .
-    pkg> instantiate
-    ```
+1. **First, run the parameter estimation** to generate a results file (e.g., `my_results.jld`).
+   ```bash
+   julia -J bngl_sysimage.so main.jl --mode time-course --parallel --n-starts 50 --output my_results.jld
+   ```
 
-    This will install all the Julia packages listed in `Project.toml`.
+2. **Then, run the script again with the `--profile` flag.** It will load the results from the specified output file and begin the profiling analysis.
+   ```bash
+   julia -J bngl_sysimage.so main.jl --mode time-course --output my_results.jld --profile
+   ```
 
-4.  **(Highly Recommended) Create the Julia System Image**
-    To significantly speed up the startup of the estimation script, pre-compile the dependencies. Run this command from your terminal:
+The results will be saved as individual PNG files in the `likelihood_profiles/` directory. Steep, V-shaped profiles indicate identifiable parameters, while flat profiles suggest non-identifiability.
 
-    ```bash
-    julia create_sysimage.jl
-    ```
+## Setup Instructions
 
     This will create a `bngl_sysimage.so` file. The main script will automatically use it if available.
 

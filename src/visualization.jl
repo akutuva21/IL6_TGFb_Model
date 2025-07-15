@@ -8,55 +8,88 @@ using PEtab
 using Printf
 using CSV
 
-# Export the original function names
 export run_visualization, plot_waterfall, plot_parameter_distribution
 
 """
     run_visualization(
         theta_optim::Vector{Float64},
-        petab_prob::PEtabODEProblem
+        petab_prob::PEtabODEProblem,
+        odesolver::ODESolver
     )
 
 Generates and saves plots comparing the model simulation against measurement data.
 
-This refactored version uses the native `PEtab.plot` function. To do so, it
-wraps the provided `theta_optim` vector in a minimal `PEtabOptimisationResult`
-struct, which is the input type the plotting function expects.
+This function manually solves the ODE for all conditions and creates plots for each observable.
 """
 function run_visualization(
     theta_optim::Vector{Float64},
-    petab_prob::PEtabODEProblem
+    petab_prob::PEtabODEProblem,
+    odesolver::ODESolver
 )
-    println("\n--- Starting Visualization (using native PEtab.jl) ---")
+    println("\n--- Starting Visualization (Manual Workaround) ---")
 
-    # The native plot function requires a result struct. We create a minimal
-    # PEtabOptimisationResult to wrap the provided parameter vector.
-    # The other fields can be placeholders as they are not used for this plot type.
-    result_for_plotting = PEtab.PEtabOptimisationResult(
-        :fminbox,      # Placeholder algorithm
-        0,             # n_opts
-        NaN,           # fmin
-        theta_optim,   # The optimal parameters to use for simulation
-        0,             # f_calls
-        0,             # n_iterations
-        0.0,           # run_time
-        nothing,       # converged
-        :Success       # ret
-    )
+    # Step 1: Manually solve the ODE for all conditions
+    println("Manually solving ODE for all conditions...")
+    ode_solutions = PEtab.solve_all_conditions(theta_optim, petab_prob, odesolver.solver)
+    println("✅ ODE solutions obtained.")
 
     plot_path = joinpath(pwd(), "final_results_plots")
     if !isdir(plot_path); mkpath(plot_path); end
 
-    # Create one plot for each unique observable ID
-    observable_ids = unique(petab_prob.petab_model.measurements_data.observableId)
+    # Step 2: Manually plot each observable
+    measurements_df = petab_prob.model_info.petab_measurements
+    observable_ids = unique(measurements_df.observable_id)
+
     for obs_id in observable_ids
+        println("Plotting observable: $obs_id")
         
-        # Use the native PEtab.jl plot function for model fits.
-        # It automatically handles data and simulation plotting.
-        plt = plot(petab_prob, result_for_plotting; obs_id=[obs_id])
+        plt = plot(
+            title=string(obs_id),
+            xlabel="Time",
+            ylabel="Value",
+            legend=:outertopright
+        )
+
+        relevant_conditions = unique(measurements_df.simulation_condition_id[measurements_df.observable_id .== obs_id])
+
+        for condition_id in relevant_conditions
+            
+            # Plot measurement data
+            data_for_plot = measurements_df.measurement[
+                (measurements_df.observable_id .== obs_id) .& 
+                (measurements_df.simulation_condition_id .== condition_id)
+            ]
+            time_points = measurements_df.time[
+                (measurements_df.observable_id .== obs_id) .& 
+                (measurements_df.simulation_condition_id .== condition_id)
+            ]
+            scatter!(plt, time_points, data_for_plot, label="Data ($condition_id)")
+
+            # Plot simulation results
+            sol_key = nothing
+            for key in keys(ode_solutions)
+                if occursin(string(condition_id), string(key))
+                    sol_key = key
+                    break
+                end
+            end
+
+            if !isnothing(sol_key)
+                solution = ode_solutions[sol_key]
+                
+                # --- THE FIX: Use the correct path to the 'h' function ---
+                simulated_values = [
+                    petab_prob.model_info.model.h(sol_u, sol_t, solution.prob.p, [], [], [], obs_id, nothing) 
+                    for (sol_u, sol_t) in zip(solution.u, solution.t)
+                ]
+                
+                plot!(plt, solution.t, simulated_values, label="Model ($condition_id)", linewidth=2)
+            else
+                @warn "Could not find a simulation solution for condition $condition_id"
+            end
+        end
         
-        # Save the plot for the current observable
-        plot_filename = joinpath(plot_path, "$(obs_id).png")
+        plot_filename = joinpath(plot_path, "plot_observable_$(obs_id).png")
         savefig(plt, plot_filename)
         println("✅ Plot saved to: $plot_filename")
     end
@@ -176,7 +209,7 @@ function plot_parameter_distribution(multistart_result::PEtabMultistartResult, p
                     color=:blue, 
                     markersize=8, 
                     markerstrokewidth=1,
-                    markerstrokecolor=:black,
+                    markerstrokecolor=:blue,
                     label="Reference values")
         end
     end

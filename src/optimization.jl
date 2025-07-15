@@ -77,7 +77,7 @@ function run_parameter_estimation(parsed_args, petab_problem)
     optimizer = SUPPORTED_OPTIMIZERS[optimizer_choice_str]
     debug_mode = get(parsed_args, "debug", false)
     time_limit = debug_mode ? 30.0 : 7200.0
-    max_iterations = debug_mode ? 100 : 20000
+    max_iterations = debug_mode ? 200 : 20000
     
     optim_options = Optim.Options(
         time_limit=time_limit,

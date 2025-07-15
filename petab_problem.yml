@@ -1,0 +1,15 @@
+# petab_problem.yml
+# Standard PEtab problem definition file
+
+format_version: 1
+parameter_file: SimData/parameters_time_course_default.tsv
+
+problems:
+  - condition_files:
+      - SimData/conditions_time_course_default.tsv
+    measurement_files:
+      - SimData/measurements_time_course_default.tsv
+    observable_files:
+      - SimData/observables_time_course_default.tsv
+    sbml_files:
+      - model_even_smaller_sbml.xml

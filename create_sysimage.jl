@@ -28,7 +28,9 @@ pkgs = [
     "CSV",
     "YAML",
     "ArgParse",
-    "JLD2"
+    "JLD2",
+    "ProfileLikelihood",
+    "ADTypes"
 ]
 
 sysimage_path = "bngl_sysimage.so"

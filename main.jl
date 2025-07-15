@@ -6,6 +6,7 @@ Pkg.activate("./bngl_julia")  # Explicit project path for main process
 include("src/model_param_est_robustness.jl")
 include("src/visualization.jl")
 include("src/optimization.jl")
+include("src/profiling.jl")
 
 using Distributed
 using LinearAlgebra
@@ -18,24 +19,21 @@ using SciMLSensitivity
 using OrdinaryDiffEq
 using Optim
 using Sundials
+using Optimization
+using ProfileLikelihood
 
-const DEFAULT_TIME_COURSE_MEASUREMENTS = "SimData/measurements_time_course.tsv"
-const DEFAULT_DOSE_RESPONSE_MEASUREMENTS = "SimData/measurements_dose_response.tsv"
-const DEFAULT_MODEL_NET = "model_even_smaller/2025_07_08__12_31_42/model_even_smaller.net"
+const DEFAULT_YAML_PATH = "petab_problem.yml"
 
-# --- DEFINE AND PARSE ARGUMENTS (ONCE) ---
+# --- DEFINE AND PARSE ARGUMENTS (CLEANED FOR YAML-BASED WORKFLOW) ---
 function define_argument_parser()
-    s = ArgParseSettings(description="Run parameter estimation and visualization.")
+    s = ArgParseSettings(description="Run parameter estimation and visualization using a PEtab YAML file.")
     @add_arg_table! s begin
-        "--mode"
-            help = "Workflow mode. Options: 'time-course', 'dose-response'."
+        "--yaml"
+            help = "Path to the PEtab YAML problem file."
             arg_type = String
-            default = "time-course"
+            default = "petab_problem.yml"
         "--parallel"
             help = "Run parameter estimation using multi-processing."
-            action = :store_true
-        "--with-preeq"
-            help = "Enable pre-equilibration before the main simulation."
             action = :store_true
         "--output", "-o"
             help = "Path to the JLD2 output file for saving/loading results."
@@ -46,44 +44,15 @@ function define_argument_parser()
             arg_type = Int
             default = 0
         "--optimizer"
-            help = "Optimization algorithm to use. Options: " * join(keys(SUPPORTED_OPTIMIZERS), ", ")
+            help = "Optimization algorithm to use. Options: LBFGS, BFGS, NelderMead"
             arg_type = String
             default = "LBFGS"
-        "--abstol"
-            help = "Absolute tolerance for the ODE solver."
-            arg_type = Float64
-            default = 1e-8
-        "--reltol"
-            help = "Relative tolerance for the ODE solver."
-            arg_type = Float64
-            default = 1e-8
-        "--net-file"
-            help = "Path to the BioNetGen .net file."
-            arg_type = String
-            default = DEFAULT_MODEL_NET
-        "--config"
-            help = "Path to the YAML config file for observable mapping and bounds."
-            arg_type = String
-            default = "config.yml"
         "--debug"
             help = "Enable debug mode for faster, less accurate testing."
             action = :store_true
-        "--measurements-file"
-            help = "Custom measurements file. Overrides defaults."
-            arg_type = String
-            default = ""
-        "--conditions-file"
-            help = "Custom conditions file. Required if using custom measurements."
-            arg_type = String
-            default = ""
-        "--observables-file"
-            help = "Custom observables file (optional)."
-            arg_type = String
-            default = ""
-        "--parameters-file"
-            help = "Custom parameters file (optional)."
-            arg_type = String
-            default = ""
+        "--profile"
+            help = "Run likelihood profiling on the best-fit parameters."
+            action = :store_true
     end
     return s
 end
@@ -149,11 +118,9 @@ function run_analysis()
     # Apply debug mode adjustments
     if parsed_args["debug"]
         println("INFO: Debug mode enabled - using faster, less accurate settings")
-        parsed_args["abstol"] = 1e-4
-        parsed_args["reltol"] = 1e-4
-        # In debug mode, run only a few starts
-        parsed_args["n-starts"] = parsed_args["n-starts"] == 0 ? 5 : min(parsed_args["n-starts"], 50)  # Allow up to 10 starts
-        println("INFO: Debug tolerances set to abstol=$(parsed_args["abstol"]), reltol=$(parsed_args["reltol"])")
+        # In debug mode, run only a few starts for faster testing
+        parsed_args["n-starts"] = parsed_args["n-starts"] == 0 ? 5 : min(parsed_args["n-starts"], 10)
+        println("INFO: Debug mode will use faster tolerances and fewer starts")
     end
 
     # Dynamically set n_starts if not provided by the user
@@ -168,34 +135,11 @@ function run_analysis()
     end
 
     # File paths from command line
-    net_file = parsed_args["net-file"]
-    config_file = parsed_args["config"]
-    enable_preeq = parsed_args["with-preeq"]
+    yaml_path = parsed_args["yaml"]
     output_filename = parsed_args["output"]
 
-    # Determine data file based on the selected mode
-    mode = parsed_args["mode"]
-    local data_file::String
-    if !isempty(parsed_args["measurements-file"])
-        data_file = parsed_args["measurements-file"]
-        println("INFO: Using custom measurements file: '$data_file'")
-    elseif mode == "time-course"
-        data_file = DEFAULT_TIME_COURSE_MEASUREMENTS
-        println("INFO: Running in 'time-course' mode with default data: '$data_file'")
-    elseif mode == "dose-response"
-        data_file = DEFAULT_DOSE_RESPONSE_MEASUREMENTS
-        println("INFO: Running in 'dose-response' mode with default data: '$data_file'")
-    else
-        @error "Invalid mode: '$mode'. Must be 'time-course' or 'dose-response'."
-        return
-    end
-    flush(stdout)
-
-
-    println("INFO: The script will use the following output file: '$output_filename'")
-    flush(stdout)
-
     println("--- Starting Full Analysis ---"); flush(stdout)
+    println("Using PEtab YAML file: '$yaml_path'"); flush(stdout)
     println("Using output file: '$output_filename'"); flush(stdout)
 
     # --- 1. Load existing results if available ---
@@ -211,48 +155,34 @@ function run_analysis()
         end
     end
 
-    # --- 2. Setup the core PEtabModel (do this only ONCE) ---
-    println("INFO: Setting up PEtab Model programmatically..."); flush(stdout)
-    @time setup_results = setup_petab_problem(enable_preeq, net_file, data_file, config_file)
+    # --- 2. Setup the core PEtabModel from YAML file ---
+    println("INFO: Setting up PEtab Model from YAML file..."); flush(stdout)
+    
+    @time setup_results = setup_petab_problem(yaml_path)
     if isnothing(setup_results)
-        @error "Failed to build PEtabModel. Cannot proceed."
+        @error "Failed to build PEtabModel from '$yaml_path'. Cannot proceed."
         return
     end
     
     # Extract the PEtab model and true parameter values
     petab_model = setup_results.petab_model
     true_param_values = setup_results.true_values
-    println("INFO: Extracted $(length(true_param_values)) true parameter values for reference plotting")
+    println("INFO: Successfully loaded PEtab model with $(length(true_param_values)) parameters")
 
-    # --- 3. Define robust solver options for simulation and steady-state ---
-    println("INFO: Defining dedicated solvers for simulation and steady-state..."); flush(stdout)
+    # --- 3. Define robust solver options ---
+    println("INFO: Defining solvers for simulation and steady-state..."); flush(stdout)
     
     local odesol, steadystate_solver, gradient_method
 
     if parsed_args["debug"]
         println("INFO: Debug mode - using Rodas5P with ForwardDiff for faster compilation")
-        # Use a pure-Julia solver for the main problem
-        odesol = ODESolver(Rodas5P(), abstol=parsed_args["abstol"], reltol=parsed_args["reltol"])
-        
-        steadystate_solver = SteadyStateSolver(:Simulate,
-                                               abstol=parsed_args["abstol"], 
-                                               reltol=parsed_args["reltol"])
+        odesol = ODESolver(Rodas5P(), abstol=1e-4, reltol=1e-4)
+        steadystate_solver = SteadyStateSolver(:Simulate, abstol=1e-4, reltol=1e-4)
         gradient_method = :ForwardDiff
-
     else # Normal (non-debug) mode
         println("INFO: Normal mode - using Rodas5P with ForwardDiff for robust optimization")
-        # Use the robust pure-Julia solver for the main problem
-        odesol = ODESolver(Rodas5P(), 
-            abstol=parsed_args["abstol"], 
-            reltol=parsed_args["reltol"],
-            maxiters=200000
-        )
-        
-        # Use the :Simulate method for steady-state as well to avoid rootfinding algorithm issues
-        steadystate_solver = SteadyStateSolver(:Simulate,
-                                               abstol=parsed_args["abstol"], 
-                                               reltol=parsed_args["reltol"],
-                                               maxiters=200000)
+        odesol = ODESolver(Rodas5P(), abstol=1e-8, reltol=1e-8, maxiters=200000)
+        steadystate_solver = SteadyStateSolver(:Simulate, abstol=1e-8, reltol=1e-8, maxiters=200000)
         gradient_method = :ForwardDiff
     end
 
@@ -324,11 +254,25 @@ function run_analysis()
     @time try
         run_visualization(
             collect(saved_results.theta_optim),
-            petab_problem
+            petab_problem,
+            odesol  # <-- PASS THE SOLVER HERE
         )
         println("✅ Visualization completed successfully!"); flush(stdout)
     catch e
         @error "Failed to generate visualization plots." exception=(e, catch_backtrace())
+    end
+
+    # --- 7. (NEW) Run Likelihood Profiling if Requested ---
+    if parsed_args["profile"]
+        # We no longer need to check for multistart_result, as profiling is now independent.
+        println("INFO: Running likelihood profiling...")
+        @time try
+            # --- THE FIX: Call with only the petab_problem ---
+            run_likelihood_profiling(petab_problem)
+            println("✅ Likelihood profiling completed successfully!"); flush(stdout)
+        catch e
+            @error "Failed to run likelihood profiling." exception=(e, catch_backtrace())
+        end
     end
 
     println("\n--- Full Analysis Complete ---"); flush(stdout)

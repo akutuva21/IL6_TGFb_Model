@@ -439,15 +439,9 @@ def generate_time_course_petab(config):
     all_observables = [obs.name for obs_key in model.observables for obs in [model.observables[obs_key]]]
     print(f"INFO: Found observables to save: {all_observables}")
 
-    # Add pre-equilibration condition
-    preeq_condition = {'conditionId': 'preeq_ss'}
-    # Set variable stimuli to 0, constant stimuli to their baseline values
-    for param in variable_stimuli:
-        preeq_condition[param] = 0.0
-    for param in constant_stimuli_names:
-        if param in baseline_condition:
-            preeq_condition[param] = baseline_condition[param]
-    condition_rows.append(preeq_condition)
+    # NOTE: We don't add preeq_ss to the main conditions table because it's only used
+    # for pre-equilibration and doesn't have corresponding measurements. PEtab will
+    # handle pre-equilibration internally using the preequilibrationConditionId column.
     
     # Process each condition
     for condition_name, condition_values in tc_settings['conditions'].items():
@@ -481,6 +475,15 @@ def generate_time_course_petab(config):
     
     # 8. Create DataFrames and save
     measurement_df = pd.DataFrame(measurement_rows)
+
+    # --- ADD PRE-EQUILIBRATION CONDITION ---
+    # Ensure the 'preeq_ss' condition is included in the conditions file
+    # Use the baseline (TREG) stimuli values for pre-equilibration
+    baseline_cond = tc_settings['conditions'].get('TREG', {})
+    preeq_row = {'conditionId': 'preeq_ss'}
+    preeq_row.update(baseline_cond)
+    condition_rows.append(preeq_row)
+
     condition_df = pd.DataFrame(condition_rows)
     
     # Create filename suffix based on noise configuration
