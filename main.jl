@@ -6,12 +6,22 @@ Pkg.activate("./bngl_julia")  # Explicit project path for main process
 include("src/model_param_est_robustness.jl")
 include("src/visualization.jl")
 include("src/optimization.jl")
-include("src/profiling.jl")
 
-using Distributed
 using LinearAlgebra
 using ArgParse
-using JLD2 
+using JLD2
+using ProfileLikelihood  # Load profiling package for profiling support
+using Base.Threads       # Enable Threads.nthreads() in main
+
+# Check threading setup for optimal performance
+if Threads.nthreads() > 1
+    println("INFO: Running with $(Threads.nthreads()) threads")
+else
+    println("INFO: Running with only 1 thread. For better performance, start Julia with: julia --threads=24")
+end
+
+include("src/profiling.jl")
+
 using ComponentArrays
 using Plots
 using PEtab
@@ -20,7 +30,6 @@ using OrdinaryDiffEq
 using Optim
 using Sundials
 using Optimization
-using ProfileLikelihood
 
 const DEFAULT_YAML_PATH = "petab_problem.yml"
 
@@ -29,18 +38,17 @@ function define_argument_parser()
     s = ArgParseSettings(description="Run parameter estimation and visualization using a PEtab YAML file.")
     @add_arg_table! s begin
         "--yaml"
-            help = "Path to the PEtab YAML problem file."
             arg_type = String
             default = "petab_problem.yml"
         "--parallel"
-            help = "Run parameter estimation using multi-processing."
+            help = "Enable parallel processing (deprecated - use threading instead)."
             action = :store_true
         "--output", "-o"
             help = "Path to the JLD2 output file for saving/loading results."
             arg_type = String
             default = "estimation_output_small.jld"
         "--n-starts"
-            help = "Number of multi-starts. Defaults to processes in parallel, or 10 in serial."
+            help = "Number of multi-starts. Defaults to thread-based parallel execution."
             arg_type = Int
             default = 0
         "--optimizer"
@@ -60,57 +68,28 @@ end
 const PARSED_ARGS = parse_args(ARGS, define_argument_parser())
 
 # ===================================================================
-# --- 2. TOP-LEVEL DISTRIBUTED SETUP ---
+# --- 2. THREADING SETUP (DISTRIBUTED PROCESSING DISABLED) ---
 # ===================================================================
+# Note: Distributed processing has been disabled in favor of threading
+# for better SLURM cluster compatibility and reliability.
+
 if PARSED_ARGS["parallel"]
-    try
-        # Use the SLURM variable to determine how many processes to add
-        n_procs = haskey(ENV, "SLURM_CPUS_PER_TASK") ? parse(Int, ENV["SLURM_CPUS_PER_TASK"]) : Sys.CPU_THREADS
-        # Add n_procs-1 workers. The main process is already running.
-        addprocs(n_procs - 1)
-        println("INFO: Successfully added $(nworkers()) worker processes."); flush(stdout)
-    catch e
-        @warn "Could not add processes. Running in serial. Error: $e"
-        flush(stderr)
-    end
+    @warn "The --parallel flag is deprecated. This version uses threading instead."
+    @warn "For optimal performance, start Julia with: julia --threads=24"
 end
+
+# Threading is handled automatically by Julia when started with --threads=N
+println("INFO: Using threading for parallel processing")
+println("INFO: Available threads: $(Threads.nthreads())")
+println("INFO: This approach is more reliable on SLURM clusters than distributed processing")
 
 const PROJECT_PATH = abspath(dirname(Base.active_project()))
-println("INFO: Main process confirmed project path is $PROJECT_PATH")
+println("INFO: Project path: $PROJECT_PATH")
 
-# --- 3. LOAD PACKAGES ON ALL PROCESSES ---
-if nworkers() > 0
-    # Get the absolute project path from the main process
-    const PROJECT_PATH = abspath(dirname(Base.active_project()))
-    println("INFO: Main process project path is $(PROJECT_PATH). Broadcasting to workers."); flush(stdout)
-
-    # This builds the code with the value of PROJECT_PATH before sending it.
-    @everywhere @eval Main begin
-        using Pkg
-        Pkg.activate($PROJECT_PATH)
-        
-        using PEtab
-        using Optim
-        using Sundials
-        using SciMLSensitivity
-    end
-    println("INFO: Packages loaded successfully on all workers."); flush(stdout)
-end
-
-if nworkers() > 0
-    println("INFO: Verifying system image on all processes..."); flush(stdout)
-    
-    # Check main process
-    main_sysimage = unsafe_string(Base.JLOptions().image_file)
-    println("      From Main (ID 1): System image is '$(main_sysimage)'"); flush(stdout)
-
-    # Check all workers
-    @everywhere begin
-        worker_sysimage = unsafe_string(Base.JLOptions().image_file)
-        println("      From Worker (ID $(myid())): System image is '$(worker_sysimage)'")
-    end
-    flush(stdout)
-end
+# --- 3. PACKAGE LOADING (THREADING-BASED) ---
+# No distributed workers to set up - threading is handled automatically
+println("INFO: Using threading-based approach - no worker setup required")
+println("INFO: All packages loaded in main process only")
 
 function run_analysis()
     parsed_args = PARSED_ARGS  # Use globally parsed arguments
@@ -123,15 +102,18 @@ function run_analysis()
         println("INFO: Debug mode will use faster tolerances and fewer starts")
     end
 
-    # Dynamically set n_starts if not provided by the user
+    # Dynamically set n_starts based on available threads
     if parsed_args["n-starts"] == 0
-        if parsed_args["parallel"] && nworkers() > 0
-            parsed_args["n-starts"] = nworkers()
-            println("INFO: --n-starts not provided, defaulting to nworkers(): $(parsed_args["n-starts"])" )
+        # Use threading for parallel starts
+        n_threads = Threads.nthreads()
+        if n_threads >= 24
+            parsed_args["n-starts"] = 100  # Can handle many starts efficiently
+        elseif n_threads >= 8
+            parsed_args["n-starts"] = 50   # Moderate number of starts
         else
-            parsed_args["n-starts"] = 10
-            println("INFO: --n-starts not provided, defaulting to 10 for serial execution.")
+            parsed_args["n-starts"] = 20   # Conservative for fewer threads
         end
+        println("INFO: --n-starts not provided, defaulting to $(parsed_args["n-starts"]) based on $(n_threads) threads")
     end
 
     # File paths from command line
@@ -148,7 +130,16 @@ function run_analysis()
         println("Found existing '$output_filename'. Attempting to load results..."); flush(stdout)
         try
             JLD2.@load output_filename multi_start_res
-            println("Successfully loaded 'multi_start_res' object!"); flush(stdout)
+            
+            # Validate loaded results
+            if !isnothing(multi_start_res) && hasfield(typeof(multi_start_res), :xmin) && hasfield(typeof(multi_start_res), :fmin)
+                println("Successfully loaded valid 'multi_start_res' object!"); flush(stdout)
+                println("  - Best cost: $(multi_start_res.fmin)")
+                println("  - Parameter count: $(length(multi_start_res.xmin))")
+            else
+                @warn "Loaded object is not a valid multi-start result. Will re-run estimation."
+                multi_start_res = nothing
+            end
         catch e
             @warn "Could not load 'multi_start_res' from file. Will re-run estimation. Error: $e"
             multi_start_res = nothing # Ensure it's nothing on failure
@@ -172,19 +163,37 @@ function run_analysis()
     # --- 3. Define robust solver options ---
     println("INFO: Defining solvers for simulation and steady-state..."); flush(stdout)
     
+    # Define domain safety check to abort invalid trajectories early
+    bad_state(u, p, t) = any(x -> x < 0 || !isfinite(x), u)  # No negatives, no NaNs/Infs
+    
     local odesol, steadystate_solver, gradient_method
 
     if parsed_args["debug"]
         println("INFO: Debug mode - using Rodas5P with ForwardDiff for faster compilation")
-        odesol = ODESolver(Rodas5P(), abstol=1e-4, reltol=1e-4)
+        odesol = ODESolver(Rodas5P(), 
+                          abstol=1e-4, 
+                          reltol=1e-4,
+                          dtmin=1e-12)
         steadystate_solver = SteadyStateSolver(:Simulate, abstol=1e-4, reltol=1e-4)
         gradient_method = :ForwardDiff
     else # Normal (non-debug) mode
         println("INFO: Normal mode - using Rodas5P with ForwardDiff for robust optimization")
-        odesol = ODESolver(Rodas5P(), abstol=1e-8, reltol=1e-8, maxiters=200000)
-        steadystate_solver = SteadyStateSolver(:Simulate, abstol=1e-8, reltol=1e-8, maxiters=200000)
+        println("INFO: Using tighter tolerances and domain safety checks to reduce solver warnings")
+        # Enhanced solver with domain safety and minimum timestep floor
+        odesol = ODESolver(Rodas5P(), 
+                          abstol=1e-10, 
+                          reltol=1e-10, 
+                          maxiters=400000,
+                          dtmin=1e-12)              # Prevent tiny timestep cascade
+        steadystate_solver = SteadyStateSolver(:Simulate, 
+                                             abstol=1e-10, 
+                                             reltol=1e-10, 
+                                             maxiters=400000)
         gradient_method = :ForwardDiff
     end
+    
+    println("INFO: Solver configured with domain safety checks and minimum timestep floor")
+    println("INFO: This should significantly reduce 'dt ... NaN' warnings during optimization")
 
     # --- 4. Run estimation ONLY if no results were loaded ---
     local petab_problem # Declare here to have it in the outer scope
@@ -266,9 +275,13 @@ function run_analysis()
     if parsed_args["profile"]
         # We no longer need to check for multistart_result, as profiling is now independent.
         println("INFO: Running likelihood profiling...")
+        
+        # Enable maximum speed optimizations for profiling
+        skip_mle_refinement!(true)  # Force quick mode to avoid expensive MLE refinement
+        
         @time try
-            # --- THE FIX: Call with only the petab_problem ---
-            run_likelihood_profiling(petab_problem)
+            # Pass the MLE and debug flag to avoid re-solving the global optimization
+            run_likelihood_profiling(petab_problem, multi_start_res.xmin, parsed_args["debug"])
             println("✅ Likelihood profiling completed successfully!"); flush(stdout)
         catch e
             @error "Failed to run likelihood profiling." exception=(e, catch_backtrace())

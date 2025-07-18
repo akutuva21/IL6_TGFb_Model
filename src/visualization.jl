@@ -119,12 +119,21 @@ function plot_waterfall(multistart_result::PEtabMultistartResult)
         return
     end
 
+    # FIX A: Get the actual number of estimated parameters to prevent BoundsError
+    n_est = length(keys(multistart_result.xmin))
+    println("INFO: Creating waterfall plot for $n_est estimated parameters")
+
     # Generate the waterfall plot using the single, native PEtab.jl function call.
     # This automatically handles sorting, scaling (log or linear), and color-clustering.
-    plt = plot(multistart_result; plot_type=:waterfall)
-
-    savefig(plt, save_path)
-    println("✅ Waterfall plot saved to: $save_path")
+    # The native function should handle the parameter count correctly, but we provide explicit info
+    try
+        plt = plot(multistart_result; plot_type=:waterfall)
+        savefig(plt, save_path)
+        println("✅ Waterfall plot saved to: $save_path")
+    catch e
+        @warn "Failed to create waterfall plot. This may be due to parameter count mismatch. Error: $e"
+        @warn "Attempted to plot $n_est parameters from multistart result"
+    end
 end
 
 
@@ -147,20 +156,42 @@ function plot_parameter_distribution(multistart_result::PEtabMultistartResult, p
     if !isdir(plot_dir); mkpath(plot_dir); end
     save_path = joinpath(plot_dir, "parameter_distribution_plot.png")
 
+    # --- FIX A: Get the actual number of estimated parameters to prevent BoundsError ---
+    n_est = length(keys(multistart_result.xmin))
+    println("INFO: Creating parameter distribution plot for $n_est estimated parameters")
+
     # --- 1. Extract necessary data ---
-    param_names = string.(petab_prob.model_info.xindices.xids[:estimate_ps])
+    param_names = string.(petab_prob.xnames)
     n_params = length(param_names)
     
-    lower_bounds = petab_prob.lower_bounds
-    upper_bounds = petab_prob.upper_bounds
+    # Verify that the multistart result matches the PEtab problem
+    if n_est != n_params
+        @warn "Parameter count mismatch: PEtab problem has $n_params parameters but multistart result has $n_est"
+        @warn "This may indicate a configuration error in your parameter estimation setup"
+    end
+    
+    # --- FIX: Ensure bounds vectors match the number of estimated parameters ---
+    lower_bounds = collect(petab_prob.lower_bounds)
+    upper_bounds = collect(petab_prob.upper_bounds)
+    
+    # Verify that bounds have the correct length
+    if length(lower_bounds) != n_params || length(upper_bounds) != n_params
+        @warn "Bounds length mismatch: expected $n_params, got $(length(lower_bounds)) and $(length(upper_bounds))"
+        @warn "This may cause plotting issues. Bounds will be truncated or extended."
+        # Truncate or extend bounds to match n_params
+        lower_bounds = resize!(lower_bounds, n_params)
+        upper_bounds = resize!(upper_bounds, n_params)
+    end
+    # --- END FIX ---
 
-    all_x_estimates = [run.xmin for run in multistart_result.runs if !isempty(run.xmin)]
+    # Convert ComponentVectors to standard Vectors using collect()
+    all_x_estimates = [collect(run.xmin) for run in multistart_result.runs if !isempty(run.xmin)]
     if isempty(all_x_estimates)
         @warn "No valid parameter estimates found to create a distribution plot."
         return
     end
 
-    best_x = multistart_result.xmin
+    best_x = collect(multistart_result.xmin)
     plot_height = max(400, n_params * 30)
     
     # --- 2. Create the plot canvas ---

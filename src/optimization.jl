@@ -8,9 +8,9 @@ using Sundials
 const SUPPORTED_OPTIMIZERS = Dict(
     "LBFGS" => LBFGS(),
     "IPNewton" => IPNewton(),
-    "BFGS" => BFGS(),                    # Often faster than LBFGS
-    "ConjugateGradient" => ConjugateGradient(),  # Good for large problems
-    "GradientDescent" => GradientDescent()       # Simple and fast
+    "BFGS" => BFGS(),
+    "ConjugateGradient" => ConjugateGradient(),
+    "GradientDescent" => GradientDescent()
 )
 
 # Optimizer recommendations for different scenarios
@@ -26,11 +26,9 @@ function run_parameter_estimation(parsed_args, petab_problem)
     println("\n🧪 Testing cost function before optimization...")
     
     try
-        # Get a single, correctly scaled start-guess using the correct function
         x_test = get_startguesses(petab_problem, 1)
         println("Testing cost function with a single start-guess vector.")
         
-        # Restore your safe_cost_function that uses .nllh, which is correct
         function safe_cost_function(x)
             try
                 result = petab_problem.nllh(x)
@@ -59,11 +57,14 @@ function run_parameter_estimation(parsed_args, petab_problem)
         return nothing
     end
 
-    use_parallel = parsed_args["parallel"] && nworkers() > 0
+    # FIXED: Use threading instead of distributed processing
+    use_threading = Threads.nthreads() > 1
     optimizer_choice_str = parsed_args["optimizer"]
     n_starts = parsed_args["n-starts"]
+    
+    # FIXED: Use thread count for determining default n_starts
     if n_starts == 0
-        n_starts = use_parallel ? length(procs()) : 1
+        n_starts = use_threading ? min(Threads.nthreads() * 4, 100) : 10
     end
 
     if !haskey(SUPPORTED_OPTIMIZERS, optimizer_choice_str)
@@ -94,14 +95,66 @@ function run_parameter_estimation(parsed_args, petab_problem)
 
     println("\n[Timing] Calibrating parameters..."); flush(stdout)
     
-    if use_parallel
-        println("Mode: PARALLEL using $(length(procs())) processes, $n_starts starts, and optimizer $optimizer_choice_str")
-        multi_start_res = calibrate_multistart(petab_problem, optimizer, n_starts;
-                                               nprocs=length(procs()),
-                                               dirsave=joinpath(pwd(), "Intermediate_results"),
-                                               options=optim_options)
-        return multi_start_res
+    # FIXED: Use threading instead of distributed processing
+    if use_threading
+        println("Mode: PARALLEL (THREADING) using $(Threads.nthreads()) threads, $n_starts starts, and optimizer $optimizer_choice_str")
+        
+        println("Getting start guesses...")
+        local start_guesses
+        try
+            _start_guesses_raw = get_startguesses(petab_problem, n_starts)
+            start_guesses = (n_starts == 1) ? [_start_guesses_raw] : _start_guesses_raw
+            println("Got $(length(start_guesses)) start guess(es) from PEtab")
+        catch e
+            println("❌ Start guess generation failed!")
+            println("Error: $e")
+            return nothing
+        end
+        
+        # FIXED: Use threading for parallel optimization starts
+        all_runs = Vector{Union{PEtab.PEtabOptimisationResult, Nothing}}(undef, length(start_guesses))
+        
+        Threads.@threads for i in 1:length(start_guesses)
+            x0 = start_guesses[i]
+            thread_id = Threads.threadid()
+            println("  Thread $thread_id: Start $i/$n_starts...")
+            try
+                println("    Thread $thread_id: Starting optimization with initial guess...")
+                start_time = time()
+                res = calibrate(petab_problem, x0, optimizer; options=optim_options)
+                elapsed = time() - start_time
+                if !isnothing(res) && isfinite(res.fmin)
+                    println("    Thread $thread_id: ✅ Optimization completed successfully in $(round(elapsed, digits=1))s. Cost: $(res.fmin)")
+                    all_runs[i] = res
+                else
+                    println("    Thread $thread_id: ⚠️  Optimization returned invalid result for start $i after $(round(elapsed, digits=1))s")
+                    all_runs[i] = nothing
+                end
+            catch e
+                error_msg = sprint(showerror, e)
+                if contains(error_msg, "maxiters") || contains(error_msg, "Interrupted")
+                    @warn "    Thread $thread_id: ∇ Optimization start $i hit solver maxiters limit - this is expected for very stiff systems"
+                else
+                    @error "    Thread $thread_id: ❌ Calibration for start $i failed with error: $(typeof(e))" exception=(e, catch_backtrace())
+                end
+                all_runs[i] = nothing
+            end
+        end
+        
+        # Filter out nothing results
+        valid_runs = filter(r -> !isnothing(r) && isfinite(r.fmin), all_runs)
+        
+        if isempty(valid_runs)
+            @error "All threaded optimization starts failed to produce a valid solution."
+            return nothing
+        end
+        
+        best_res = valid_runs[argmin([r.fmin for r in valid_runs])]
+        return PEtab.PEtabMultistartResult(best_res.xmin, best_res.fmin, best_res.alg, n_starts, 
+                                           "LatinHypercubeSample", nothing, collect(filter(!isnothing, all_runs)))
+        
     else
+        # Serial fallback for single-threaded execution
         println("Mode: SERIAL with optimizer $optimizer_choice_str, $n_starts start(s)")
         println("Getting start guesses...")
         
