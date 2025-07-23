@@ -3,6 +3,8 @@
 using Pkg
 Pkg.activate("./bngl_julia")  # Explicit project path for main process
 
+Pkg.update()
+
 include("src/model_param_est_robustness.jl")
 include("src/visualization.jl")
 include("src/optimization.jl")
@@ -10,7 +12,6 @@ include("src/optimization.jl")
 using LinearAlgebra
 using ArgParse
 using JLD2
-using ProfileLikelihood  # Load profiling package for profiling support
 using Base.Threads       # Enable Threads.nthreads() in main
 
 # Check threading setup for optimal performance
@@ -129,19 +130,41 @@ function run_analysis()
     if isfile(output_filename)
         println("Found existing '$output_filename'. Attempting to load results..."); flush(stdout)
         try
-            JLD2.@load output_filename multi_start_res
+            # Try to load the new format first (essential data only)
+            best_mle = nothing
+            best_cost = nothing
             
-            # Validate loaded results
-            if !isnothing(multi_start_res) && hasfield(typeof(multi_start_res), :xmin) && hasfield(typeof(multi_start_res), :fmin)
-                println("Successfully loaded valid 'multi_start_res' object!"); flush(stdout)
-                println("  - Best cost: $(multi_start_res.fmin)")
-                println("  - Parameter count: $(length(multi_start_res.xmin))")
-            else
-                @warn "Loaded object is not a valid multi-start result. Will re-run estimation."
-                multi_start_res = nothing
+            try
+                JLD2.@load output_filename best_mle best_cost
+                if !isnothing(best_mle) && !isnothing(best_cost)
+                    println("✅ Successfully loaded essential estimation data!")
+                    println("  - Best cost: $best_cost")
+                    println("  - Parameter count: $(length(best_mle))")
+                    
+                    # Create a minimal result object for compatibility
+                    multi_start_res = (xmin = best_mle, fmin = best_cost)
+                else
+                    @warn "Essential data is incomplete. Will re-run estimation."
+                    multi_start_res = nothing
+                end
+            catch
+                # Fallback: try to load the old format (full multi_start_res object)
+                println("Attempting to load legacy format...")
+                JLD2.@load output_filename multi_start_res
+                
+                # Validate loaded results
+                if !isnothing(multi_start_res) && hasfield(typeof(multi_start_res), :xmin) && hasfield(typeof(multi_start_res), :fmin)
+                    println("Successfully loaded legacy 'multi_start_res' object!")
+                    println("  - Best cost: $(multi_start_res.fmin)")
+                    println("  - Parameter count: $(length(multi_start_res.xmin))")
+                else
+                    @warn "Loaded object is not a valid multi-start result. Will re-run estimation."
+                    multi_start_res = nothing
+                end
             end
+            
         catch e
-            @warn "Could not load 'multi_start_res' from file. Will re-run estimation. Error: $e"
+            @warn "Could not load results from file. Will re-run estimation. Error: $e"
             multi_start_res = nothing # Ensure it's nothing on failure
         end
     end
@@ -162,31 +185,28 @@ function run_analysis()
 
     # --- 3. Define robust solver options ---
     println("INFO: Defining solvers for simulation and steady-state..."); flush(stdout)
-    
-    # Define domain safety check to abort invalid trajectories early
-    bad_state(u, p, t) = any(x -> x < 0 || !isfinite(x), u)  # No negatives, no NaNs/Infs
-    
+        
     local odesol, steadystate_solver, gradient_method
 
     if parsed_args["debug"]
-        println("INFO: Debug mode - using Rodas5P with ForwardDiff for faster compilation")
-        odesol = ODESolver(Rodas5P(), 
+        println("INFO: Debug mode - using QNDF with numerical Jacobian for better stiffness handling")
+        odesol = ODESolver(QNDF(autodiff=false),  # QNDF is more robust for very stiff systems
                           abstol=1e-4, 
                           reltol=1e-4,
                           dtmin=1e-12)
         steadystate_solver = SteadyStateSolver(:Simulate, abstol=1e-4, reltol=1e-4)
         gradient_method = :ForwardDiff
     else # Normal (non-debug) mode
-        println("INFO: Normal mode - using Rodas5P with ForwardDiff for robust optimization")
-        println("INFO: Using tighter tolerances and domain safety checks to reduce solver warnings")
-        # Enhanced solver with domain safety and minimum timestep floor
-        odesol = ODESolver(Rodas5P(), 
-                          abstol=1e-10, 
-                          reltol=1e-10, 
-                          maxiters=400000,
-                          dtmin=1e-12)              # Prevent tiny timestep cascade
+        println("INFO: Normal mode - using QNDF with numerical Jacobian for maximum stiffness robustness")
+        println("INFO: QNDF solver is specifically designed for very stiff biochemical systems")
+        # Enhanced solver with QNDF for extreme stiffness handling
+        odesol = ODESolver(QNDF(autodiff=false),  # Use numerical Jacobian to avoid dual-number conflicts
+                          abstol=1e-8,   # Slightly relaxed from 1e-10 for better convergence
+                          reltol=1e-8, 
+                          maxiters=1000000,  # More iterations for stiff systems
+                          dtmin=1e-15)       # Even smaller minimum timestep for stiff problems
         steadystate_solver = SteadyStateSolver(:Simulate, 
-                                             abstol=1e-10, 
+                                             abstol=1e-8,   # Match ODE solver tolerances 
                                              reltol=1e-10, 
                                              maxiters=400000)
         gradient_method = :ForwardDiff
@@ -218,10 +238,19 @@ function run_analysis()
         end
 
         try
-            JLD2.@save output_filename multi_start_res
-            println("INFO: New estimation output saved to '$output_filename'"); flush(stdout)
+            # Extract essential data to avoid JLD2 serialization warnings
+            best_mle = multi_start_res.xmin
+            best_cost = multi_start_res.fmin
+            
+            @info "Best parameters found: $best_mle"
+            @info "Best cost: $best_cost"
+            
+            # Save only the essential data, avoiding complex Optim objects
+            JLD2.@save output_filename best_mle best_cost
+            println("✅ Essential estimation data saved successfully to '$output_filename'")
+            println("   (Saved MLE parameters and cost, avoiding JLD2 warnings)")
         catch e
-            @error "Failed to save new '$output_filename'. Error: $e"
+            @error "Failed to save essential data to '$output_filename'. Error: $e"
         end
     end
 
@@ -241,8 +270,26 @@ function run_analysis()
 
     # --- 6. Generate Plots and Final Visualizations ---
     if !isnothing(multi_start_res)
+        println("\n--- Diagnosing Multistart Data ---"); flush(stdout)
+        diagnose_multistart_data(multi_start_res, petab_problem)
+        
         println("\n--- Generating Waterfall Plot ---"); flush(stdout)
-        plot_waterfall(multi_start_res)
+        try
+            plot_waterfall(multi_start_res)
+        catch e
+            @warn "Primary waterfall plot failed: $e"
+            println("Attempting fallback implementation...")
+            try
+                plot_waterfall_custom_fallback(multi_start_res)
+            catch e2
+                @warn "Fallback waterfall plot also failed: $e2"
+                try
+                    plot_waterfall_native_fallback(multi_start_res, petab_problem)
+                catch e3
+                    @error "All waterfall plot implementations failed. Last error: $e3"
+                end
+            end
+        end
         
         println("\n--- Generating Parameter Distribution Plot ---"); flush(stdout)
         
@@ -274,17 +321,21 @@ function run_analysis()
     # --- 7. (NEW) Run Likelihood Profiling if Requested ---
     if parsed_args["profile"]
         # We no longer need to check for multistart_result, as profiling is now independent.
-        println("INFO: Running likelihood profiling...")
-        
-        # Enable maximum speed optimizations for profiling
-        skip_mle_refinement!(true)  # Force quick mode to avoid expensive MLE refinement
+        println("INFO: Running modern likelihood profiling with LikelihoodProfiler.jl...")
         
         @time try
-            # Pass the MLE and debug flag to avoid re-solving the global optimization
-            run_likelihood_profiling(petab_problem, multi_start_res.xmin, parsed_args["debug"])
-            println("✅ Likelihood profiling completed successfully!"); flush(stdout)
+            # Pass the MLE and debug flag to the modernized profiling function
+            prof_result = run_likelihood_profiling(petab_problem, multi_start_res.xmin, parsed_args["debug"])
+            
+            if !isnothing(prof_result)
+                println("✅ Modern likelihood profiling completed successfully!")
+                println("Profile result type: $(typeof(prof_result))")
+            else
+                @warn "Profiling returned no results"
+            end
+            flush(stdout)
         catch e
-            @error "Failed to run likelihood profiling." exception=(e, catch_backtrace())
+            @error "Failed to run modern likelihood profiling." exception=(e, catch_backtrace())
         end
     end
 
