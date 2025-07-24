@@ -26,23 +26,32 @@ try
     println("Adding packages to the clean environment...")
     Pkg.add(final_pkgs)
 
-    # 4. Build the system image using the clean environment.
+    # Set an environment variable to tell the workload script where the project root is.
+    project_path = abspath(@__DIR__)
+    ENV["BNGL_JULIA_PROJECT_PATH"] = project_path
+    println("🗂️  Setting BNGL_JULIA_PROJECT_PATH = $project_path")
+
+    # 4. Build the system image using the clean environment AND the workload script.
     mkpath("SysImage")
     sysimage_path = joinpath("SysImage", "bngl_full.so")
     println("\n🛠 Creating FULL system image from the clean environment...")
     println("📍 Output: $sysimage_path")
+    println("🚀 Including precompilation workload to eliminate 'time-to-first-X' costs...")
 
     create_sysimage(
         final_pkgs;
         sysimage_path  = sysimage_path,
         project        = tmp_project_dir, # This is the crucial instruction
-        incremental    = false
+        precompile_execution_file = joinpath(project_path, "precompile_workload.jl"), # Execute workload during build
+        incremental    = false,
+        cpu_target     = "x86-64-v2"
     )
 
     println("\n✅ Full system image created successfully.")
 finally
-    # 5. Clean up the temporary directory.
+    # 5. Clean up the temporary directory and environment variable.
     println("Cleaning up the temporary build environment...")
+    delete!(ENV, "BNGL_JULIA_PROJECT_PATH")
     rm(tmp_project_dir; force=true, recursive=true)
 end
 

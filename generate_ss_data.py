@@ -180,7 +180,12 @@ def generate_time_course_excel(config):
     constant_stimuli_names = set(tc_settings.get('constant_stimuli', []))
     all_stimuli_params = variable_stimuli.union(constant_stimuli_names)
 
-    param_to_sbml_id = discover_species_map(bng_model, list(all_stimuli_params))
+    # Use a temporary model instance for species mapping discovery to avoid contaminating the main model
+    print("  Creating temporary model instance for species mapping discovery...")
+    temp_model_for_tracing = bionetgen.bngmodel(model_path)
+    param_to_sbml_id = discover_species_map(temp_model_for_tracing, list(all_stimuli_params))
+    # After this, temp_model_for_tracing can be discarded. The main 'bng_model' object is still clean.
+    
     true_kinetic_params = get_true_parameters(bng_model, all_stimuli_params)
 
     # 3. Calculate the single, shared pre-equilibration steady state
@@ -382,8 +387,12 @@ def generate_time_course_petab(config):
     
     true_params = get_true_parameters(model, condition_params)
     
-    # 5. Discover the species map BEFORE you need it for pre-equilibration.
-    param_to_sbml_id = discover_species_map(model, list(condition_params))
+    # 5. Discover the species map using a temporary model instance.
+    #    This prevents the main model object from being modified with tracer values.
+    print("  Creating temporary model instance for species mapping discovery...")
+    temp_model_for_tracing = bionetgen.bngmodel(model_path)
+    param_to_sbml_id = discover_species_map(temp_model_for_tracing, list(condition_params))
+    # After this, temp_model_for_tracing can be discarded. The main 'model' object is still clean.
     
     # 3. Get pre-equilibration steady-state
     variable_stimuli = set(tc_settings.get('variable_stimuli', []))

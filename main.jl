@@ -1,9 +1,7 @@
 # main.jl
 
 using Pkg
-Pkg.activate("./bngl_julia")  # Explicit project path for main process
-
-Pkg.update()
+Pkg.activate("./bngl_julia")
 
 include("src/model_param_est_robustness.jl")
 include("src/visualization.jl")
@@ -12,9 +10,8 @@ include("src/optimization.jl")
 using LinearAlgebra
 using ArgParse
 using JLD2
-using Base.Threads       # Enable Threads.nthreads() in main
+using Base.Threads
 
-# Check threading setup for optimal performance
 if Threads.nthreads() > 1
     println("INFO: Running with $(Threads.nthreads()) threads")
 else
@@ -34,7 +31,7 @@ using Optimization
 
 const DEFAULT_YAML_PATH = "petab_problem.yml"
 
-# --- DEFINE AND PARSE ARGUMENTS (CLEANED FOR YAML-BASED WORKFLOW) ---
+# --- DEFINE AND PARSE ARGUMENTS ---
 function define_argument_parser()
     s = ArgParseSettings(description="Run parameter estimation and visualization using a PEtab YAML file.")
     @add_arg_table! s begin
@@ -71,8 +68,6 @@ const PARSED_ARGS = parse_args(ARGS, define_argument_parser())
 # ===================================================================
 # --- 2. THREADING SETUP (DISTRIBUTED PROCESSING DISABLED) ---
 # ===================================================================
-# Note: Distributed processing has been disabled in favor of threading
-# for better SLURM cluster compatibility and reliability.
 
 if PARSED_ARGS["parallel"]
     @warn "The --parallel flag is deprecated. This version uses threading instead."
@@ -87,8 +82,6 @@ println("INFO: This approach is more reliable on SLURM clusters than distributed
 const PROJECT_PATH = abspath(dirname(Base.active_project()))
 println("INFO: Project path: $PROJECT_PATH")
 
-# --- 3. PACKAGE LOADING (THREADING-BASED) ---
-# No distributed workers to set up - threading is handled automatically
 println("INFO: Using threading-based approach - no worker setup required")
 println("INFO: All packages loaded in main process only")
 
@@ -105,15 +98,8 @@ function run_analysis()
 
     # Dynamically set n_starts based on available threads
     if parsed_args["n-starts"] == 0
-        # Use threading for parallel starts
         n_threads = Threads.nthreads()
-        if n_threads >= 24
-            parsed_args["n-starts"] = 100  # Can handle many starts efficiently
-        elseif n_threads >= 8
-            parsed_args["n-starts"] = 50   # Moderate number of starts
-        else
-            parsed_args["n-starts"] = 20   # Conservative for fewer threads
-        end
+        parsed_args["n-starts"] = n_threads
         println("INFO: --n-starts not provided, defaulting to $(parsed_args["n-starts"]) based on $(n_threads) threads")
     end
 
@@ -130,7 +116,6 @@ function run_analysis()
     if isfile(output_filename)
         println("Found existing '$output_filename'. Attempting to load results..."); flush(stdout)
         try
-            # Try to load the new format first (essential data only)
             best_mle = nothing
             best_cost = nothing
             
@@ -141,18 +126,23 @@ function run_analysis()
                     println("  - Best cost: $best_cost")
                     println("  - Parameter count: $(length(best_mle))")
                     
-                    # Create a minimal result object for compatibility
-                    multi_start_res = (xmin = best_mle, fmin = best_cost)
+                    multi_start_res = PEtab.PEtabMultistartResult(
+                        best_mle,            # xmin
+                        best_cost,           # fmin
+                        :LoadedFromFile,     # alg (placeholder)
+                        1,                   # nmultistarts (placeholder)
+                        "LoadedFromFile",    # sampling_method (placeholder)
+                        nothing,             # dirsave
+                        []                   # runs (empty vector)
+                    )
                 else
                     @warn "Essential data is incomplete. Will re-run estimation."
                     multi_start_res = nothing
                 end
             catch
-                # Fallback: try to load the old format (full multi_start_res object)
                 println("Attempting to load legacy format...")
                 JLD2.@load output_filename multi_start_res
                 
-                # Validate loaded results
                 if !isnothing(multi_start_res) && hasfield(typeof(multi_start_res), :xmin) && hasfield(typeof(multi_start_res), :fmin)
                     println("Successfully loaded legacy 'multi_start_res' object!")
                     println("  - Best cost: $(multi_start_res.fmin)")
@@ -165,20 +155,19 @@ function run_analysis()
             
         catch e
             @warn "Could not load results from file. Will re-run estimation. Error: $e"
-            multi_start_res = nothing # Ensure it's nothing on failure
+            multi_start_res = nothing
         end
     end
 
     # --- 2. Setup the core PEtabModel from YAML file ---
     println("INFO: Setting up PEtab Model from YAML file..."); flush(stdout)
-    
+
     @time setup_results = setup_petab_problem(yaml_path)
     if isnothing(setup_results)
         @error "Failed to build PEtabModel from '$yaml_path'. Cannot proceed."
         return
     end
-    
-    # Extract the PEtab model and true parameter values
+
     petab_model = setup_results.petab_model
     true_param_values = setup_results.true_values
     println("INFO: Successfully loaded PEtab model with $(length(true_param_values)) parameters")
@@ -189,39 +178,38 @@ function run_analysis()
     local odesol, steadystate_solver, gradient_method
 
     if parsed_args["debug"]
-        println("INFO: Debug mode - using QNDF with numerical Jacobian for better stiffness handling")
-        odesol = ODESolver(QNDF(autodiff=false),  # QNDF is more robust for very stiff systems
-                          abstol=1e-4, 
-                          reltol=1e-4,
-                          dtmin=1e-12)
+        println("INFO: Debug mode - using Rodas5P with numerical Jacobian for better stiffness handling")
+        odesol = ODESolver(Rodas5P(),
+                            abstol=1e-4, 
+                            reltol=1e-4,
+                            dtmin=1e-12)
         steadystate_solver = SteadyStateSolver(:Simulate, abstol=1e-4, reltol=1e-4)
         gradient_method = :ForwardDiff
     else # Normal (non-debug) mode
         println("INFO: Normal mode - using QNDF with numerical Jacobian for maximum stiffness robustness")
-        println("INFO: QNDF solver is specifically designed for very stiff biochemical systems")
-        # Enhanced solver with QNDF for extreme stiffness handling
-        odesol = ODESolver(QNDF(autodiff=false),  # Use numerical Jacobian to avoid dual-number conflicts
-                          abstol=1e-8,   # Slightly relaxed from 1e-10 for better convergence
-                          reltol=1e-8, 
-                          maxiters=1000000,  # More iterations for stiff systems
-                          dtmin=1e-15)       # Even smaller minimum timestep for stiff problems
+        println("INFO: Rodas5P solver is specifically designed for very stiff biochemical systems")
+        odesol = ODESolver(Rodas5P(),
+                            abstol=1e-10,
+                            reltol=1e-10, 
+                            maxiters=1000000,
+                            dtmin=1e-15)
         steadystate_solver = SteadyStateSolver(:Simulate, 
-                                             abstol=1e-8,   # Match ODE solver tolerances 
-                                             reltol=1e-10, 
-                                             maxiters=400000)
+                                                abstol=1e-10,
+                                                reltol=1e-10, 
+                                                maxiters=400000)
         gradient_method = :ForwardDiff
     end
-    
+
     println("INFO: Solver configured with domain safety checks and minimum timestep floor")
     println("INFO: This should significantly reduce 'dt ... NaN' warnings during optimization")
 
     # --- 4. Run estimation ONLY if no results were loaded ---
-    local petab_problem # Declare here to have it in the outer scope
+    local petab_problem
     if isnothing(multi_start_res)
         println("INFO: Building PEtabODEProblem for estimation..."); flush(stdout)
         
         @time petab_problem = PEtabODEProblem(
-            petab_model, # Use the extracted petab_model
+            petab_model,
             odesolver = odesol,
             ss_solver = steadystate_solver,
             gradient_method=gradient_method,
@@ -238,7 +226,6 @@ function run_analysis()
         end
 
         try
-            # Extract essential data to avoid JLD2 serialization warnings
             best_mle = multi_start_res.xmin
             best_cost = multi_start_res.fmin
             
@@ -311,14 +298,14 @@ function run_analysis()
         run_visualization(
             collect(saved_results.theta_optim),
             petab_problem,
-            odesol  # <-- PASS THE SOLVER HERE
+            odesol
         )
         println("✅ Visualization completed successfully!"); flush(stdout)
     catch e
         @error "Failed to generate visualization plots." exception=(e, catch_backtrace())
     end
 
-    # --- 7. (NEW) Run Likelihood Profiling if Requested ---
+    # --- 7. Run Likelihood Profiling if Requested ---
     if parsed_args["profile"]
         # We no longer need to check for multistart_result, as profiling is now independent.
         println("INFO: Running modern likelihood profiling with LikelihoodProfiler.jl...")

@@ -242,8 +242,17 @@ function run_visualization(
     println("\n--- Starting Visualization (Manual Workaround) ---")
 
     # Step 1: Manually solve the ODE for all conditions
-    println("Manually solving ODE for all conditions...")
-    ode_solutions = PEtab.solve_all_conditions(theta_optim, petab_prob, odesolver.solver)
+    println("Manually solving ODE for all conditions with high precision...")
+    # Pass the high-precision tolerances from the odesolver object to ensure
+    # visualization uses the same numerical precision as parameter estimation
+    ode_solutions = PEtab.solve_all_conditions(
+        theta_optim, 
+        petab_prob, 
+        odesolver.solver;
+        abstol=odesolver.abstol,
+        reltol=odesolver.reltol,
+        maxiters=odesolver.maxiters
+    )
     println("✅ ODE solutions obtained.")
 
     plot_path = joinpath(pwd(), "final_results_plots")
@@ -319,29 +328,23 @@ potential issues causing plotting errors, especially parameter count mismatches.
 """
 function diagnose_multistart_data(multistart_result::PEtabMultistartResult, petab_prob::PEtabODEProblem)
     println("\n--- Multistart Result Diagnostics ---")
-    println("Number of runs: $(length(multistart_result.runs))")
-    println("Best objective value: $(multistart_result.fmin)")
+    
+    total_starts_attempted = multistart_result.nmultistarts  # Fixed: removed underscore
+    valid_runs = multistart_result.runs
+    num_valid_runs = length(valid_runs)
+    num_failed_runs = total_starts_attempted - num_valid_runs
+    
+    println("Total starts attempted: $(total_starts_attempted)")
+    println("Number of valid (finite) runs returned: $(num_valid_runs)")
+    println("Number of failed/discarded runs: $(num_failed_runs)")
+    println("Best objective value found: $(multistart_result.fmin)")
     
     if !isempty(multistart_result.xmin)
         println("Number of parameters in best result: $(length(multistart_result.xmin))")
-        println("Parameter names in best result: $(propertynames(multistart_result.xmin))")
     end
     
     println("\n--- PEtab Problem Diagnostics ---")
-    println("Number of estimated parameters: $(petab_prob.nparameters_estimate)")
-    println("Parameter names: $(petab_prob.xnames)")
-    
-    println("\n--- Individual Run Analysis ---")
-    finite_runs = 0
-    for (i, run) in enumerate(multistart_result.runs[1:min(5, end)])  # Check first 5 runs
-        if isfinite(run.fmin)
-            finite_runs += 1
-            println("Run $i: fmin = $(run.fmin), params = $(length(run.xmin))")
-        else
-            println("Run $i: Non-finite objective value")
-        end
-    end
-    println("Total runs with finite objectives: $finite_runs / $(length(multistart_result.runs))")
+    println("Number of estimated parameters in model: $(petab_prob.nparameters_estimate)")
     
     # Check for parameter count mismatches
     if !isempty(multistart_result.xmin) && length(multistart_result.xmin) != petab_prob.nparameters_estimate
