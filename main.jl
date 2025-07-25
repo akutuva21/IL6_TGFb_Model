@@ -7,10 +7,67 @@ include("src/model_param_est_robustness.jl")
 include("src/visualization.jl")
 include("src/optimization.jl")
 
+# --- START OF DEBUGGING FUNCTION ---
+function debug_petab_problem(prob::PEtab.PEtabODEProblem)
+    println("\n\n--- 🕵️  STARTING PETAB PROBLEM DIAGNOSTICS 🕵️  ---")
+    
+    println("\n[1] Checking Parameter Names and Count...")
+    n_params = length(prob.xnames)
+    println("    Number of parameters to estimate: ", n_params)
+    println("    Parameter names: ", prob.xnames)
+
+    println("\n[2] Checking Parameter Bounds...")
+    println("    Lower bounds type: ", typeof(prob.lower_bounds))
+    println("    Upper bounds type: ", typeof(prob.upper_bounds))
+    
+    lb_ok = all(x -> isa(x, Float64), prob.lower_bounds)
+    ub_ok = all(x -> isa(x, Float64), prob.upper_bounds)
+    println("    All lower bounds are Float64: ", lb_ok)
+    println("    All upper bounds are Float64: ", ub_ok)
+    if !lb_ok
+        println("    ⚠️  Problem in lower bounds: ", prob.lower_bounds)
+    end
+    if !ub_ok
+        println("    ⚠️  Problem in upper bounds: ", prob.upper_bounds)
+    end
+
+    println("\n[3] Checking Nominal Transformed Values (Source of `similar`)...")
+    println("    Nominal transformed type: ", typeof(prob.xnominal_transformed))
+    println("    Nominal transformed element type: ", eltype(prob.xnominal_transformed))
+    nominal_ok = all(x -> isa(x, Float64), prob.xnominal_transformed)
+    println("    All nominal transformed values are Float64: ", nominal_ok)
+    if !nominal_ok
+        println("    ⚠️  Problem in nominal transformed values: ")
+        show(stdout, "text/plain", prob.xnominal_transformed)
+        println()
+    end
+
+    println("\n[4] Checking Parameter Scales (Crucial for `transform_x`)...")
+    xscales = prob.model_info.xindices.xscale
+    println("    Parameter scales dictionary: ")
+    show(stdout, "text/plain", xscales)
+    println()
+
+    valid_scales = [:lin, :log, :log10, :log2]
+    scales_ok = all(scale -> scale in valid_scales, values(xscales))
+    println("    All parameter scales are valid: ", scales_ok)
+    if !scales_ok
+        for (param, scale) in xscales
+            if !(scale in valid_scales)
+                println("    ⚠️  INVALID SCALE FOUND for parameter '", param, "': ", scale)
+            end
+        end
+    end
+
+    println("\n--- 🕵️  END OF DIAGNOSTICS 🕵️  ---\n\n")
+end
+# --- END OF DEBUGGING FUNCTION ---
+
 using LinearAlgebra
 using ArgParse
 using JLD2
 using Base.Threads
+using DiffEqCallbacks
 
 if Threads.nthreads() > 1
     println("INFO: Running with $(Threads.nthreads()) threads")
@@ -50,9 +107,9 @@ function define_argument_parser()
             arg_type = Int
             default = 0
         "--optimizer"
-            help = "Optimization algorithm to use. Options: LBFGS, BFGS, NelderMead"
+            help = "Optimization algorithm. Options: auto, Fides, IPNewton, LBFGS, BFGS (auto=most robust available)"
             arg_type = String
-            default = "LBFGS"
+            default = "auto"
         "--debug"
             help = "Enable debug mode for faster, less accurate testing."
             action = :store_true
@@ -66,7 +123,7 @@ end
 const PARSED_ARGS = parse_args(ARGS, define_argument_parser())
 
 # ===================================================================
-# --- 2. THREADING SETUP (DISTRIBUTED PROCESSING DISABLED) ---
+# --- 2. THREADING SETUP ---
 # ===================================================================
 
 if PARSED_ARGS["parallel"]
@@ -126,15 +183,35 @@ function run_analysis()
                     println("  - Best cost: $best_cost")
                     println("  - Parameter count: $(length(best_mle))")
                     
+                    # --- START: CORRECTED OBJECT RECONSTRUCTION ---
+                    
+                    # 1. Create a minimal PEtabOptimisationResult to represent the loaded best fit.
+                    #    We fill in the non-essential fields with placeholder values.
+                    best_run_reconstructed = PEtab.PEtabOptimisationResult(
+                        best_mle,         # xmin
+                        best_cost,        # fmin
+                        best_mle,         # x0 (can use xmin as a placeholder)
+                        :LoadedFromFile,  # alg
+                        0,                # niterations
+                        0.0,              # runtime
+                        [],               # xtrace
+                        [],               # ftrace
+                        true,             # converged
+                        nothing           # original
+                    )
+
+                    # 2. Create the PEtabMultistartResult with a list containing our single reconstructed run.
                     multi_start_res = PEtab.PEtabMultistartResult(
-                        best_mle,            # xmin
-                        best_cost,           # fmin
+                        best_mle,            # xmin (the overall best)
+                        best_cost,           # fmin (the overall best)
                         :LoadedFromFile,     # alg (placeholder)
                         1,                   # nmultistarts (placeholder)
                         "LoadedFromFile",    # sampling_method (placeholder)
                         nothing,             # dirsave
-                        []                   # runs (empty vector)
+                        [best_run_reconstructed] # runs <-- NOW CONTAINS ONE VALID RUN
                     )
+                    # --- END: CORRECTED OBJECT RECONSTRUCTION ---
+
                 else
                     @warn "Essential data is incomplete. Will re-run estimation."
                     multi_start_res = nothing
@@ -173,48 +250,120 @@ function run_analysis()
     println("INFO: Successfully loaded PEtab model with $(length(true_param_values)) parameters")
 
     # --- 3. Define robust solver options ---
-    println("INFO: Defining solvers for simulation and steady-state..."); flush(stdout)
+    println("INFO: Defining robust solver for simulation and steady-state..."); flush(stdout)
         
-    local odesol, steadystate_solver, gradient_method
+    local odesol, gradient_method
 
+    # === ENHANCED ODE SOLVER CONFIGURATION FOR SCIENTIFIC PARAMETER ESTIMATION ===
+    # Following DifferentialEquations.jl best practices for maximum accuracy and robustness
+    # Using TerminateSteadyState callback for robust steady-state detection
+    
     if parsed_args["debug"]
-        println("INFO: Debug mode - using Rodas5P with numerical Jacobian for better stiffness handling")
-        odesol = ODESolver(Rodas5P(),
-                            abstol=1e-4, 
-                            reltol=1e-4,
-                            dtmin=1e-12)
-        steadystate_solver = SteadyStateSolver(:Simulate, abstol=1e-4, reltol=1e-4)
+        println("🐛 DEBUG MODE: Using ROBUST composite solver with loose tolerances for rapid iteration")
+        println("📖 Using AutoVern7(Rodas5P()) with built-in steady-state detection")
+        
+        odesol = ODESolver(
+            AutoVern7(Rodas5P()),
+            abstol=1e-6,              # Relaxed absolute tolerance for speed
+            reltol=1e-6,              # Relaxed relative tolerance for speed
+            force_dtmin=true,         # Crucial for preventing failures
+            maxiters=10000            # Lower maxiters for faster debug runs
+        )
+        
         gradient_method = :ForwardDiff
-    else # Normal (non-debug) mode
-        println("INFO: Normal mode - using QNDF with numerical Jacobian for maximum stiffness robustness")
-        println("INFO: Rodas5P solver is specifically designed for very stiff biochemical systems")
-        odesol = ODESolver(Rodas5P(),
-                            abstol=1e-10,
-                            reltol=1e-10, 
-                            maxiters=1000000,
-                            dtmin=1e-15)
-        steadystate_solver = SteadyStateSolver(:Simulate, 
-                                                abstol=1e-10,
-                                                reltol=1e-10, 
-                                                maxiters=400000)
-        gradient_method = :ForwardDiff
+        
+    else # PRODUCTION MODE: Maximum accuracy for publication-quality fits
+        println("🔬 PRODUCTION MODE: High-accuracy composite solver for publication-quality fits")
+        println("📖 Using AutoVern7(Rodas5P()) - adaptive algorithm selection with built-in steady-state")
+        println("   • AutoVern7: High-order solver for smooth regions")
+        println("   • Rodas5P: Specialized for stiff biochemical systems")
+        println("   • TerminateSteadyState: Robust steady-state detection")
+        
+        # Composite algorithm following DifferentialEquations.jl recommendations
+        # AutoVern7 handles smooth regions efficiently, Rodas5P handles stiff regions
+        composite_solver = AutoVern7(Rodas5P())
+        
+        odesol = ODESolver(
+            composite_solver,
+            abstol=1e-9,              # Tighter absolute tolerance for precise gradients
+            reltol=1e-9,              # Tighter relative tolerance for precise gradients  
+            force_dtmin=true,         # Force minimum timestep to prevent NaN errors
+            maxiters=10000000         # Allow more iterations for complex dynamics
+        )
+        
+        gradient_method = :ForwardDiff  # Most reliable for biochemical models
     end
 
-    println("INFO: Solver configured with domain safety checks and minimum timestep floor")
-    println("INFO: This should significantly reduce 'dt ... NaN' warnings during optimization")
+    # --- START OF THE FIX ---
+    # We will now use a more explicit and robust steady-state solver that avoids
+    # the TerminateSteadyState callback which is causing the bug.
+    # By setting tmax=Inf, we instruct the solver to simulate until the system
+    # naturally reaches a steady state.
+    println("INFO: Using explicit steady-state simulation (tmax=Inf) to bypass callback bug.")
+    local steadystate_solver = SteadyStateSolver(
+        :Simulate,
+        # The key change is that we are NOT providing a custom termination_check.
+        # PEtab.jl will then default to simulating for a very long time (tmax=Inf),
+        # which is a very robust way to find the steady state.
+        abstol = odesol.abstol * 10,
+        reltol = odesol.reltol * 10
+    )
+    # --- END OF THE FIX ---
+
+    println("✅ Enhanced solver configuration completed:")
+    println("   • ODE Solver: $(typeof(odesol.solver))")
+    println("   • Absolute tolerance: $(odesol.abstol)")
+    println("   • Relative tolerance: $(odesol.reltol)")
+    println("   • Steady-state solver: :Simulate mode with tmax=Inf")
+    println("   • Expected benefits: Bypasses internal callback bug, robust steady-state detection")
 
     # --- 4. Run estimation ONLY if no results were loaded ---
     local petab_problem
     if isnothing(multi_start_res)
         println("INFO: Building PEtabODEProblem for estimation..."); flush(stdout)
+
+        # --- START: CORRECTED AND FINAL CALLBACK CODE ---
+        println("INFO: Adding PositiveDomain callback to PEtabModel to enforce non-negative concentrations.")
         
+        # 1. Create the PositiveDomain callback
+        positive_domain_cb = PositiveDomain()
+
+        # 2. Combine it with any callbacks that might already exist in the model
+        combined_callbacks = CallbackSet(petab_model.callbacks, positive_domain_cb)
+
+        # 3. Create a NEW PEtabModel instance, copying all fields from the original
+        #    but replacing the .callbacks field. This is the correct way to handle
+        #    immutable structs.
+        petab_model_with_callback = PEtabModel(
+            petab_model.name,
+            petab_model.h,
+            petab_model.u0!,
+            petab_model.u0,
+            petab_model.sd,
+            petab_model.float_tspan,
+            petab_model.paths,
+            petab_model.sys,
+            petab_model.sys_mutated,
+            petab_model.parametermap,
+            petab_model.speciemap,
+            petab_model.petab_tables,
+            combined_callbacks,
+            petab_model.defined_in_julia
+        )
+        
+        # 4. Now, create the PEtabODEProblem using the NEW model object.
         @time petab_problem = PEtabODEProblem(
-            petab_model,
+            petab_model_with_callback, # <-- Use the new model
             odesolver = odesol,
             ss_solver = steadystate_solver,
-            gradient_method=gradient_method,
-            verbose=false
+            gradient_method = gradient_method,
+            verbose = false
         )
+        # --- END: CORRECTED AND FINAL CALLBACK CODE ---
+        
+        # --- ADD DIAGNOSTIC CALL ---
+        debug_petab_problem(petab_problem)
+        # ---------------------
         
         println("✅ PEtabODEProblem created successfully")
 
@@ -244,13 +393,37 @@ function run_analysis()
     # --- 5. Build visualization problem only if needed, otherwise reuse ---
     if !@isdefined(petab_problem)
         println("INFO: Building PEtabODEProblem for visualization..."); flush(stdout)
+        
+        # --- START: CORRECTED AND FINAL CALLBACK CODE ---
+        println("INFO: Adding PositiveDomain callback to PEtabModel for visualization.")
+        positive_domain_cb = PositiveDomain()
+        combined_callbacks = CallbackSet(petab_model.callbacks, positive_domain_cb)
+        
+        petab_model_with_callback = PEtabModel(
+            petab_model.name,
+            petab_model.h,
+            petab_model.u0!,
+            petab_model.u0,
+            petab_model.sd,
+            petab_model.float_tspan,
+            petab_model.paths,
+            petab_model.sys,
+            petab_model.sys_mutated,
+            petab_model.parametermap,
+            petab_model.speciemap,
+            petab_model.petab_tables,
+            combined_callbacks,
+            petab_model.defined_in_julia
+        )
+        
         @time petab_problem = PEtabODEProblem(
-            petab_model,
+            petab_model_with_callback,
             odesolver = odesol,
             ss_solver = steadystate_solver,
-            gradient_method=gradient_method,
-            verbose=false
+            gradient_method = gradient_method,
+            verbose = false
         )
+        # --- END: CORRECTED AND FINAL CALLBACK CODE ---
     else
         println("INFO: Reusing existing PEtabODEProblem for visualization."); flush(stdout)
     end

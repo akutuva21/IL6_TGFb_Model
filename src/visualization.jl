@@ -639,58 +639,21 @@ function plot_parameter_distribution(multistart_result::PEtabMultistartResult, p
     if !isdir(plot_dir); mkpath(plot_dir); end
     save_path = joinpath(plot_dir, "parameter_distribution_plot.png")
 
-    # --- FIX A: Get the actual number of estimated parameters to prevent BoundsError ---
     n_est = length(keys(multistart_result.xmin))
     println("INFO: Creating parameter distribution plot for $n_est estimated parameters")
 
-    # --- 1. Extract necessary data ---
-    param_names = string.(petab_prob.xnames)
-    n_params = length(param_names)
+    # --- MODIFICATION: Work with Symbols directly ---
+    param_names_symbols = petab_prob.xnames # This is already a Vector{Symbol}
+    param_names_strings = string.(param_names_symbols) # Use this for plot labels only
+    n_params_plot = length(param_names_symbols)
     
-    # Verify that the multistart result matches the PEtab problem
-    if n_est != n_params
-        @warn "Parameter count mismatch: PEtab problem has $n_params parameters but multistart result has $n_est"
-        @warn "This may indicate a configuration error in your parameter estimation setup"
-        # Use the smaller count to avoid array bounds errors
-        n_params_plot = min(n_est, n_params)
-        param_names = param_names[1:n_params_plot]
-        @warn "Using only the first $n_params_plot parameters for plotting"
-    else
-        n_params_plot = n_params
-    end
-    
-    # --- FIX: Ensure bounds vectors match the number of estimated parameters ---
     lower_bounds = collect(petab_prob.lower_bounds)
     upper_bounds = collect(petab_prob.upper_bounds)
     
-    # Verify that bounds have the correct length for plotting
-    if length(lower_bounds) != n_params_plot || length(upper_bounds) != n_params_plot
-        @warn "Bounds length mismatch: expected $n_params_plot for plotting, got $(length(lower_bounds)) and $(length(upper_bounds))"
-        @warn "Truncating or extending bounds to match plotting parameters."
-        # Truncate or extend bounds to match n_params_plot
-        if length(lower_bounds) > n_params_plot
-            lower_bounds = lower_bounds[1:n_params_plot]
-        else
-            lower_bounds = resize!(lower_bounds, n_params_plot)
-        end
-        if length(upper_bounds) > n_params_plot
-            upper_bounds = upper_bounds[1:n_params_plot]
-        else
-            upper_bounds = resize!(upper_bounds, n_params_plot)
-        end
-    end
-    # --- END FIX ---
-
-    # Convert ComponentVectors to standard Vectors using collect() and handle parameter count
     all_x_estimates = []
     for run in multistart_result.runs
         if !isempty(run.xmin)
-            x_vec = collect(run.xmin)
-            # Truncate to match plotting parameter count if needed
-            if length(x_vec) > n_params_plot
-                x_vec = x_vec[1:n_params_plot]
-            end
-            push!(all_x_estimates, x_vec)
+            push!(all_x_estimates, collect(run.xmin))
         end
     end
     
@@ -700,74 +663,78 @@ function plot_parameter_distribution(multistart_result::PEtabMultistartResult, p
     end
 
     best_x = collect(multistart_result.xmin)
-    # Truncate best_x to match plotting parameter count if needed
-    if length(best_x) > n_params_plot
-        best_x = best_x[1:n_params_plot]
-    end
+    plot_height = max(400, n_params_plot * 40) # Increased height for better readability
     
-    plot_height = max(400, n_params_plot * 30)
-    
-    # --- 2. Create the plot canvas ---
     plt = plot(
-        title="Estimated parameters",
-        xlabel="Parameter value (log10)",
+        title="Estimated Parameters",
+        xlabel="Parameter Value (log10)",
         ylabel="Parameter",
-        legend=false,
-        yticks=(1:n_params_plot, param_names),
+        legend=:topright, # Moved legend inside
+        # --- MODIFICATION: Use the string version for labels ---
+        yticks=(1:n_params_plot, param_names_strings),
         yflip=true,
         framestyle=:box,
-        size=(800, plot_height)
+        size=(900, plot_height),
+        dpi=300
     )
 
-    # --- 3. Plot all optimization runs ---
     y_values = 1:n_params_plot
     for x_vec in all_x_estimates
         if x_vec != best_x
-            plot!(plt, x_vec, y_values, seriestype=:path, color=:gray, alpha=0.3, linewidth=1)
+            plot!(plt, x_vec, y_values, seriestype=:path, color=:gray, alpha=0.3, linewidth=1, label="")
         end
     end
     
-    # --- 4. Plot parameter bounds ---
     bounds_y = vcat(y_values, y_values)
     bounds_x = vcat(lower_bounds, upper_bounds)
-    scatter!(plt, bounds_x, bounds_y, marker=:+, color=:black, markersize=4, label="")
+    scatter!(plt, bounds_x, bounds_y, marker=:+, color=:black, markersize=4, label="Bounds")
 
-    # --- 5. Add reference values if provided ---
+    # --- START OF MODIFICATION ---
+    # This section is rewritten to correctly plot the true values as a connected line.
     if !isnothing(reference_values)
-        ref_x_values = Float64[]
-        ref_y_values = Int[]
-        for (i, param_name) in enumerate(param_names)
-            # Check for both String and Symbol keys for robustness
-            if haskey(reference_values, param_name)
-                push!(ref_x_values, reference_values[param_name])
-                push!(ref_y_values, i)
-            elseif haskey(reference_values, Symbol(param_name))
-                push!(ref_x_values, reference_values[Symbol(param_name)])
-                push!(ref_y_values, i)
+        ref_x_values_log10 = Float64[]
+        
+        println("INFO: Matching and transforming reference (true) values...")
+        # --- MODIFICATION: Iterate over the original Symbols ---
+        for param_name_sym in param_names_symbols
+            
+            # The lookup is now a direct Symbol-to-Symbol check, which is robust.
+            if haskey(reference_values, param_name_sym)
+                true_linear_value = reference_values[param_name_sym]
+                # The plot is on log10 scale, so we must transform the true values
+                true_log10_value = log10(true_linear_value)
+                push!(ref_x_values_log10, true_log10_value)
+                println("  - Found '$param_name_sym': true value = $true_linear_value (log10: $true_log10_value)")
+            else
+                @warn "Could not find true value for parameter '$param_name_sym'. It will not be plotted."
+                # Push NaN so the line has a gap, preserving the order
+                push!(ref_x_values_log10, NaN) 
             end
         end
         
-        if !isempty(ref_x_values)
-            scatter!(plt, ref_x_values, ref_y_values, 
-                    marker=:star, 
+        if !isempty(filter(!isnan, ref_x_values_log10))
+            # Plot the true values as a distinct blue line with star markers
+            plot!(plt, ref_x_values_log10, y_values, 
+                    seriestype=:path, 
                     color=:blue, 
-                    markersize=8, 
-                    markerstrokewidth=1,
+                    linewidth=2.5,
+                    markershape=:star5,
+                    markersize=8,
                     markerstrokecolor=:blue,
-                    label="Reference values")
+                    label="True Values")
         end
     end
+    # --- END OF MODIFICATION ---
 
-    # --- 6. Highlight the single best run ---
     if !isempty(best_x)
         plot!(plt, best_x, y_values, 
               seriestype=:path, 
               color=:red, 
               alpha=0.9,
-              linewidth=2,
+              linewidth=2.5, # Increased line width
               marker=:circle,
-              markersize=3,
-              label="Best Run")
+              markersize=4,
+              label="Best Fit")
     end
     
     savefig(plt, save_path)

@@ -36,8 +36,8 @@ time_course_settings:
     TH17: {IL6_0: 100.0, TGFb_0: 1.0}
   
   simulation:
-    duration: 100.0
-    steps: 20
+    duration: 40.0
+    steps: 8
 
   noise:
     add: false
