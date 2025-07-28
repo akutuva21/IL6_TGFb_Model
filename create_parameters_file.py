@@ -14,18 +14,20 @@ print("--- Generating PEtab parameters file with sigma variables ---")
 print(f"Loading model from: {BNGL_MODEL_PATH}")
 model = bionetgen.bngmodel(BNGL_MODEL_PATH)
 
-# 2. Define which parameters are controlled by the conditions file
-# These will be marked as NOT estimated (estimate = 0)
-condition_controlled_params = {'IL6_0', 'TGFb_0'}
-
-# 2.1. Define the specific parameters to estimate
-parameters_to_estimate = {
-    'k_act_stat3_by_il6r', 
-    'k_cat_pka', 
-    'kf_pka_bind', 
-    'kf_s3s4', 
-    'kf_s3stat3d'
-}
+# 2. Define which parameters should NOT be estimated
+# Initial concentrations (ending in '_0') will be marked as NOT estimated (estimate = 0)
+# This includes both condition-controlled and model initial concentrations
+def should_estimate_parameter(param_name):
+    """
+    Determine if a parameter should be estimated based on its name.
+    Returns True if parameter should be estimated, False if it should be fixed.
+    """
+    # Don't estimate any parameter ending in '_0' (initial concentrations)
+    if param_name.endswith('_0'):
+        return False
+    
+    # Estimate all other kinetic parameters
+    return True
 
 # 3. Define the observables that need sigma parameters
 # These are from your measurements file and config.yml
@@ -56,26 +58,20 @@ try:
         # Get the parameter value
         nominal_value = float(param_obj.value)
             
-        # Check if this parameter is controlled by the experiment conditions
-        if param_name in condition_controlled_params:
-            should_estimate = 0
-            # For non-estimated parameters, bounds are often set to the nominal value
-            lower_bound = nominal_value
-            upper_bound = nominal_value
-            print(f"  Parameter '{param_name}': NOT estimated (controlled by conditions)")
-        elif param_name in parameters_to_estimate:
-            # Only these 5 specific parameters are estimated
+        # Use the new function to determine if parameter should be estimated
+        if should_estimate_parameter(param_name):
+            # Estimate this parameter
             should_estimate = 1
-            # Set bounds for estimated parameters
-            lower_bound = nominal_value / 10.0
-            upper_bound = nominal_value * 10.0
+            # Set bounds for estimated parameters (wider range for better exploration)
+            lower_bound = nominal_value / 100.0  # More liberal lower bound
+            upper_bound = nominal_value * 100.0  # More liberal upper bound
             print(f"  Parameter '{param_name}': ESTIMATED with bounds [{lower_bound:.3e}, {upper_bound:.3e}]")
         else:
-            # All other kinetic parameters are fixed at their nominal values
+            # Fix this parameter (initial concentrations ending in '_0')
             should_estimate = 0
             lower_bound = nominal_value
             upper_bound = nominal_value
-            print(f"  Parameter '{param_name}': NOT estimated (fixed kinetic parameter)")
+            print(f"  Parameter '{param_name}': NOT estimated (initial concentration)")
 
         petab_params.append({
             'parameterId': param_name,

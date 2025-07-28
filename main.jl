@@ -1,7 +1,6 @@
 # main.jl
 
 using Pkg
-import SBMLImporter
 
 Pkg.activate("./bngl_julia")
 
@@ -128,9 +127,7 @@ function run_analysis()
                     println("✅ Successfully loaded essential estimation data!")
                     println("  - Best cost: $best_cost")
                     println("  - Parameter count: $(length(best_mle))")
-                    
-                    # --- START: CORRECTED OBJECT RECONSTRUCTION ---
-                    
+                                        
                     # 1. Create a minimal PEtabOptimisationResult to represent the loaded best fit.
                     #    We fill in the non-essential fields with placeholder values.
                     best_run_reconstructed = PEtab.PEtabOptimisationResult(
@@ -156,7 +153,6 @@ function run_analysis()
                         nothing,             # dirsave
                         [best_run_reconstructed] # runs <-- NOW CONTAINS ONE VALID RUN
                     )
-                    # --- END: CORRECTED OBJECT RECONSTRUCTION ---
 
                 else
                     @warn "Essential data is incomplete. Will re-run estimation."
@@ -233,28 +229,12 @@ function run_analysis()
         gradient_method = :ForwardDiff  # Most reliable for biochemical models
     end
 
-    # --- START OF THE FIX ---
-    # We will now use a more explicit and robust steady-state solver that avoids
-    # the TerminateSteadyState callback which is causing the bug.
-    # By setting tmax=Inf, we instruct the solver to simulate until the system
-    # naturally reaches a steady state.
-    println("INFO: Using explicit steady-state simulation (tmax=Inf) to bypass callback bug.")
-    local steadystate_solver = SteadyStateSolver(
-        :Simulate,
-        # The key change is that we are NOT providing a custom termination_check.
-        # PEtab.jl will then default to simulating for a very long time (tmax=Inf),
-        # which is a very robust way to find the steady state.
-        abstol = odesol.abstol * 10,
-        reltol = odesol.reltol * 10
-    )
-    # --- END OF THE FIX ---
-
     println("✅ Enhanced solver configuration completed:")
     println("   • ODE Solver: $(typeof(odesol.solver))")
     println("   • Absolute tolerance: $(odesol.abstol)")
     println("   • Relative tolerance: $(odesol.reltol)")
-    println("   • Steady-state solver: :Simulate mode with tmax=Inf")
-    println("   • Expected benefits: Avoids CompositeAlgorithm conflicts, robust steady-state detection")
+    println("   • Steady-state solver: Using PEtab.jl defaults")
+    println("   • Expected benefits: Avoids CompositeAlgorithm conflicts, default steady-state handling")
 
     # --- 4. Run estimation ONLY if no results were loaded ---
     local petab_problem
@@ -294,7 +274,6 @@ function run_analysis()
         @time petab_problem = PEtabODEProblem(
             petab_model_with_callback, # <-- Use the new model
             odesolver = odesol,
-            ss_solver = steadystate_solver,
             gradient_method = gradient_method,
             verbose = false
         )
@@ -353,7 +332,6 @@ function run_analysis()
         @time petab_problem = PEtabODEProblem(
             petab_model_with_callback,
             odesolver = odesol,
-            ss_solver = steadystate_solver,
             gradient_method = gradient_method,
             verbose = false
         )
