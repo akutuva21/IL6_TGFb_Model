@@ -1,9 +1,5 @@
 # main.jl
 
-using Pkg
-
-Pkg.activate("./bngl_julia")
-
 include("src/model_param_est_robustness.jl")
 include("src/visualization.jl")
 include("src/optimization.jl")
@@ -13,110 +9,79 @@ using ArgParse
 using JLD2
 using Base.Threads
 using DiffEqCallbacks
+using Logging
 
-if Threads.nthreads() > 1
-    println("INFO: Running with $(Threads.nthreads()) threads")
-else
-    println("INFO: Running with only 1 thread. For better performance, start Julia with: julia --threads=24")
+function create_petab_problem_with_callbacks(petab_model, odesolver, gradient_method)
+    @info "Adding PositiveDomain callback to PEtabModel to enforce non-negative concentrations."
+    
+    positive_domain_cb = PositiveDomain()
+    combined_callbacks = CallbackSet(petab_model.callbacks, positive_domain_cb)
+
+    petab_model_with_callback = PEtabModel(
+        petab_model.name,
+        petab_model.h,
+        petab_model.u0!,
+        petab_model.u0,
+        petab_model.sd,
+        petab_model.float_tspan,
+        petab_model.paths,
+        petab_model.sys,
+        petab_model.sys_mutated,
+        petab_model.parametermap,
+        petab_model.speciemap,
+        petab_model.petab_tables,
+        combined_callbacks,
+        petab_model.defined_in_julia
+    )
+    
+    @time petab_problem = PEtabODEProblem(
+        petab_model_with_callback,
+        odesolver=odesolver,
+        gradient_method=gradient_method,
+        verbose=false
+    )
+    
+    @info "✅ PEtabODEProblem created successfully"
+    return petab_problem
 end
-
-include("src/profiling.jl")
-
-using ComponentArrays
-using Plots
-using PEtab
-using SciMLSensitivity
-using OrdinaryDiffEq
-using Optim
-using Sundials
-using Optimization
-
-const DEFAULT_YAML_PATH = "petab_problem.yml"
-
-# --- DEFINE AND PARSE ARGUMENTS ---
-function define_argument_parser()
-    s = ArgParseSettings(description="Run parameter estimation and visualization using a PEtab YAML file.")
-    @add_arg_table! s begin
-        "--yaml"
-            arg_type = String
-            default = "petab_problem.yml"
-        "--parallel"
-            help = "Enable parallel processing (deprecated - use threading instead)."
-            action = :store_true
-        "--output", "-o"
-            help = "Path to the JLD2 output file for saving/loading results."
-            arg_type = String
-            default = "estimation_output_small.jld"
-        "--n-starts"
-            help = "Number of multi-starts. Defaults to thread-based parallel execution."
-            arg_type = Int
-            default = 0
-        "--optimizer"
-            help = "Optimization algorithm. Options: auto, Fides, IPNewton, LBFGS, BFGS (auto=most robust available)"
-            arg_type = String
-            default = "auto"
-        "--debug"
-            help = "Enable debug mode for faster, less accurate testing."
-            action = :store_true
-        "--profile"
-            help = "Run likelihood profiling on the best-fit parameters."
-            action = :store_true
-    end
-    return s
-end
-
-const PARSED_ARGS = parse_args(ARGS, define_argument_parser())
-
-# ===================================================================
-# --- 2. THREADING SETUP ---
-# ===================================================================
-
-if PARSED_ARGS["parallel"]
-    @warn "The --parallel flag is deprecated. This version uses threading instead."
-    @warn "For optimal performance, start Julia with: julia --threads=24"
-end
-
-# Threading is handled automatically by Julia when started with --threads=N
-println("INFO: Using threading for parallel processing")
-println("INFO: Available threads: $(Threads.nthreads())")
-println("INFO: This approach is more reliable on SLURM clusters than distributed processing")
-
-const PROJECT_PATH = abspath(dirname(Base.active_project()))
-println("INFO: Project path: $PROJECT_PATH")
-
-println("INFO: Using threading-based approach - no worker setup required")
-println("INFO: All packages loaded in main process only")
 
 function run_analysis()
     parsed_args = PARSED_ARGS  # Use globally parsed arguments
 
+    # Setup logging level
+    if parsed_args["debug"]
+        global_logger(ConsoleLogger(stderr, Logging.Debug))
+        @info "Debug mode enabled - using faster, less accurate settings and debug logging."
+    else
+        global_logger(ConsoleLogger(stderr, Logging.Info))
+    end
+
     # Apply debug mode adjustments
     if parsed_args["debug"]
-        println("INFO: Debug mode enabled - using faster, less accurate settings")
         # In debug mode, run only a few starts for faster testing
         parsed_args["n-starts"] = parsed_args["n-starts"] == 0 ? 5 : min(parsed_args["n-starts"], 10)
-        println("INFO: Debug mode will use faster tolerances and fewer starts")
+        @info "Debug mode will use faster tolerances and fewer starts"
     end
 
     # Dynamically set n_starts based on available threads
     if parsed_args["n-starts"] == 0
         n_threads = Threads.nthreads()
         parsed_args["n-starts"] = n_threads
-        println("INFO: --n-starts not provided, defaulting to $(parsed_args["n-starts"]) based on $(n_threads) threads")
+        @info "--n-starts not provided, defaulting to $(parsed_args["n-starts"]) based on $(n_threads) threads"
     end
 
     # File paths from command line
     yaml_path = parsed_args["yaml"]
     output_filename = parsed_args["output"]
 
-    println("--- Starting Full Analysis ---"); flush(stdout)
-    println("Using PEtab YAML file: '$yaml_path'"); flush(stdout)
-    println("Using output file: '$output_filename'"); flush(stdout)
+    @info "--- Starting Full Analysis ---"
+    @info "Using PEtab YAML file: '$yaml_path'"
+    @info "Using output file: '$output_filename'"
 
     # --- 1. Load existing results if available ---
     local multi_start_res = nothing
     if isfile(output_filename)
-        println("Found existing '$output_filename'. Attempting to load results..."); flush(stdout)
+        @info "Found existing '$output_filename'. Attempting to load results..."
         try
             best_mle = nothing
             best_cost = nothing
@@ -124,12 +89,11 @@ function run_analysis()
             try
                 JLD2.@load output_filename best_mle best_cost
                 if !isnothing(best_mle) && !isnothing(best_cost)
-                    println("✅ Successfully loaded essential estimation data!")
-                    println("  - Best cost: $best_cost")
-                    println("  - Parameter count: $(length(best_mle))")
+                    @info "✅ Successfully loaded essential estimation data!"
+                    @info "  - Best cost: $best_cost"
+                    @info "  - Parameter count: $(length(best_mle))"
                                         
                     # 1. Create a minimal PEtabOptimisationResult to represent the loaded best fit.
-                    #    We fill in the non-essential fields with placeholder values.
                     best_run_reconstructed = PEtab.PEtabOptimisationResult(
                         best_mle,         # xmin
                         best_cost,        # fmin
@@ -159,13 +123,13 @@ function run_analysis()
                     multi_start_res = nothing
                 end
             catch
-                println("Attempting to load legacy format...")
+                @info "Attempting to load legacy format..."
                 JLD2.@load output_filename multi_start_res
                 
                 if !isnothing(multi_start_res) && hasfield(typeof(multi_start_res), :xmin) && hasfield(typeof(multi_start_res), :fmin)
-                    println("Successfully loaded legacy 'multi_start_res' object!")
-                    println("  - Best cost: $(multi_start_res.fmin)")
-                    println("  - Parameter count: $(length(multi_start_res.xmin))")
+                    @info "Successfully loaded legacy 'multi_start_res' object!"
+                    @info "  - Best cost: $(multi_start_res.fmin)"
+                    @info "  - Parameter count: $(length(multi_start_res.xmin))"
                 else
                     @warn "Loaded object is not a valid multi-start result. Will re-run estimation."
                     multi_start_res = nothing
@@ -179,7 +143,7 @@ function run_analysis()
     end
 
     # --- 2. Setup the core PEtabModel from YAML file ---
-    println("INFO: Setting up PEtab Model from YAML file..."); flush(stdout)
+    @info "Setting up PEtab Model from YAML file..."
 
     @time setup_results = setup_petab_problem(yaml_path)
     if isnothing(setup_results)
@@ -189,15 +153,15 @@ function run_analysis()
 
     petab_model = setup_results.petab_model
     true_param_values = setup_results.true_values
-    println("INFO: Successfully loaded PEtab model with $(length(true_param_values)) parameters")
+    @info "Successfully loaded PEtab model with $(length(true_param_values)) parameters"
 
     # --- 3. Define robust solver options ---
-    println("INFO: Defining robust solver for simulation and steady-state..."); flush(stdout)
+    @info "Defining robust solver for simulation and steady-state..."
         
     local odesol, gradient_method
 
     if parsed_args["debug"]
-        println("🐛 DEBUG MODE: Using minimal debug configuration to isolate issues")
+        @debug "🐛 DEBUG MODE: Using minimal debug configuration to isolate issues"
         
         odesol = ODESolver(
             Rodas5P(),              # Simple, robust implicit solver
@@ -210,10 +174,10 @@ function run_analysis()
         gradient_method = :ForwardDiff
         
     else # PRODUCTION MODE: Use SINGLE robust solver (no composite)
-        println("🔬 PRODUCTION MODE: Single robust solver to avoid CompositeAlgorithm conflicts")
-        println("📖 Using Rodas5P() - specialized for stiff biochemical systems")
-        println("   • Rodas5P: Rosenbrock method optimized for stiff systems")
-        println("   • Avoids CompositeAlgorithm matrix allocation conflicts")
+        @info "🔬 PRODUCTION MODE: Single robust solver to avoid CompositeAlgorithm conflicts"
+        @info "📖 Using Rodas5P() - specialized for stiff biochemical systems"
+        @info "   • Rodas5P: Rosenbrock method optimized for stiff systems"
+        @info "   • Avoids CompositeAlgorithm matrix allocation conflicts"
         
         # Use single robust solver - NO COMPOSITE to avoid PEtab conflicts
         single_solver = Rodas5P()
@@ -229,57 +193,21 @@ function run_analysis()
         gradient_method = :ForwardDiff  # Most reliable for biochemical models
     end
 
-    println("✅ Enhanced solver configuration completed:")
-    println("   • ODE Solver: $(typeof(odesol.solver))")
-    println("   • Absolute tolerance: $(odesol.abstol)")
-    println("   • Relative tolerance: $(odesol.reltol)")
-    println("   • Steady-state solver: Using PEtab.jl defaults")
-    println("   • Expected benefits: Avoids CompositeAlgorithm conflicts, default steady-state handling")
+    @info "✅ Enhanced solver configuration completed:"
+    @info "   • ODE Solver: $(typeof(odesol.solver))"
+    @info "   • Absolute tolerance: $(odesol.abstol)"
+    @info "   • Relative tolerance: $(odesol.reltol)"
+    @info "   • Steady-state solver: Using PEtab.jl defaults"
+    @info "   • Expected benefits: Avoids CompositeAlgorithm conflicts, default steady-state handling"
 
-    # --- 4. Run estimation ONLY if no results were loaded ---
+    # --- 4. Create PEtabProblem (centralized) ---
     local petab_problem
+    @info "Building PEtabODEProblem..."
+    petab_problem = create_petab_problem_with_callbacks(petab_model, odesol, gradient_method)
+
+    # --- 5. Run estimation ONLY if no results were loaded ---
     if isnothing(multi_start_res)
-        println("INFO: Building PEtabODEProblem for estimation..."); flush(stdout)
-
-        # --- START: CORRECTED AND FINAL CALLBACK CODE ---
-        println("INFO: Adding PositiveDomain callback to PEtabModel to enforce non-negative concentrations.")
-        
-        # 1. Create the PositiveDomain callback
-        positive_domain_cb = PositiveDomain()
-
-        # 2. Combine it with any callbacks that might already exist in the model
-        combined_callbacks = CallbackSet(petab_model.callbacks, positive_domain_cb)
-
-        # 3. Create a NEW PEtabModel instance, copying all fields from the original
-        #    but replacing the .callbacks field. This is the correct way to handle
-        #    immutable structs.
-        petab_model_with_callback = PEtabModel(
-            petab_model.name,
-            petab_model.h,
-            petab_model.u0!,
-            petab_model.u0,
-            petab_model.sd,
-            petab_model.float_tspan,
-            petab_model.paths,
-            petab_model.sys,
-            petab_model.sys_mutated,
-            petab_model.parametermap,
-            petab_model.speciemap,
-            petab_model.petab_tables,
-            combined_callbacks,
-            petab_model.defined_in_julia
-        )
-        
-        # 4. Now, create the PEtabODEProblem using the NEW model object.
-        @time petab_problem = PEtabODEProblem(
-            petab_model_with_callback, # <-- Use the new model
-            odesolver = odesol,
-            gradient_method = gradient_method,
-            verbose = false
-        )
-        
-        println("✅ PEtabODEProblem created successfully")
-
+        @info "Starting parameter estimation..."
         multi_start_res = run_parameter_estimation(parsed_args, petab_problem)
          
         if isnothing(multi_start_res)
@@ -296,61 +224,24 @@ function run_analysis()
             
             # Save only the essential data, avoiding complex Optim objects
             JLD2.@save output_filename best_mle best_cost
-            println("✅ Essential estimation data saved successfully to '$output_filename'")
-            println("   (Saved MLE parameters and cost, avoiding JLD2 warnings)")
+            @info "✅ Essential estimation data saved successfully to '$output_filename'"
+            @info "   (Saved MLE parameters and cost, avoiding JLD2 warnings)"
         catch e
             @error "Failed to save essential data to '$output_filename'. Error: $e"
         end
     end
 
-    # --- 5. Build visualization problem only if needed, otherwise reuse ---
-    if !@isdefined(petab_problem)
-        println("INFO: Building PEtabODEProblem for visualization..."); flush(stdout)
-        
-        # --- START: CORRECTED AND FINAL CALLBACK CODE ---
-        println("INFO: Adding PositiveDomain callback to PEtabModel for visualization.")
-        positive_domain_cb = PositiveDomain()
-        combined_callbacks = CallbackSet(petab_model.callbacks, positive_domain_cb)
-        
-        petab_model_with_callback = PEtabModel(
-            petab_model.name,
-            petab_model.h,
-            petab_model.u0!,
-            petab_model.u0,
-            petab_model.sd,
-            petab_model.float_tspan,
-            petab_model.paths,
-            petab_model.sys,
-            petab_model.sys_mutated,
-            petab_model.parametermap,
-            petab_model.speciemap,
-            petab_model.petab_tables,
-            combined_callbacks,
-            petab_model.defined_in_julia
-        )
-        
-        @time petab_problem = PEtabODEProblem(
-            petab_model_with_callback,
-            odesolver = odesol,
-            gradient_method = gradient_method,
-            verbose = false
-        )
-        # --- END: CORRECTED AND FINAL CALLBACK CODE ---
-    else
-        println("INFO: Reusing existing PEtabODEProblem for visualization."); flush(stdout)
-    end
-
     # --- 6. Generate Plots and Final Visualizations ---
     if !isnothing(multi_start_res)
-        println("\n--- Diagnosing Multistart Data ---"); flush(stdout)
+        @info "\n--- Diagnosing Multistart Data ---"
         diagnose_multistart_data(multi_start_res, petab_problem)
         
-        println("\n--- Generating Waterfall Plot ---"); flush(stdout)
+        @info "\n--- Generating Waterfall Plot ---"
         try
             plot_waterfall(multi_start_res)
         catch e
             @warn "Primary waterfall plot failed: $e"
-            println("Attempting fallback implementation...")
+            @info "Attempting fallback implementation..."
             try
                 plot_waterfall_custom_fallback(multi_start_res)
             catch e2
@@ -363,10 +254,10 @@ function run_analysis()
             end
         end
         
-        println("\n--- Generating Parameter Distribution Plot ---"); flush(stdout)
+        @info "\n--- Generating Parameter Distribution Plot ---"
         
         # Use the true parameter values from the BNGL model as reference
-        println("INFO: Using true parameter values from BNGL model as reference")
+        @info "Using true parameter values from BNGL model as reference"
         
         plot_parameter_distribution(multi_start_res, petab_problem, reference_values=true_param_values)
     end
@@ -377,41 +268,80 @@ function run_analysis()
         names_est_opt=string.(propertynames(multi_start_res.xmin))
     )
     
-    println("\n--- Starting Visualization ---"); flush(stdout)
-    println("\n[Timing] Running visualization..."); flush(stdout)
+    @info "\n--- Starting Visualization ---"
+    @info "\n[Timing] Running visualization..."
     @time try
         run_visualization(
             collect(saved_results.theta_optim),
             petab_problem,
             odesol
         )
-        println("✅ Visualization completed successfully!"); flush(stdout)
+        @info "✅ Visualization completed successfully!"
     catch e
         @error "Failed to generate visualization plots." exception=(e, catch_backtrace())
     end
 
     # --- 7. Run Likelihood Profiling if Requested ---
     if parsed_args["profile"]
-        # We no longer need to check for multistart_result, as profiling is now independent.
-        println("INFO: Running modern likelihood profiling with LikelihoodProfiler.jl...")
+        @info "Running modern likelihood profiling with LikelihoodProfiler.jl..."
         
         @time try
             # Pass the MLE and debug flag to the modernized profiling function
             prof_result = run_likelihood_profiling(petab_problem, multi_start_res.xmin, parsed_args["debug"])
             
             if !isnothing(prof_result)
-                println("✅ Modern likelihood profiling completed successfully!")
-                println("Profile result type: $(typeof(prof_result))")
+                @info "✅ Modern likelihood profiling completed successfully!"
+                @info "Profile result type: $(typeof(prof_result))"
             else
                 @warn "Profiling returned no results"
             end
-            flush(stdout)
         catch e
             @error "Failed to run modern likelihood profiling." exception=(e, catch_backtrace())
         end
     end
 
-    println("\n--- Full Analysis Complete ---"); flush(stdout)
+    @info "\n--- Full Analysis Complete ---"
 end
+
+# --- DEFINE AND PARSE ARGUMENTS ---
+function define_argument_parser()
+    s = ArgParseSettings(description="Run parameter estimation and visualization using a PEtab YAML file.")
+    @add_arg_table! s begin
+        "--yaml"
+            arg_type = String
+            default = "petab_problem.yml"
+        "--output", "-o"
+            help = "Path to the JLD2 output file for saving/loading results."
+            arg_type = String
+            default = "estimation_output_small.jld"
+        "--n-starts"
+            help = "Number of multi-starts. Defaults to thread-based parallel execution."
+            arg_type = Int
+            default = 0
+        "--optimizer"
+            help = "Optimization algorithm. Options: auto, Fides, IPNewton, LBFGS, BFGS (auto=most robust available)"
+            arg_type = String
+            default = "auto"
+        "--debug"
+            help = "Enable debug mode for faster, less accurate testing."
+            action = :store_true
+        "--profile"
+            help = "Run likelihood profiling on the best-fit parameters."
+            action = :store_true
+    end
+    return s
+end
+
+const PARSED_ARGS = parse_args(ARGS, define_argument_parser())
+
+# ===================================================================
+# --- 2. THREADING SETUP ---
+# ===================================================================
+
+println("INFO: Using threading for parallel processing")
+println("INFO: Available threads: $(Threads.nthreads())")
+
+const PROJECT_PATH = abspath(dirname(Base.active_project()))
+println("INFO: Project path: $PROJECT_PATH")
 
 run_analysis()

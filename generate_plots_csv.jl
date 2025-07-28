@@ -1,8 +1,5 @@
-using Pkg
-Pkg.activate("bngl_julia/")
-
 # Load all necessary packages
-using DifferentialEquations, PEtab, Sundials, ComponentArrays, Printf
+using DifferentialEquations, PEtab, Sundials, ComponentArrays, Printf, Logging
 using DataFrames, CSV, Plots, SymbolicUtils, Symbolics
 using ModelingToolkit: species, parameters, observed, unknowns, get_iv # Ensure species is here
 
@@ -10,21 +7,21 @@ using ModelingToolkit: species, parameters, observed, unknowns, get_iv # Ensure 
 include("src/model_param_est_robustness.jl")
 include("src/visualization.jl")
 
-println("--- Final Results Processing: Exporting All Observables and Generating Plots ---")
+# Setup logging
+global_logger(ConsoleLogger(stderr, Logging.Info))
+
+@info "--- Final Results Processing: Exporting All Observables and Generating Plots ---"
 
 # --- CONFIGURATION ---
 const NUM_SIMULATION_POINTS = 200 # Increase for smoother curves
 
 # --- 1. Set up the PEtab Model and other required objects ---
-println("Setting up PEtab model and objects...")
+@info "Setting up PEtab model and objects..."
 
 # Use the current setup function with required parameters
-enable_preeq = true
-model_net_path = "model_even_smaller/2025_07_09__16_30_17/model_even_smaller.net"
-data_path = "SimData/measurements_time_course.tsv"
-config_path = "config.yml"
+petab_problem_path = "petab_problem.yml"
 
-setup_results = setup_petab_problem(enable_preeq, model_net_path, data_path, config_path)
+setup_results = setup_petab_problem(petab_problem_path)
 if isnothing(setup_results)
     @error "Failed to build PEtabModel. Cannot proceed."
     exit()

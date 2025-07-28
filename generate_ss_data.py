@@ -4,6 +4,19 @@ import yaml
 import os
 import argparse
 import bionetgen
+import logging
+
+# --------------------------------------------------------------------------
+#                   LOGGING CONFIGURATION
+# --------------------------------------------------------------------------
+
+def setup_logging(level=logging.INFO):
+    """Setup logging configuration."""
+    logging.basicConfig(
+        level=level,
+        format='%(levelname)s: %(message)s',
+        handlers=[logging.StreamHandler()]
+    )
 
 # --------------------------------------------------------------------------
 #                   COMMAND-LINE ARGUMENT PARSING
@@ -18,6 +31,7 @@ def get_args():
         default="config.yml",
         help="Path to the YAML configuration file. Default: config.yml"
     )
+    parser.add_argument('--debug', action='store_true', help='Enable debug logging.')
     return parser.parse_args()
 
 # --------------------------------------------------------------------------
@@ -26,7 +40,7 @@ def get_args():
 
 def get_true_parameters(model: bionetgen.bngmodel, exclude_params: set) -> dict:
     """Extracts the default parameter values from the model, excluding condition parameters."""
-    print("--- Extracting true kinetic parameters from BNGL model ---")
+    logging.info("--- Extracting true kinetic parameters from BNGL model ---")
     true_params = {}
     # Iterate over parameter NAMES (which are strings)
     for param_name in model.parameters:
@@ -34,7 +48,7 @@ def get_true_parameters(model: bionetgen.bngmodel, exclude_params: set) -> dict:
             # Access the parameter object from the model using its name
             param_obj = model.parameters[param_name]
             true_params[param_name] = float(param_obj.value)
-    print(f"  Found {len(true_params)} kinetic parameters.")
+    logging.info(f"  Found {len(true_params)} kinetic parameters.")
     return true_params
 
 def calculate_preeq_steadystate(
@@ -48,7 +62,7 @@ def calculate_preeq_steadystate(
     Calculates the pre-equilibration steady-state.
     Sets variable stimuli to zero but maintains constant background stimuli.
     """
-    print("--- Calculating single pre-equilibration steady-state ---")
+    logging.info("--- Calculating single pre-equilibration steady-state ---")
     simulator = model.setup_simulator()
 
     # Set all kinetic parameters to their "true" default values
@@ -59,25 +73,25 @@ def calculate_preeq_steadystate(
     for param_name, value in stimuli_to_zero.items():
         sbml_id = param_to_sbml_id[param_name] # Use the map to get the ID
         simulator.model[sbml_id] = value
-        print(f"    Setting variable stimulus {param_name} ({sbml_id}) to {value} for pre-equilibration.")
+        logging.debug(f"    Setting variable stimulus {param_name} ({sbml_id}) to {value} for pre-equilibration.")
 
     # Set constant background stimuli to their defined values
     for param_name, value in constant_stimuli.items():
         sbml_id = param_to_sbml_id[param_name] # Use the map to get the ID
         simulator.model[sbml_id] = value
-        print(f"    Setting constant stimulus {param_name} ({sbml_id}) to {value} for pre-equilibration.")
+        logging.debug(f"    Setting constant stimulus {param_name} ({sbml_id}) to {value} for pre-equilibration.")
 
-    print("    1. Solving for steady-state via long simulation...")
+    logging.info("    1. Solving for steady-state via long simulation...")
     # It's better to use the model's own steady state finder if available
     try:
         simulator.ss()
-        print("    ...Steady-state calculated via simulator's ss() method.")
+        logging.info("    ...Steady-state calculated via simulator's ss() method.")
     except:
-        print("    ss() method failed, falling back to long simulation...")
+        logging.warning("    ss() method failed, falling back to long simulation...")
         simulator.simulate(start=0, end=1e8, steps=2)
 
     ss_concentrations = simulator.model.getFloatingSpeciesConcentrations()
-    print("    ...Correct pre-equilibrium state calculated and saved.")
+    logging.info("    ...Correct pre-equilibrium state calculated and saved.")
     return ss_concentrations
 
 def run_simulation_from_preeq(
@@ -112,7 +126,7 @@ def run_simulation_from_preeq(
     simulator.integrator.maximum_num_steps = 50000
     
     # 5. Simulate the dynamic response
-    print("    Simulating dynamic response...")
+    logging.info("    Simulating dynamic response...")
     result = simulator.simulate(start=0, end=sim_duration, steps=sim_steps)
     
     if result is None:
@@ -123,7 +137,7 @@ def run_simulation_from_preeq(
 
 def discover_species_map(model: bionetgen.bngmodel, params_to_trace: list) -> dict:
     """Uses a tracer method to find the mapping from BNGL parameters to simulator species IDs."""
-    print("--- Discovering species mapping with tracer method ---")
+    logging.info("--- Discovering species mapping with tracer method ---")
     tracer_map = {param: 9999.9 - i*1000 for i, param in enumerate(params_to_trace)}
     
     for param_name, tracer_val in tracer_map.items():
@@ -140,12 +154,12 @@ def discover_species_map(model: bionetgen.bngmodel, params_to_trace: list) -> di
             if abs(conc - tracer_val) < 1e-6:
                 sbml_id = all_species_ids[i]
                 param_to_sbml_id[param_name] = sbml_id
-                print(f"  SUCCESS: Traced parameter '{param_name}' to simulator ID '{sbml_id}'")
+                logging.info(f"  SUCCESS: Traced parameter '{param_name}' to simulator ID '{sbml_id}'")
                 found = True
                 break
         if not found:
             raise RuntimeError(f"FATAL ERROR: Could not find tracer for '{param_name}'.")
-    print("-----------------------------------------------------")
+    logging.info("-----------------------------------------------------")
     return param_to_sbml_id
 
 def add_noise(data_series: pd.Series, noise_level: float, rng: np.random.Generator) -> pd.Series:
@@ -163,7 +177,7 @@ def generate_time_course_excel(config):
     Generates time-course data with a consistent pre-equilibration step
     and saves it to a single Excel file in "wide" format.
     """
-    print(f"--- Running Time-Course Data Generation (Consistent Preeq) ---")
+    logging.info(f"--- Running Time-Course Data Generation (Consistent Preeq) ---")
     
     # 1. Load settings and model
     tc_settings = config['time_course_settings']
@@ -171,7 +185,7 @@ def generate_time_course_excel(config):
     model_path = config['model_path']
     rng = np.random.default_rng(config['random_seed'])
     
-    print(f"Loading BNGL model from: {model_path}")
+    logging.info(f"Loading BNGL model from: {model_path}")
     bng_model = bionetgen.bngmodel(model_path)
     os.makedirs(output_dir, exist_ok=True)
 
@@ -181,7 +195,7 @@ def generate_time_course_excel(config):
     all_stimuli_params = variable_stimuli.union(constant_stimuli_names)
 
     # Use a temporary model instance for species mapping discovery to avoid contaminating the main model
-    print("  Creating temporary model instance for species mapping discovery...")
+    logging.info("  Creating temporary model instance for species mapping discovery...")
     temp_model_for_tracing = bionetgen.bngmodel(model_path)
     param_to_sbml_id = discover_species_map(temp_model_for_tracing, list(all_stimuli_params))
     # After this, temp_model_for_tracing can be discarded. The main 'bng_model' object is still clean.
@@ -206,7 +220,7 @@ def generate_time_course_excel(config):
     # 4. Run simulation for each condition from the shared steady state
     time_course_results = {}
     for condition_name, stimuli_values in tc_settings['conditions'].items():
-        print(f"\n--- Processing Condition: {condition_name} ---")
+        logging.info(f"\n--- Processing Condition: {condition_name} ---")
         stimuli_with_ids = {param_to_sbml_id[p]: v for p, v in stimuli_values.items()}
         
         df_sim = run_simulation_from_preeq(
@@ -224,17 +238,17 @@ def generate_time_course_excel(config):
     noise_str = f"_noise{int(noise_conf['level_percent'])}" if noise_conf['add'] else ""
     filename = os.path.join(output_dir, f"preeq{noise_str}.xlsx")
     
-    print(f"\n--- Formatting and saving data to '{filename}' ---")
+    logging.info(f"\n--- Formatting and saving data to '{filename}' ---")
     
     # Get observable names from the model object
     all_observables = [obs.name for obs_key in bng_model.observables for obs in [bng_model.observables[obs_key]]]
-    print(f"INFO: Found observables to save: {all_observables}")
+    logging.info(f"INFO: Found observables to save: {all_observables}")
 
     with pd.ExcelWriter(filename) as writer:
         for obs_name in sorted(all_observables):
             # Check if the observable column exists in the first simulation result
             if obs_name not in time_course_results[list(tc_settings['conditions'].keys())[0]].columns:
-                print(f"WARNING: Observable '{obs_name}' not found in simulation output. Skipping.")
+                logging.warning(f"WARNING: Observable '{obs_name}' not found in simulation output. Skipping.")
                 continue
 
             # Create a new DataFrame for this observable's sheet
@@ -253,7 +267,7 @@ def generate_time_course_excel(config):
             # Write this observable's DataFrame to a sheet in the Excel file
             sheet_df.to_excel(writer, sheet_name=obs_name, index=False)
             
-    print(f"✅ Data saved successfully to {filename}")
+    logging.info(f"✅ Data saved successfully to {filename}")
 
 
 # --------------------------------------------------------------------------
@@ -265,7 +279,7 @@ def excel_to_petab_dose_response(config):
     Reads a dose-response Excel file, converts it to PEtab format,
     and saves the measurement and condition files.
     """
-    print("--- Running Dose-Response Data Processing ---")
+    logging.info("--- Running Dose-Response Data Processing ---")
     
     # 1. Load settings
     dr_settings = config['dose_response_settings']
@@ -274,7 +288,7 @@ def excel_to_petab_dose_response(config):
     os.makedirs(output_dir, exist_ok=True)
 
     if not input_conf['load_from_file']:
-        print("This script is configured to process an existing file. Skipping.")
+        logging.info("This script is configured to process an existing file. Skipping.")
         return
 
     # 2. Read the Excel data
@@ -282,15 +296,15 @@ def excel_to_petab_dose_response(config):
     dose_col = input_conf['dose_column_name']
     col_map = input_conf['column_to_observable_map']
     
-    print(f"  Reading data from '{filepath}'...")
+    logging.info(f"  Reading data from '{filepath}'...")
     try:
         df_wide = pd.read_excel(filepath)
     except FileNotFoundError:
-        print(f"ERROR: Data file not found at '{filepath}'")
+        logging.error(f"ERROR: Data file not found at '{filepath}'")
         return
 
     # 3. Convert from wide to long format (PEtab measurements table)
-    print("  Converting data to PEtab long format...")
+    logging.info("  Converting data to PEtab long format...")
     
     # Melt the DataFrame to turn it into a long format
     df_long = df_wide.melt(
@@ -350,9 +364,9 @@ def excel_to_petab_dose_response(config):
     measurement_df.to_csv(measurement_path, index=False, sep='\t')
     condition_df.to_csv(condition_path, index=False, sep='\t')
     
-    print(f"✅ PEtab files created successfully:")
-    print(f"   - Measurements: {measurement_path}")
-    print(f"   - Conditions:   {condition_path}")
+    logging.info(f"✅ PEtab files created successfully:")
+    logging.info(f"   - Measurements: {measurement_path}")
+    logging.info(f"   - Conditions:   {condition_path}")
 
 
 # --------------------------------------------------------------------------
@@ -365,7 +379,7 @@ def generate_time_course_petab(config):
     and saves it in PEtab-standard TSV format (long format).
     This is the recommended method for PEtab compliance.
     """
-    print(f"--- Running Time-Course Data Generation (PEtab TSV Format) ---")
+    logging.info(f"--- Running Time-Course Data Generation (PEtab TSV Format) ---")
     
     # 1. Load settings and model
     tc_settings = config['time_course_settings']
@@ -377,19 +391,19 @@ def generate_time_course_petab(config):
     
     # 2. Extract parameters
     conditions_list = tc_settings['conditions'].keys()
-    print("  Identified conditions:", list(conditions_list))
+    logging.info(f"  Identified conditions: {list(conditions_list)}")
     
     # Get stimulus parameters from the variable_stimuli and constant_stimuli lists
     variable_stimuli = set(tc_settings.get('variable_stimuli', []))
     constant_stimuli_names = set(tc_settings.get('constant_stimuli', []))
     condition_params = variable_stimuli.union(constant_stimuli_names)
-    print("  Identified stimulus (condition) parameters:", list(condition_params))
+    logging.info(f"  Identified stimulus (condition) parameters: {list(condition_params)}")
     
     true_params = get_true_parameters(model, condition_params)
     
     # 5. Discover the species map using a temporary model instance.
     #    This prevents the main model object from being modified with tracer values.
-    print("  Creating temporary model instance for species mapping discovery...")
+    logging.info("  Creating temporary model instance for species mapping discovery...")
     temp_model_for_tracing = bionetgen.bngmodel(model_path)
     param_to_sbml_id = discover_species_map(temp_model_for_tracing, list(condition_params))
     # After this, temp_model_for_tracing can be discarded. The main 'model' object is still clean.
@@ -411,7 +425,7 @@ def generate_time_course_petab(config):
     
     # Now this call will work because param_to_sbml_id is defined.
     preeq_ss = calculate_preeq_steadystate(model, true_params, stimuli_to_zero, constant_stimuli, param_to_sbml_id)
-    print(f"  Pre-equilibration steady-state calculated.")
+    logging.info(f"  Pre-equilibration steady-state calculated.")
     
     # 4. Simulation settings
     sim_confs = tc_settings['simulation']
@@ -422,7 +436,7 @@ def generate_time_course_petab(config):
     time_course_results = {}
     
     for condition_name, condition_values in tc_settings['conditions'].items():
-        print(f"  Simulating condition: {condition_name}")
+        logging.info(f"  Simulating condition: {condition_name}")
         
         # Create the dictionary with the correct simulator IDs
         stimuli_with_ids = {param_to_sbml_id[p]: v for p, v in condition_values.items()}
@@ -433,7 +447,7 @@ def generate_time_course_petab(config):
         time_course_results[condition_name] = result_df
     
     # 7. Convert to PEtab long format
-    print("  Converting data to PEtab long format...")
+    logging.info("  Converting data to PEtab long format...")
     
     # Create noise generator
     noise_conf = tc_settings['noise']
@@ -446,7 +460,7 @@ def generate_time_course_petab(config):
     
     # Get observable names from the model object
     all_observables = [obs.name for obs_key in model.observables for obs in [model.observables[obs_key]]]
-    print(f"INFO: Found observables to save: {all_observables}")
+    logging.info(f"INFO: Found observables to save: {all_observables}")
 
     # NOTE: We don't add preeq_ss to the main conditions table because it's only used
     # for pre-equilibration and doesn't have corresponding measurements. PEtab will
@@ -498,57 +512,141 @@ def generate_time_course_petab(config):
     # Create filename suffix based on noise configuration
     if noise_conf['add']:
         noise_percent = int(noise_conf['level_percent'])
-        filename_suffix = f"_noise_{noise_percent}"
+        filename_suffix = f"_noise{noise_percent}"
     else:
-        filename_suffix = "_default"
-    
-    # Save to TSV files with appropriate naming
+        filename_suffix = "_no_noise"
+        
     measurement_path = os.path.join(output_dir, f"measurements_time_course{filename_suffix}.tsv")
     condition_path = os.path.join(output_dir, f"conditions_time_course{filename_suffix}.tsv")
     
     measurement_df.to_csv(measurement_path, index=False, sep='\t')
     condition_df.to_csv(condition_path, index=False, sep='\t')
     
-    print(f"✅ PEtab TSV files created successfully:")
-    print(f"   - Measurements: {measurement_path}")
-    print(f"   - Conditions:   {condition_path}")
-    print(f"   - Total measurements: {len(measurement_df)}")
-    print(f"   - Total conditions: {len(condition_df)}")
+    logging.info(f"✅ PEtab time-course files created successfully:")
+    logging.info(f"   - Measurements: {measurement_path}")
+    logging.info(f"   - Conditions:   {condition_path}")
+    
+    return measurement_df, condition_df, model
 
 
 # --------------------------------------------------------------------------
-#                   MAIN EXECUTION LOGIC
+#                   PEtab FILE CREATION
+# --------------------------------------------------------------------------
+
+def create_observables_petab(measurements_df, observables_mapping, output_path):
+    """Create observables.tsv file from measurements data."""
+    logging.info("Creating observables PEtab file...")
+    
+    # Get unique observableIds from measurements
+    observable_ids = measurements_df['observableId'].unique()
+    
+    observables_data = []
+    for obs_id in observable_ids:
+        observables_data.append({
+            'observableId': obs_id,
+            'observableName': observables_mapping.get(obs_id, obs_id),
+            'observableFormula': obs_id,  # Using observableId as formula
+            'noiseFormula': f"noiseParameter1_{obs_id}"
+        })
+    
+    observables_df = pd.DataFrame(observables_data)
+    observables_df.to_csv(output_path, sep='\t', index=False)
+    logging.info(f"✅ Observables file saved: {output_path}")
+
+def create_parameters_petab(config, model, measurements_df, output_path):
+    """Create parameters.tsv file from config and measurements."""
+    logging.info("Creating parameters PEtab file...")
+    
+    parameters_data = []
+    
+    # Add model parameters from bionetgen model
+    def should_estimate_parameter(param_name):
+        if param_name.endswith('_0'):
+            return False
+        return True
+
+    for param_name in model.parameters:
+        param_obj = model.parameters[param_name]
+        nominal_value = float(param_obj.value)
+        if should_estimate_parameter(param_name):
+            should_estimate = 1
+            lower_bound = nominal_value / 100.0
+            upper_bound = nominal_value * 100.0
+        else:
+            should_estimate = 0
+            lower_bound = nominal_value
+            upper_bound = nominal_value
+        
+        parameters_data.append({
+            'parameterId': param_name,
+            'parameterName': param_name,
+            'parameterScale': 'log10',
+            'lowerBound': lower_bound,
+            'upperBound': upper_bound,
+            'nominalValue': nominal_value,
+            'estimate': should_estimate
+        })
+
+    # Add noise parameters for each observable
+    observable_ids = measurements_df['observableId'].unique()
+    for obs_id in observable_ids:
+        parameters_data.append({
+            'parameterId': f'noiseParameter1_{obs_id}',
+            'parameterName': f'noiseParameter1_{obs_id}',
+            'parameterScale': 'log10',
+            'lowerBound': 1e-6,
+            'upperBound': 1e6,
+            'nominalValue': 0.1,
+            'estimate': 1
+        })
+    
+    parameters_df = pd.DataFrame(parameters_data)
+    parameters_df.to_csv(output_path, sep='\t', index=False)
+    logging.info(f"✅ Parameters file saved: {output_path}")
+
+
+# --------------------------------------------------------------------------
+#                   MAIN EXECUTION BLOCK
 # --------------------------------------------------------------------------
 
 def main():
-    """Main function to run the data generation/processing pipeline."""
+    """Main function to generate steady-state data and PEtab files."""
     args = get_args()
     
-    print(f"Loading configuration from: {args.config}")
-    try:
-        with open(args.config, 'r') as f:
-            config = yaml.safe_load(f)
-    except FileNotFoundError:
-        print(f"ERROR: Configuration file not found at '{args.config}'")
-        return
-    except yaml.YAMLError as e:
-        print(f"ERROR: Could not parse YAML file: {e}")
-        return
+    # Setup logging
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    setup_logging(log_level)
 
-    run_mode = config.get("run_mode")
-    print(f"Selected run mode: '{run_mode}'")
+    with open(args.config, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    # Generate measurements and conditions
+    measurements_df, condition_df, model = generate_time_course_petab(config)
+    
+    # Create PEtab files
+    output_dir = "petab_files"
+    os.makedirs(output_dir, exist_ok=True)
+    
+    observables_path = os.path.join(output_dir, "observables.tsv")
+    parameters_path = os.path.join(output_dir, "parameters.tsv")
+    
+    create_observables_petab(
+        measurements_df, 
+        config['observables_mapping'], 
+        observables_path
+    )
+    
+    create_parameters_petab(
+        config,
+        model,
+        measurements_df, 
+        parameters_path
+    )
+    
+    logging.info("🎉 All PEtab files generated successfully!")
 
-    if run_mode == "dose_response":
-        excel_to_petab_dose_response(config)
-            
-    elif run_mode == "time_course":
-        generate_time_course_excel(config)
-        
-    elif run_mode == "time_course_petab":
-        generate_time_course_petab(config)
-        
-    else:
-        print(f"ERROR: Unknown run_mode '{run_mode}'. Please choose 'dose_response', 'time_course', or 'time_course_petab'.")
 
 if __name__ == "__main__":
+    # excel_to_petab_dose_response(config)
+    # generate_time_course_excel(config)
     main()
