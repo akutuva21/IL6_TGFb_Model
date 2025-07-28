@@ -695,22 +695,61 @@ function plot_parameter_distribution(multistart_result::PEtabMultistartResult, p
         ref_x_values_log10 = Float64[]
         
         println("INFO: Matching and transforming reference (true) values...")
+        println("DIAGNOSTIC: Available true parameter names: $(collect(keys(reference_values)))")
+        println("DIAGNOSTIC: Available true parameter types: $(typeof.(collect(keys(reference_values))))")
+        println("DIAGNOSTIC: Estimated parameter symbols: $param_names_symbols")
+        
+        # Try multiple matching strategies for robustness
+        matched_count = 0
         # --- MODIFICATION: Iterate over the original Symbols ---
         for param_name_sym in param_names_symbols
+            # Remove log10_ prefix if present for matching
+            base_name = string(param_name_sym)
+            if startswith(base_name, "log10_")
+                base_name = base_name[7:end]  # Remove "log10_" prefix
+            end
             
-            # The lookup is now a direct Symbol-to-Symbol check, which is robust.
-            if haskey(reference_values, param_name_sym)
-                true_linear_value = reference_values[param_name_sym]
-                # The plot is on log10 scale, so we must transform the true values
-                true_log10_value = log10(true_linear_value)
-                push!(ref_x_values_log10, true_log10_value)
-                println("  - Found '$param_name_sym': true value = $true_linear_value (log10: $true_log10_value)")
+            # Try multiple matching strategies
+            true_value = nothing
+            match_method = ""
+            
+            # Strategy 1: Try base_name as Symbol
+            base_name_sym = Symbol(base_name)
+            if haskey(reference_values, base_name_sym)
+                true_value = reference_values[base_name_sym]
+                match_method = "Symbol match"
+            # Strategy 2: Try base_name as String
+            elseif haskey(reference_values, base_name)
+                true_value = reference_values[base_name]
+                match_method = "String match"
+            # Strategy 3: Try original param_name_sym directly
+            elseif haskey(reference_values, param_name_sym)
+                true_value = reference_values[param_name_sym]
+                match_method = "Direct symbol match"
+            # Strategy 4: Try case-insensitive matching
             else
-                @warn "Could not find true value for parameter '$param_name_sym'. It will not be plotted."
-                # Push NaN so the line has a gap, preserving the order
+                for (ref_key, ref_val) in reference_values
+                    ref_key_str = string(ref_key)
+                    if lowercase(ref_key_str) == lowercase(base_name)
+                        true_value = ref_val
+                        match_method = "Case-insensitive match"
+                        break
+                    end
+                end
+            end
+            
+            if !isnothing(true_value)
+                true_log10_value = log10(true_value)
+                push!(ref_x_values_log10, true_log10_value)
+                matched_count += 1
+                println("  ✓ Found '$base_name' → true value = $true_value (log10: $true_log10_value) [$match_method]")
+            else
+                @warn "Could not find true value for parameter '$base_name'. Available keys: $(collect(keys(reference_values)))"
                 push!(ref_x_values_log10, NaN) 
             end
         end
+        
+        println("INFO: Successfully matched $matched_count out of $(length(param_names_symbols)) parameters")
         
         if !isempty(filter(!isnan, ref_x_values_log10))
             # Plot the true values as a distinct blue line with star markers

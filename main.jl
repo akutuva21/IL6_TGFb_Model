@@ -1,67 +1,13 @@
 # main.jl
 
 using Pkg
+import SBMLImporter
+
 Pkg.activate("./bngl_julia")
 
 include("src/model_param_est_robustness.jl")
 include("src/visualization.jl")
 include("src/optimization.jl")
-
-# --- START OF DEBUGGING FUNCTION ---
-function debug_petab_problem(prob::PEtab.PEtabODEProblem)
-    println("\n\n--- 🕵️  STARTING PETAB PROBLEM DIAGNOSTICS 🕵️  ---")
-    
-    println("\n[1] Checking Parameter Names and Count...")
-    n_params = length(prob.xnames)
-    println("    Number of parameters to estimate: ", n_params)
-    println("    Parameter names: ", prob.xnames)
-
-    println("\n[2] Checking Parameter Bounds...")
-    println("    Lower bounds type: ", typeof(prob.lower_bounds))
-    println("    Upper bounds type: ", typeof(prob.upper_bounds))
-    
-    lb_ok = all(x -> isa(x, Float64), prob.lower_bounds)
-    ub_ok = all(x -> isa(x, Float64), prob.upper_bounds)
-    println("    All lower bounds are Float64: ", lb_ok)
-    println("    All upper bounds are Float64: ", ub_ok)
-    if !lb_ok
-        println("    ⚠️  Problem in lower bounds: ", prob.lower_bounds)
-    end
-    if !ub_ok
-        println("    ⚠️  Problem in upper bounds: ", prob.upper_bounds)
-    end
-
-    println("\n[3] Checking Nominal Transformed Values (Source of `similar`)...")
-    println("    Nominal transformed type: ", typeof(prob.xnominal_transformed))
-    println("    Nominal transformed element type: ", eltype(prob.xnominal_transformed))
-    nominal_ok = all(x -> isa(x, Float64), prob.xnominal_transformed)
-    println("    All nominal transformed values are Float64: ", nominal_ok)
-    if !nominal_ok
-        println("    ⚠️  Problem in nominal transformed values: ")
-        show(stdout, "text/plain", prob.xnominal_transformed)
-        println()
-    end
-
-    println("\n[4] Checking Parameter Scales (Crucial for `transform_x`)...")
-    xscales = prob.model_info.xindices.xscale
-    println("    Parameter scales dictionary: ")
-    show(stdout, "text/plain", xscales)
-    println()
-
-    valid_scales = [:lin, :log, :log10, :log2]
-    scales_ok = all(scale -> scale in valid_scales, values(xscales))
-    println("    All parameter scales are valid: ", scales_ok)
-    if !scales_ok
-        for (param, scale) in xscales
-            if !(scale in valid_scales)
-                println("    ⚠️  INVALID SCALE FOUND for parameter '", param, "': ", scale)
-            end
-        end
-    end
-
-    println("\n--- 🕵️  END OF DIAGNOSTICS 🕵️  ---\n\n")
-end
-# --- END OF DEBUGGING FUNCTION ---
 
 using LinearAlgebra
 using ArgParse
@@ -254,37 +200,30 @@ function run_analysis()
         
     local odesol, gradient_method
 
-    # === ENHANCED ODE SOLVER CONFIGURATION FOR SCIENTIFIC PARAMETER ESTIMATION ===
-    # Following DifferentialEquations.jl best practices for maximum accuracy and robustness
-    # Using TerminateSteadyState callback for robust steady-state detection
-    
     if parsed_args["debug"]
-        println("🐛 DEBUG MODE: Using ROBUST composite solver with loose tolerances for rapid iteration")
-        println("📖 Using AutoVern7(Rodas5P()) with built-in steady-state detection")
+        println("🐛 DEBUG MODE: Using minimal debug configuration to isolate issues")
         
         odesol = ODESolver(
-            AutoVern7(Rodas5P()),
-            abstol=1e-6,              # Relaxed absolute tolerance for speed
-            reltol=1e-6,              # Relaxed relative tolerance for speed
-            force_dtmin=true,         # Crucial for preventing failures
-            maxiters=10000            # Lower maxiters for faster debug runs
+            Rodas5P(),              # Simple, robust implicit solver
+            abstol=1e-6,
+            reltol=1e-6,
+            force_dtmin=true,
+            maxiters=10000
         )
         
         gradient_method = :ForwardDiff
         
-    else # PRODUCTION MODE: Maximum accuracy for publication-quality fits
-        println("🔬 PRODUCTION MODE: High-accuracy composite solver for publication-quality fits")
-        println("📖 Using AutoVern7(Rodas5P()) - adaptive algorithm selection with built-in steady-state")
-        println("   • AutoVern7: High-order solver for smooth regions")
-        println("   • Rodas5P: Specialized for stiff biochemical systems")
-        println("   • TerminateSteadyState: Robust steady-state detection")
+    else # PRODUCTION MODE: Use SINGLE robust solver (no composite)
+        println("🔬 PRODUCTION MODE: Single robust solver to avoid CompositeAlgorithm conflicts")
+        println("📖 Using Rodas5P() - specialized for stiff biochemical systems")
+        println("   • Rodas5P: Rosenbrock method optimized for stiff systems")
+        println("   • Avoids CompositeAlgorithm matrix allocation conflicts")
         
-        # Composite algorithm following DifferentialEquations.jl recommendations
-        # AutoVern7 handles smooth regions efficiently, Rodas5P handles stiff regions
-        composite_solver = AutoVern7(Rodas5P())
+        # Use single robust solver - NO COMPOSITE to avoid PEtab conflicts
+        single_solver = Rodas5P()
         
         odesol = ODESolver(
-            composite_solver,
+            single_solver,
             abstol=1e-9,              # Tighter absolute tolerance for precise gradients
             reltol=1e-9,              # Tighter relative tolerance for precise gradients  
             force_dtmin=true,         # Force minimum timestep to prevent NaN errors
@@ -315,7 +254,7 @@ function run_analysis()
     println("   • Absolute tolerance: $(odesol.abstol)")
     println("   • Relative tolerance: $(odesol.reltol)")
     println("   • Steady-state solver: :Simulate mode with tmax=Inf")
-    println("   • Expected benefits: Bypasses internal callback bug, robust steady-state detection")
+    println("   • Expected benefits: Avoids CompositeAlgorithm conflicts, robust steady-state detection")
 
     # --- 4. Run estimation ONLY if no results were loaded ---
     local petab_problem
@@ -359,11 +298,6 @@ function run_analysis()
             gradient_method = gradient_method,
             verbose = false
         )
-        # --- END: CORRECTED AND FINAL CALLBACK CODE ---
-        
-        # --- ADD DIAGNOSTIC CALL ---
-        debug_petab_problem(petab_problem)
-        # ---------------------
         
         println("✅ PEtabODEProblem created successfully")
 

@@ -1,6 +1,6 @@
 parameterId	parameterScale	lowerBound	upperBound	nominalValue	estimate
-TGFb_0	lin	1.0	1.0	1.0	0
-IL6_0	lin	0.0	0.0	0.0	0
+TGFb_0	log10	1.0	1.0	1.0	0
+IL6_0	log10	0.0	0.0	0.0	0
 kf_il6_bind	log10	0.01	0.01	0.01	0
 kr_il6_bind	log10	0.01	0.01	0.01	0
 k_act_il6r	log10	0.5	0.5	0.5	0
@@ -22,3 +22,11 @@ SMAD3_0	log10	100.0	100.0	100.0	0
 SMAD4_0	log10	50.0	50.0	50.0	0
 STAT3m_0	log10	100.0	100.0	100.0	0
 PKA_0	log10	50.0	50.0	50.0	0
+sigma_Free_IL6_obs	lin	1.0	1.0	1.0	0
+sigma_Free_TGFb_obs	lin	1.0	1.0	1.0	0
+sigma_IL6R_Active	lin	1.0	1.0	1.0	0
+sigma_PKA_active	lin	1.0	1.0	1.0	0
+sigma_S3S4_complex_obs	lin	1.0	1.0	1.0	0
+sigma_S3STAT3d_complex_obs	lin	1.0	1.0	1.0	0
+sigma_STAT3d_active_obs	lin	1.0	1.0	1.0	0
+sigma_pSMAD3_obs	lin	1.0	1.0	1.0	0

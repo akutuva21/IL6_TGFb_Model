@@ -111,7 +111,5 @@ end reaction rules
 end model
 
 # Actions
-generate_network({overwrite=>1,verbose=>0})
-simulate({method=>"ode",t_end=>100,n_steps=>1000})
-visualize({type=>"contactmap",suffix=>"all"})
+generate_network({overwrite=>1})
 writeSBML()
