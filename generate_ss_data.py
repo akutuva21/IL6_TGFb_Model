@@ -5,18 +5,24 @@ import os
 import argparse
 import bionetgen
 import logging
+import sys
 
 # --------------------------------------------------------------------------
 #                   LOGGING CONFIGURATION
 # --------------------------------------------------------------------------
 
 def setup_logging(level=logging.INFO):
-    """Setup logging configuration."""
+    """Setup logging configuration for cluster compatibility."""
     logging.basicConfig(
         level=level,
         format='%(levelname)s: %(message)s',
-        handlers=[logging.StreamHandler()]
+        handlers=[logging.StreamHandler(sys.stdout)],
+        force=True
     )
+    # Force immediate flushing
+    for handler in logging.getLogger().handlers:
+        handler.setStream(sys.stdout)
+        handler.flush = lambda: sys.stdout.flush()
 
 # --------------------------------------------------------------------------
 #                   COMMAND-LINE ARGUMENT PARSING
@@ -268,6 +274,7 @@ def generate_time_course_excel(config):
             sheet_df.to_excel(writer, sheet_name=obs_name, index=False)
             
     logging.info(f"✅ Data saved successfully to {filename}")
+    sys.stdout.flush()
 
 
 # --------------------------------------------------------------------------
@@ -367,6 +374,7 @@ def excel_to_petab_dose_response(config):
     logging.info(f"✅ PEtab files created successfully:")
     logging.info(f"   - Measurements: {measurement_path}")
     logging.info(f"   - Conditions:   {condition_path}")
+    sys.stdout.flush()
 
 
 # --------------------------------------------------------------------------
@@ -525,6 +533,7 @@ def generate_time_course_petab(config):
     logging.info(f"✅ PEtab time-course files created successfully:")
     logging.info(f"   - Measurements: {measurement_path}")
     logging.info(f"   - Conditions:   {condition_path}")
+    sys.stdout.flush()
     
     return measurement_df, condition_df, model
 
@@ -561,21 +570,34 @@ def create_parameters_petab(config, model, measurements_df, output_path):
     
     # Add model parameters from bionetgen model
     def should_estimate_parameter(param_name):
-        if param_name.endswith('_0'):
-            return False
-        return True
+        # Stimulus parameters that should be condition-controlled
+        stimulus_params = {'IL6_0', 'TGFb_0'}
+        return param_name not in stimulus_params
+
+    # Define custom bounds for initial concentration parameters
+    initial_concentration_params = {'IL6R_0', 'SMAD3_0', 'SMAD4_0', 'STAT3m_0', 'PKA_0'}
 
     for param_name in model.parameters:
         param_obj = model.parameters[param_name]
         nominal_value = float(param_obj.value)
+        
         if should_estimate_parameter(param_name):
             should_estimate = 1
-            lower_bound = nominal_value / 100.0
-            upper_bound = nominal_value * 100.0
+            
+            # Set custom bounds for initial concentration parameters
+            if param_name in initial_concentration_params:
+                lower_bound = 0.01
+                upper_bound = 200.0
+            else:
+                # Use default ±10x bounds for kinetic parameters
+                lower_bound = nominal_value / 10.0
+                upper_bound = nominal_value * 10.0
         else:
             should_estimate = 0
-            lower_bound = nominal_value
-            upper_bound = nominal_value
+            # For fixed parameters, ensure bounds are slightly different to avoid uniform distribution error
+            epsilon = abs(nominal_value) * 1e-10 + 1e-10
+            lower_bound = nominal_value - epsilon
+            upper_bound = nominal_value + epsilon
         
         parameters_data.append({
             'parameterId': param_name,
@@ -594,16 +616,15 @@ def create_parameters_petab(config, model, measurements_df, output_path):
             'parameterId': f'noiseParameter1_{obs_id}',
             'parameterName': f'noiseParameter1_{obs_id}',
             'parameterScale': 'log10',
-            'lowerBound': 1e-6,
-            'upperBound': 1e6,
-            'nominalValue': 0.1,
-            'estimate': 1
+            'lowerBound': 1e-2,
+            'upperBound': 1e2,
+            'nominalValue': 1,
+            'estimate': 0
         })
     
     parameters_df = pd.DataFrame(parameters_data)
     parameters_df.to_csv(output_path, sep='\t', index=False)
     logging.info(f"✅ Parameters file saved: {output_path}")
-
 
 # --------------------------------------------------------------------------
 #                   MAIN EXECUTION BLOCK
@@ -644,6 +665,7 @@ def main():
     )
     
     logging.info("🎉 All PEtab files generated successfully!")
+    sys.stdout.flush()
 
 
 if __name__ == "__main__":

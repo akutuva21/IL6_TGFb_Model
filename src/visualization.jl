@@ -701,7 +701,6 @@ function plot_parameter_distribution(multistart_result::PEtabMultistartResult, p
         
         # Try multiple matching strategies for robustness
         matched_count = 0
-        # --- MODIFICATION: Iterate over the original Symbols ---
         for param_name_sym in param_names_symbols
             # Remove log10_ prefix if present for matching
             base_name = string(param_name_sym)
@@ -763,7 +762,6 @@ function plot_parameter_distribution(multistart_result::PEtabMultistartResult, p
                     label="True Values")
         end
     end
-    # --- END OF MODIFICATION ---
 
     if !isempty(best_x)
         plot!(plt, best_x, y_values, 

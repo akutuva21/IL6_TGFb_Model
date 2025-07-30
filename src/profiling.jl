@@ -12,6 +12,7 @@ using JLD2
 using Statistics
 using PEtab
 using Pkg
+using Base.Threads
 
 include("solver_config.jl")
 
@@ -168,10 +169,10 @@ Modern likelihood profiling using LikelihoodProfiler.jl, with a robust manual fa
 - **Zoomed Plots**: `ylims=(0, 15)` makes confidence intervals clearly visible.
 """
 function run_likelihood_profiling(petab_problem::PEtabODEProblem, θ_mle::Union{ComponentVector, Nothing}=nothing, debug_mode::Bool=false)
-    println("\n--- 🔬 Starting Modern Likelihood Profiling (LikelihoodProfiler.jl) ---")
+    println("\n--- 🔬 Starting Modern Likelihood Profiling (LikelihoodProfiler.jl, Parallel) ---")
 
     if isnothing(θ_mle)
-        @error "MLE parameter estimates are required for profiling. Please provide θ_mle."
+        @error "MLE parameter estimates are required for profiling."
         return nothing
     end
 
@@ -182,80 +183,69 @@ function run_likelihood_profiling(petab_problem::PEtabODEProblem, θ_mle::Union{
 
     θ_mle_vec = collect(θ_mle)
     param_names = string.(petab_problem.xnames)
+    n_params = length(param_names)
 
-    try
-        # --- This is the main, modern profiling workflow ---
-
-        # 1. Create OptimizationProblem wrapper
-        function objective_wrapper(θ, p)
-            if any(θ .< petab_problem.lower_bounds) || any(θ .> petab_problem.upper_bounds)
-                return Inf
-            end
-            try
-                result = petab_problem.nllh(θ; prior=false)
-                return isfinite(result) ? result : Inf
-            catch
-                return Inf
-            end
+    # 1. Create the base PLProblem (shared across threads)
+    function objective_wrapper(θ, p)
+        if any(θ .< petab_problem.lower_bounds) || any(θ .> petab_problem.upper_bounds)
+            return Inf
         end
+        try
+            result = petab_problem.nllh(θ; prior=false)
+            return isfinite(result) ? result : Inf
+        catch
+            return Inf
+        end
+    end
 
-        optprob = OptimizationProblem(
-            OptimizationFunction(objective_wrapper, Optimization.AutoForwardDiff()),
-            θ_mle_vec;
-            lb = collect(petab_problem.lower_bounds),
-            ub = collect(petab_problem.upper_bounds)
-        )
+    base_optprob = OptimizationProblem(
+        OptimizationFunction(objective_wrapper, Optimization.AutoForwardDiff()),
+        θ_mle_vec;
+        lb = collect(petab_problem.lower_bounds),
+        ub = collect(petab_problem.upper_bounds)
+    )
 
-        # 2. Create PLProblem
-        plprob = LikelihoodProfiler.PLProblem(optprob, θ_mle_vec)
+    plprob = LikelihoodProfiler.PLProblem(base_optprob, θ_mle_vec)
 
-        # 3. Configure and run the profiler
-        # THE FIX: Add the required 'stepper' keyword argument
+    # --- PARALLEL EXECUTION ---
+    println("Starting parallel likelihood profiling across $n_params parameters using $(nthreads()) threads...")
+    prof_sols = Vector{Any}(undef, n_params)
+
+    @time Threads.@threads for i in 1:n_params
+        println("Thread $(threadid()): Profiling parameter $i ($(param_names[i]))")
+        
+        # Configure the profiler for this specific run
         profiler = LikelihoodProfiler.OptimizationProfiler(
             optimizer = OptimizationOptimJL.LBFGS(),
-            stepper = LikelihoodProfiler.FixedStep(initial_step = 0.1)  # Required stepper
+            stepper = LikelihoodProfiler.FixedStep(initial_step = 0.1)
         )
         
-        println("Starting likelihood profiling with maxiters=100...")
-        # THE FIX: Remove the unsupported 'resolution' keyword argument
-        @time prof_sol = LikelihoodProfiler.profile(plprob, profiler; maxiters=100)
-        println("✅ Profiling computation complete.")
-
-        # 4. Generate and save plots
-        println("\n--- Generating Profile Plots ---")
-        for i in 1:length(param_names)
-            param_name = param_names[i]
-            plt = plot(prof_sol, i;
-                xlabel = "$param_name (log₁₀ scale)",
-                ylabel = "Δ Log-Likelihood",
-                title = "Profile Likelihood: $param_name",
-                legend = :topright,
-                linewidth = 2,
-                ylims = (0, 15) # Zoom in
-            )
-            hline!(plt, [1.92], label="95% CI", color=:red, linestyle=:dash)
-            hline!(plt, [3.84], label="99% CI", color=:orange, linestyle=:dash)
-            savefig(plt, joinpath(profile_dir, "profile_$(param_name).png"))
-        end
-        println("✅ Individual profile plots saved.")
-
-        # Generate summary plot
-        summary_plt = plot(prof_sol; ylims=(0, 15), legend=:outertopright)
-        hline!(summary_plt, [1.92], label="95% CI", color=:red, linestyle=:dash)
-        savefig(summary_plt, joinpath(profile_dir, "profile_summary.png"))
-        println("✅ Summary plot saved.")
-
-        return prof_sol
-
-    catch e
-        @error "Modern likelihood profiling failed. Falling back to manual method." exception=(e, catch_backtrace())
-        # --- This is the FALLBACK path ---
-        return run_likelihood_profiling_manual(petab_problem, θ_mle, debug_mode)
+        # Profile ONLY the i-th parameter in this thread using idxs
+        single_prof_sol = LikelihoodProfiler.profile(plprob, profiler; idxs=[i], maxiters=100)
+        
+        # Store the result
+        prof_sols[i] = single_prof_sol
     end
-end
+    
+    println("✅ Parallel profiling computation complete.")
 
-# Deprecated functions for backward compatibility (will be removed)
-function skip_mle_refinement!(use_quick_mle::Bool=false)
-    @warn "skip_mle_refinement! is deprecated. LikelihoodProfiler.jl handles MLE refinement automatically."
-    return nothing
+    # --- PLOTTING (Iterates over the collected results) ---
+    println("\n--- Generating Profile Plots ---")
+    for i in 1:n_params
+        param_name = param_names[i]
+        plt = plot(prof_sols[i], 1;  # '1' since each result has only one profile
+                   xlabel = "$param_name (log₁₀ scale)",
+                   ylabel = "Δ Log-Likelihood",
+                   title = "Profile Likelihood: $param_name",
+                   legend = :topright,
+                   linewidth = 2,
+                   ylims = (0, 15)
+                  )
+        hline!(plt, [1.92], label="95% CI", color=:red, linestyle=:dash)
+        hline!(plt, [3.84], label="99% CI", color=:orange, linestyle=:dash)
+        savefig(plt, joinpath(profile_dir, "profile_$(param_name).png"))
+    end
+    println("✅ Individual profile plots saved.")
+
+    return prof_sols
 end
