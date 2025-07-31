@@ -155,7 +155,8 @@ function run_parameter_estimation(parsed_args, petab_problem)
                 optimizer_obj,  # This should now be the proper PEtab.Fides() object
                 n_starts;
                 options=options,
-                save_trace=false
+                save_trace=false,
+                dirsave = "intermediate_results"  # Save intermediate results
             )
         else
             # Use Julia native optimizers
@@ -164,7 +165,8 @@ function run_parameter_estimation(parsed_args, petab_problem)
                 optimizer_obj,
                 n_starts;
                 options=options,
-                save_trace=false
+                save_trace=false,
+                dirsave = "intermediate_results"  # Save intermediate results
             )
         end
     catch e

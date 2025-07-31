@@ -396,6 +396,9 @@ def generate_time_course_petab(config):
     
     model_path = config['model_path']
     model = bionetgen.bngmodel(model_path)
+
+    # indicate what file you are loading
+    logging.info(f"Loading BNGL model from: {model_path}")
     
     # 2. Extract parameters
     conditions_list = tc_settings['conditions'].keys()

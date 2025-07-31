@@ -189,13 +189,13 @@ function run_analysis()
     else # Normal (non-debug) mode
         println("INFO: Normal mode - using Rodas5P with ForwardDiff for robust optimization")
         odesol = ODESolver(Rodas5P(), 
-                          abstol=1e-10, 
-                          reltol=1e-10, 
+                          abstol=1e-8, 
+                          reltol=1e-8, 
                           maxiters=400000,
                           dtmin=1e-12)
         steadystate_solver = SteadyStateSolver(:Simulate, 
-                                             abstol=1e-10, 
-                                             reltol=1e-10, 
+                                             abstol=1e-8, 
+                                             reltol=1e-8, 
                                              maxiters=400000)
         gradient_method = :ForwardDiff
     end
@@ -291,11 +291,26 @@ function run_analysis()
     # --- 7. Run Likelihood Profiling if Requested ---
     if parsed_args["profile"]
         @info "Running modern likelihood profiling with LikelihoodProfiler.jl..."; flush(stdout); flush(stderr)
-        
+
+        # --- CREATE LOOSE-SOLVER PEtabODEProblem FOR PROFILING ---
+        profiling_odesol = ODESolver(
+            Rodas5P(),
+            abstol=1e-6,     # << looser tolerances!
+            reltol=1e-6,
+            dtmin=1e-12
+        )
+        profiling_steadystate_solver = SteadyStateSolver(:Simulate, abstol=1e-6, reltol=1e-6)
+
+        petab_problem_profile = create_petab_problem_with_callbacks(
+            petab_model,
+            profiling_odesol,
+            profiling_steadystate_solver,
+            gradient_method  # You can reuse 'gradient_method' just like above.
+        )
+
+        # Pass this relaxed petab_problem to profiling:
         @time try
-            # Pass the MLE and debug flag to the modernized profiling function
-            prof_result = run_likelihood_profiling(petab_problem, multi_start_res.xmin, parsed_args["debug"])
-            
+            prof_result = run_likelihood_profiling(petab_problem_profile, multi_start_res.xmin, parsed_args["debug"])
             if !isnothing(prof_result)
                 @info "✅ Modern likelihood profiling completed successfully!"; flush(stdout); flush(stderr)
                 @info "Profile result type: $(typeof(prof_result))"; flush(stdout); flush(stderr)
@@ -307,8 +322,8 @@ function run_analysis()
         end
     end
 
-    @info "\n--- Full Analysis Complete ---"; flush(stdout); flush(stderr)
-end
+        @info "\n--- Full Analysis Complete ---"; flush(stdout); flush(stderr)
+    end
 
 # --- DEFINE AND PARSE ARGUMENTS ---
 function define_argument_parser()
