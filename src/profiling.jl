@@ -21,7 +21,7 @@ function run_modern_likelihood_profiling(
 )
     println("\n--- 🔬 Attempting Thread-Safe Modern Likelihood Profiling ---")
 
-    profile_dir = joinpath(pwd(), "likelihood_profiles_modern")
+    profile_dir = joinpath(pwd(), "likelihood_profiles")
     mkpath(profile_dir)
 
     param_names = string.(keys(θ_mle))

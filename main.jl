@@ -33,7 +33,6 @@ function create_petab_problem_with_callbacks(petab_model, odesolver, steadystate
     
     positive_domain_cb = PositiveDomain()
     combined_callbacks = CallbackSet(petab_model.callbacks, positive_domain_cb)
-    combined_callbacks = petab_model.callbacks  # Use existing callbacks if any
 
     petab_model_with_callback = PEtabModel(
         petab_model.name,
@@ -53,9 +52,10 @@ function create_petab_problem_with_callbacks(petab_model, odesolver, steadystate
     )
     
     @time petab_problem = PEtabODEProblem(
-            petab_model, # Use the extracted petab_model
+            petab_model_with_callback, # Use model augmented with PositiveDomain callback
             odesolver = odesolver,
             ss_solver = steadystate_solver,
+            gradient_method = :ForwardDiff,
             verbose=false
         )
     
