@@ -156,7 +156,7 @@ function run_parameter_estimation(parsed_args, petab_problem)
                 n_starts;
                 options=options,
                 save_trace=false,
-                dirsave = "intermediate_results"  # Save intermediate results
+                dirsave = "Intermediate_results"  # Save intermediate results
             )
         else
             # Use Julia native optimizers
@@ -166,7 +166,7 @@ function run_parameter_estimation(parsed_args, petab_problem)
                 n_starts;
                 options=options,
                 save_trace=false,
-                dirsave = "intermediate_results"  # Save intermediate results
+                dirsave = "Intermediate_results"  # Save intermediate results
             )
         end
     catch e

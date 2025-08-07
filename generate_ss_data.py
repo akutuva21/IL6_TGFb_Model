@@ -571,37 +571,35 @@ def create_parameters_petab(config, model, measurements_df, output_path):
     
     parameters_data = []
     
-    # Add model parameters from bionetgen model
-    def should_estimate_parameter(param_name):
-        # Stimulus parameters that should be condition-controlled
-        stimulus_params = {'IL6_0', 'TGFb_0'}
-        return param_name not in stimulus_params
-
-    # Define custom bounds for initial concentration parameters
+    # Define which parameters should NOT be estimated (they are controlled by the conditions file)
+    stimulus_params = {'IL6_0', 'TGFb_0'}
+    
+    # Define custom bounds for initial concentration parameters if needed
     initial_concentration_params = {'IL6R_0', 'SMAD3_0', 'SMAD4_0', 'STAT3m_0', 'PKA_0'}
 
+    # Iterate through all parameters defined in the BNGL model
     for param_name in model.parameters:
         param_obj = model.parameters[param_name]
         nominal_value = float(param_obj.value)
         
-        if should_estimate_parameter(param_name):
-            should_estimate = 1
-            
-            # Set custom bounds for initial concentration parameters
-            if param_name in initial_concentration_params:
-                lower_bound = 0.01
-                upper_bound = 200.0
-            else:
-                # Use default ±10x bounds for kinetic parameters
-                lower_bound = nominal_value / 10.0
-                upper_bound = nominal_value * 10.0
+        # Determine if the parameter should be estimated
+        if param_name in stimulus_params:
+            should_estimate = 0  # These are set in the conditions file
         else:
-            should_estimate = 0
-            # For fixed parameters, ensure bounds are slightly different to avoid uniform distribution error
+            should_estimate = 1  # All other kinetic parameters will be estimated
+
+        # Set reasonable default bounds
+        if param_name in initial_concentration_params:
+            lower_bound = 0.01
+            upper_bound = 200.0
+        else:
+            lower_bound = nominal_value / 10.0
+            upper_bound = nominal_value * 10.0
+        # For fixed parameters, ensure bounds are not identical
+        if should_estimate == 0:
             epsilon = abs(nominal_value) * 1e-10 + 1e-10
             lower_bound = nominal_value - epsilon
             upper_bound = nominal_value + epsilon
-        
         parameters_data.append({
             'parameterId': param_name,
             'parameterName': param_name,

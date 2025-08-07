@@ -15,8 +15,6 @@ kf_s3stat3d	kf_s3stat3d	log10	0.1	10.0	1.0	1
 kr_s3stat3d	kr_s3stat3d	log10	0.01	1.0	0.1	1
 kf_pka_bind	kf_pka_bind	log10	0.1	10.0	1.0	1
 kr_pka_bind	kr_pka_bind	log10	0.01	1.0	0.1	1
-k_cat_pka	k_cat_pka	log10	0.02	2.0	0.2	1
-k_deact_pka	k_deact_pka	log10	0.005	0.5	0.05	1
 IL6R_0	IL6R_0	log10	0.01	200.0	100.0	1
 SMAD3_0	SMAD3_0	log10	0.01	200.0	100.0	1
 SMAD4_0	SMAD4_0	log10	0.01	200.0	50.0	1

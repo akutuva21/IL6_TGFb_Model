@@ -28,8 +28,6 @@ begin parameters
     # PKA activation parameters
     kf_pka_bind         1.0
     kr_pka_bind         0.1
-    k_cat_pka           0.2
-    k_deact_pka         0.05
 
     # Initial amounts of cellular components
     IL6R_0              100.0
@@ -96,15 +94,8 @@ begin reaction rules
     # 6. pSMAD3/STAT3d_active Complex Formation (Competition for pSMAD3)
     R6_Bind_S3STAT3d: SMAD3(phos~P,smad4_site,stat3_site,pka_site) + STAT3d_active(s3_site) <-> SMAD3(phos~P,smad4_site,stat3_site!1,pka_site).STAT3d_active(s3_site!1) kf_s3stat3d,kr_s3stat3d
 
-    # 7. PKA Activation - NEW TWO-STEP MECHANISM
-    # 7a. Reversible binding of S3S4 complex to inactive PKA
-    R7a_Bind_PKA: SMAD3(phos~P,smad4_site!1,stat3_site,pka_site).SMAD4(s3_site!1) + PKA(activity~I,s3s4_site) <-> SMAD3(phos~P,smad4_site!1,stat3_site,pka_site!2).SMAD4(s3_site!1).PKA(activity~I,s3s4_site!2) kf_pka_bind,kr_pka_bind
-    
-    # 7b. Catalytic conversion of the bound complex to produce active PKA
-    R7b_Activate_PKA: SMAD3(phos~P,smad4_site!1,stat3_site,pka_site!2).SMAD4(s3_site!1).PKA(activity~I,s3s4_site!2) -> SMAD3(phos~P,smad4_site,stat3_site,pka_site) + SMAD4(s3_site) + PKA(activity~A,s3s4_site) k_cat_pka
-
-    # 8. PKA Deactivation
-    R8_Deact_PKA: PKA(activity~A,s3s4_site) -> PKA(activity~I,s3s4_site) k_deact_pka
+    # 7. PKA Activation
+    R7_Bind_PKA: SMAD3(phos~P,smad4_site!1,stat3_site,pka_site).SMAD4(s3_site!1) + PKA(activity~I,s3s4_site) <-> SMAD3(phos~P,smad4_site!1,stat3_site,pka_site!2).SMAD4(s3_site!1).PKA(activity~A,s3s4_site!2) kf_pka_bind,kr_pka_bind
 
 end reaction rules
 
@@ -112,4 +103,5 @@ end model
 
 # Actions
 generate_network({overwrite=>1})
+simulate({method=>"ode",t_end=>100,n_steps=>1000})
 writeSBML()
