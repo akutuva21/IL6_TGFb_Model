@@ -19,9 +19,10 @@ function get_optimizer_and_options(optimizer_name::Symbol, debug_mode::Bool)
         
         # 2. Options must be a Python dictionary. Do not put "hessian_update" here.
         fides_opts = py"{
-            'maxiter': $(debug_mode ? 200 : 1000),
-            'fatol': 1e-6,
-            'frtol': 1e-8
+            'maxiter': $(debug_mode ? 150 : 500),
+            'fatol': 1e-5,
+            'frtol': 1e-7,
+            'gtol': 1e-6
         }"
 
         println("Using Fides via PEtab.jl's built-in wrapper with BFGS updates.")
@@ -30,9 +31,9 @@ function get_optimizer_and_options(optimizer_name::Symbol, debug_mode::Bool)
     else
         # This part for Optim.jl solvers is correct and needs no changes.
         optim_options = Optim.Options(
-            iterations = debug_mode ? 200 : 2000,
-            g_tol      = debug_mode ? 1e-6 : 1e-8,
-            f_reltol   = debug_mode ? 1e-6 : 1e-12,
+            iterations = debug_mode ? 200 : 800,
+            g_tol      = 1e-6,
+            f_reltol   = debug_mode ? 1e-6 : 1e-8,
             show_trace = false
         )
 

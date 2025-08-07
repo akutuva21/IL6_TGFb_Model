@@ -56,6 +56,7 @@ function create_petab_problem_with_callbacks(petab_model, odesolver, steadystate
             odesolver = odesolver,
             ss_solver = steadystate_solver,
             gradient_method = :ForwardDiff,
+            hessian_method = :ForwardDiff,
             verbose=false
         )
     
@@ -357,5 +358,7 @@ println("INFO: Available threads: $(Threads.nthreads())")
 
 const PROJECT_PATH = abspath(dirname(Base.active_project()))
 println("INFO: Project path: $PROJECT_PATH")
+
+BLAS.set_num_threads(1)
 
 run_analysis()
