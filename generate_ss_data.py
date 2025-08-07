@@ -464,6 +464,13 @@ def generate_time_course_petab(config):
     noise_conf = tc_settings['noise']
     seed = tc_settings.get('random_seed', 42)
     rng = np.random.default_rng(seed)
+    # Precompute sigma on natural log scale for a constant coefficient of variation
+    # sigma_logn = sqrt(log(1 + CV^2))
+    noise_fraction = noise_conf['level_percent'] / 100.0
+    sigma_logn = (
+        float(np.sqrt(np.log(1.0 + noise_fraction**2)))
+        if noise_conf['add'] else 0.0
+    )
     
     # Prepare measurement and condition DataFrames
     measurement_rows = []
@@ -493,11 +500,10 @@ def generate_time_course_petab(config):
                 if obs_name in row:
                     measurement_val = row[obs_name]
                     
-                    # Add noise if configured
+                    # Add noise if configured: log-normal (natural log) for constant CV
                     if noise_conf['add']:
-                        noise_fraction = noise_conf['level_percent'] / 100.0
-                        noise = rng.normal(loc=0.0, scale=noise_fraction * abs(measurement_val))
-                        measurement_val = max(0, measurement_val + noise)  # Clip to non-negative
+                        measurement_val = measurement_val * np.exp(rng.normal(0.0, sigma_logn))
+                        measurement_val = max(0.0, measurement_val)  # Clip to non-negative
                     
                     measurement_rows.append({
                         'observableId': obs_name,
@@ -558,7 +564,8 @@ def create_observables_petab(measurements_df, observables_mapping, output_path):
             'observableId': obs_id,
             'observableName': observables_mapping.get(obs_id, obs_id),
             'observableFormula': obs_id,  # Using observableId as formula
-            'noiseFormula': f"noiseParameter1_{obs_id}"
+            'noiseFormula': f"noiseParameter1_{obs_id}",
+            'noiseDistribution': 'logNormal'
         })
     
     observables_df = pd.DataFrame(observables_data)
@@ -610,16 +617,23 @@ def create_parameters_petab(config, model, measurements_df, output_path):
             'estimate': should_estimate
         })
 
-    # Add noise parameters for each observable
+    # Add noise parameters for each observable: sigma in natural-log space (logNormal)
+    noise_conf = config['time_course_settings']['noise']
+    noise_fraction = noise_conf['level_percent'] / 100.0
+    sigma_logn = (
+        float(np.sqrt(np.log(1.0 + noise_fraction**2)))
+        if noise_conf['add'] else 0.0
+    )
+
     observable_ids = measurements_df['observableId'].unique()
     for obs_id in observable_ids:
         parameters_data.append({
             'parameterId': f'noiseParameter1_{obs_id}',
             'parameterName': f'noiseParameter1_{obs_id}',
-            'parameterScale': 'log10',
-            'lowerBound': 1e-2,
-            'upperBound': 1e2,
-            'nominalValue': 1,
+            'parameterScale': 'lin',
+            'lowerBound': 0.001,
+            'upperBound': 1.0,
+            'nominalValue': sigma_logn if sigma_logn > 0 else 0.0,
             'estimate': 0
         })
     
