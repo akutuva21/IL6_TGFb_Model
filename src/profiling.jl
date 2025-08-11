@@ -1,193 +1,105 @@
-# src/profiling.jl
-
 using LikelihoodProfiler
+using LikelihoodProfiler: AdaptiveStep, FixedStep
 using Optimization
 using OptimizationOptimJL
 using ComponentArrays
 using Plots
-using JLD2
-using Statistics
 using PEtab
+using ForwardDiff
 
-# ==============================================================================
-# METHOD 1: Modern, AD-based Profiling (Thread-Safe Version)
-# ==============================================================================
-function run_modern_likelihood_profiling(
-    petab_model::PEtabModel, # Pass the base model
+"""
+run_likelihood_profiling(petab_model, odesolver, steadystate_solver, θ_mle; debug=false, maxiters=20)
+
+Minimal threaded likelihood profiling:
+  - Selects a small set of non-initial, non-noise parameters (<=8; <=4 in debug)
+  - Uses finite-difference gradients (AutoFiniteDiff)
+  - Strips Dual numbers defensively
+  - Saves one PNG per parameter under ./likelihood_profiles
+Returns Dict{name => profile_result}.
+"""
+function run_likelihood_profiling(
+    petab_model::PEtabModel,
     odesolver,
     steadystate_solver,
-    θ_mle::ComponentVector,
-    debug_mode::Bool
+    θ_mle::ComponentVector;
+    debug::Bool=false,
+    maxiters::Int=20
 )
-    println("\n--- 🔬 Attempting Thread-Safe Modern Likelihood Profiling ---")
+    println("\n--- Likelihood Profiling (minimal) ---"); flush(stdout)
+    t_start = time()
 
-    profile_dir = joinpath(pwd(), "likelihood_profiles")
-    mkpath(profile_dir)
+    # Build a fresh PEtab ODE problem with provided solvers
+    petab_problem = PEtabODEProblem(petab_model; odesolver=odesolver, ss_solver=steadystate_solver)
 
-    param_names = string.(keys(θ_mle))
-    n_params = length(param_names)
-    prof_sols = Vector{Any}(undef, n_params)
-
-    println("Starting parallel profiling across $n_params parameters...")
-    Threads.@threads for i in 1:n_params
-        println("Thread $(threadid()) starting parameter $i ($(param_names[i]))")
-        
-        # --- KEY CHANGE: THREAD-LOCAL PROBLEM CREATION ---
-        # Each thread builds its own PEtabODEProblem to avoid race conditions.
-        local petab_problem_local = PEtabODEProblem(
-            petab_model,
-            odesolver=odesolver,
-            ss_solver=steadystate_solver,
-            verbose=false
-        )
-
-        function local_objective(θ_est, p_not_used)
-            return petab_problem_local.nllh(θ_est; prior=false)
-        end
-
-        local_optprob = OptimizationProblem(
-            OptimizationFunction(local_objective, Optimization.AutoForwardDiff()),
-            collect(θ_mle);
-            lb = collect(petab_problem_local.lower_bounds),
-            ub = collect(petab_problem_local.upper_bounds)
-        )
-
-        local_plprob = LikelihoodProfiler.PLProblem(local_optprob, collect(θ_mle))
-        
-        profiler = LikelihoodProfiler.OptimizationProfiler(
-            optimizer = OptimizationOptimJL.LBFGS(),
-            stepper = LikelihoodProfiler.FixedStep(initial_step = 0.1)
-        )
-        
-        single_prof_sol = LikelihoodProfiler.profile(local_plprob, profiler; idxs=[i], maxiters=100)
-        prof_sols[i] = single_prof_sol
-        println("✅ Thread $(threadid()) completed parameter $i")
+    all_names = string.(keys(θ_mle))
+    # Filter: exclude noise params and initial conditions (ending with _0)
+    cand = [n for n in all_names if !startswith(n, "noiseParameter") && !endswith(n, "_0")]
+    target = debug ? 4 : 8
+    params = first(cand, min(length(cand), target))
+    if isempty(params)
+        params = first(all_names, min(length(all_names), target))
     end
+    println("[Profiling] Parameters: $(params)")
 
-    println("\n--- Generating Modern Profile Plots ---")
-    for i in 1:n_params
-        param_name = param_names[i]
-        
-        # Check if the profile solution for this parameter exists and is valid
-        if isassigned(prof_sols, i) && !isnothing(prof_sols[i])
-            try
-                plt = plot(prof_sols[i], 1; # The '1' is needed as each result has only one profile
-                           xlabel = "$param_name (log₁₀ scale)",
-                           ylabel = "Δ Log-Likelihood",
-                           title = "Profile Likelihood: $param_name",
-                           legend = :topright,
-                           linewidth = 2,
-                           ylims = (0, 15) # Zoom in on the relevant confidence region
-                          )
-                
-                # Add confidence interval lines
-                hline!(plt, [1.92], label="95% CI", color=:red, linestyle=:dash)
-                hline!(plt, [3.84], label="99% CI", color=:orange, linestyle=:dash)
-                
-                savefig(plt, joinpath(profile_dir, "profile_$(param_name).png"))
+    θ_init = collect(θ_mle)
+    lb = collect(petab_problem.lower_bounds)
+    ub = collect(petab_problem.upper_bounds)
 
-            catch e
-                @warn "Could not generate plot for parameter '$param_name'. Error: $e"
-            end
+    # Indices for selected params
+    idxs = Int[]
+    for p in params
+        i = findfirst(==(p), all_names)
+        if i !== nothing && ub[i] - lb[i] > 1e-9
+            push!(idxs, i)
         else
-            @warn "No valid profile solution found for parameter '$param_name'. Skipping plot."
+            println("[Profiling] Skipping fixed param $p")
         end
     end
-    println("✅ Modern profile plots saved.")
+    if isempty(idxs)
+        println("[Profiling] No variable parameters to profile; aborting.")
+        return Dict{String,Any}()
+    end
 
-    println("✅ Modern profiling computation complete.")
-    return prof_sols
-end
+    # Objective
+    function obj(θ_est, _)
+        θ_work = eltype(θ_est) <: ForwardDiff.Dual ? ForwardDiff.value.(θ_est) : θ_est
+        try
+            petab_problem.nllh(θ_work; prior=false)
+        catch
+            1e6
+        end
+    end
 
-# ==============================================================================
-# METHOD 2: Manual, Grid-based Profiling (Robust Fallback)
-# ==============================================================================
-function run_manual_likelihood_profiling(petab_problem::PEtabODEProblem, θ_mle::ComponentVector, debug_mode::Bool)
-    println("\n--- 🔬 Running Robust Manual Likelihood Profiling (Fallback) ---")
-    
-    profile_dir = joinpath(pwd(), "likelihood_profiles_manual")
-    mkpath(profile_dir)
+    optf = OptimizationFunction(obj, Optimization.AutoFiniteDiff())
+    optprob = OptimizationProblem(optf, θ_init; lb=lb, ub=ub)
+    plprob = LikelihoodProfiler.PLProblem(optprob, θ_init)
+    profiler = LikelihoodProfiler.OptimizationProfiler(
+    optimizer = OptimizationOptimJL.LBFGS(),
+    stepper = LikelihoodProfiler.FixedStep(; initial_step = 0.1)
+    )
+    println("[Profiling] Profiler constructed with LBFGS + FixedStep(0.1)")
 
-    param_names = string.(petab_problem.xnames)
-    n_params = length(param_names)
-    θ_mle_vec = collect(θ_mle)
-    
-    mle_nllh = petab_problem.nllh(θ_mle_vec; prior=false)
-    println("  MLE negative log-likelihood: $mle_nllh")
-    
-    profiles = Dict()
-    
-    for (i, param_name) in enumerate(param_names)
-        println("Manually profiling parameter $i: $param_name")
-        
-        lb = petab_problem.lower_bounds[i]
-        ub = petab_problem.upper_bounds[i]
-        
-        n_points = debug_mode ? 20 : 50
-        param_range = range(lb, ub, length=n_points)
-        
-        likelihood_values = Float64[]
-        
-        for param_val in param_range
-            θ_test = copy(θ_mle_vec)
-            θ_test[i] = param_val
-            
+    println("[Profiling] Running threaded profiling on $(length(idxs)) parameters...")
+    res = LikelihoodProfiler.profile(plprob, profiler; idxs=idxs, maxiters=maxiters, parallel_type=:threads)
+
+    prof_dir = joinpath(pwd(), "likelihood_profiles"); mkpath(prof_dir)
+    out = Dict{String,Any}()
+    profiles_array = getproperty(res, :profiles)
+    for (j, p) in enumerate(params)
+        if j <= length(profiles_array)
+            pr = profiles_array[j]
+            out[p] = pr
             try
-                nllh_val = petab_problem.nllh(θ_test; prior=false)
-                push!(likelihood_values, nllh_val - mle_nllh)
+                plt = plot(pr, 1; xlabel=p, ylabel="Δ Log-Likelihood", title="Profile: $p")
+                hline!(plt, [1.92]; color=:red, linestyle=:dash, label="95% CI")
+                savefig(plt, joinpath(prof_dir, "profile_$(p).png"))
+                println("[Profiling] Saved $p")
             catch e
-                push!(likelihood_values, Inf)
+                println("[Profiling] Plot failed for $p: $e")
             end
         end
-        
-        profiles[param_name] = (param_range=collect(param_range), likelihood=likelihood_values)
-        
-        # Plotting
-        valid_indices = .!isinf.(likelihood_values)
-        if any(valid_indices)
-            plt = plot(param_range[valid_indices], likelihood_values[valid_indices],
-                      xlabel="$param_name (log₁₀ scale)",
-                      ylabel="Δ Log-Likelihood",
-                      title="Manual Profile: $param_name",
-                      linewidth=2, legend=false, ylims=(0, 15))
-            hline!(plt, [1.92], color=:red, linestyle=:dash)
-            hline!(plt, [3.84], color=:orange, linestyle=:dash)
-            savefig(plt, joinpath(profile_dir, "profile_$(param_name).png"))
-        end
     end
-    
-    println("✅ Manual profiling completed.")
-    return profiles
+
+    println("[Profiling] Done in $(round(time()-t_start; digits=2)) s")
+    return out
 end
-
-# ==============================================================================
-# MAIN WRAPPER FUNCTION WITH FALLBACK LOGIC (Updated Call)
-# ==============================================================================
-function run_likelihood_profiling_with_fallback(petab_problem::PEtabODEProblem, petab_model, profiling_odesol, profiling_steadystate_solver, θ_mle::ComponentVector, debug_mode::Bool)
-    
-    try
-        @info "Attempting modern, thread-safe likelihood profiling..."
-        
-        # Call the updated modern profiler with the necessary ingredients
-        prof_result = run_modern_likelihood_profiling(
-            petab_model, 
-            profiling_odesol, 
-            profiling_steadystate_solver, 
-            θ_mle, 
-            debug_mode
-        )
-        return prof_result
-
-    catch e
-        @warn "Modern likelihood profiling failed."
-        @warn "Error was: $e"
-        @info "Switching to robust manual profiling as a fallback..."
-        
-        # The manual method is not parallel and can use the pre-built problem
-        prof_result = run_manual_likelihood_profiling(petab_problem, θ_mle, debug_mode)
-        return prof_result
-    end
-end
-
-# Export the main wrapper function
-export run_likelihood_profiling_with_fallback

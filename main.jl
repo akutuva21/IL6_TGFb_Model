@@ -290,31 +290,30 @@ function run_analysis()
     end
 
     # --- 7. Run Likelihood Profiling if Requested ---
+    @info "[ProfilingGate] profile flag parsed as: $(parsed_args["profile"])"; flush(stdout); flush(stderr)
     if parsed_args["profile"]
-        @info "Running likelihood profiling with robust fallback..."
-
-        # Define the looser solver settings for profiling
-        profiling_odesol = ODESolver(
-            Rodas5P(),
-            abstol=1e-4,
-            reltol=1e-4
-        )
+        @info "[ProfilingGate] Preparing likelihood profiling run..."; flush(stdout); flush(stderr)
+        profiling_odesol = ODESolver(Rodas5P(), abstol=1e-4, reltol=1e-4)
         profiling_steadystate_solver = SteadyStateSolver(:Simulate, abstol=1e-4, reltol=1e-4)
-
-        @time prof_result = run_likelihood_profiling_with_fallback(
-            petab_problem,
+        start_prof_wall = time()
+        @info "[ProfilingGate] Entering run_likelihood_profiling()"; flush(stdout); flush(stderr)
+        prof_result = @time run_likelihood_profiling(
             petab_model,
             profiling_odesol,
             profiling_steadystate_solver,
-            multi_start_res.xmin,
-            parsed_args["debug"]
+            multi_start_res.xmin;
+            debug=parsed_args["debug"],
+            maxiters=20,
         )
-
+        elapsed_prof = round(time() - start_prof_wall; digits=2)
+    @info "[ProfilingGate] Profiling wall time: $(elapsed_prof)s"; flush(stdout); flush(stderr)
         if !isnothing(prof_result)
-            @info "✅ Likelihood profiling completed."
+            @info "✅ Likelihood profiling completed."; flush(stdout); flush(stderr)
         else
-            @warn "Profiling returned no results."
+            @warn "Profiling returned no results."; flush(stdout); flush(stderr)
         end
+    else
+        @info "[ProfilingGate] Skipping profiling (flag not set)."; flush(stdout); flush(stderr)
     end
 end
 
@@ -348,6 +347,7 @@ function define_argument_parser()
 end
 
 const PARSED_ARGS = parse_args(ARGS, define_argument_parser())
+@info "[ArgsDebug] Parsed arguments: $(PARSED_ARGS)"; flush(stdout); flush(stderr)
 
 # ===================================================================
 # --- 2. THREADING SETUP ---
