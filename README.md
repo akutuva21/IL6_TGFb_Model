@@ -11,26 +11,27 @@ This repository contains a complete workflow to generate PEtab-compliant data fr
 ## Requirements
 
 - Python 3.8+
-- Julia 1.9+
+- Julia 1.10+
 - Python packages: `pandas`, `numpy`, `pyyaml`, `bionetgen`, `openpyxl`
 
 ## Setup
 
-```bash
+```powershell
+# Clone
 git clone <repository-url>
 cd IL6_TGFB
 
-# Python deps
-pip install -r requirements.txt  # or install packages listed above
+# Python deps (install listed packages)
+pip install pandas numpy pyyaml bionetgen openpyxl
 
-# Julia deps (from project root)
-julia --project=. -e "using Pkg; Pkg.instantiate()"
+# Julia deps (project lives under bngl_julia/)
+julia --project=bngl_julia -e "using Pkg; Pkg.instantiate()"
 ```
 
 Optional: build a sysimage for faster Julia startup
 
-```bash
-julia precompile_workload.jl
+```powershell
+julia --project=bngl_julia precompile_workload.jl
 # or your existing sysimage creation script
 ```
 
@@ -38,7 +39,7 @@ julia precompile_workload.jl
 
 1) Generate PEtab data (Python)
 
-```bash
+```powershell
 python generate_ss_data.py --config config.yml
 ```
 
@@ -46,14 +47,14 @@ python generate_ss_data.py --config config.yml
 
 3) Run multi-start calibration (Julia)
 
-```bash
-julia --threads=<N> --project=. main.jl --yaml petab_problem.yml --n-starts 24 --optimizer Fides --output results.jld
+```powershell
+julia --threads <N> --project=bngl_julia main.jl --yaml petab_problem.yml --n-starts 24 --optimizer Fides --output estimation_output_small.jld
 ```
 
 4) Visualize and optional profiling
 
-```bash
-julia --threads=<N> --project=. main.jl --yaml petab_problem.yml --n-starts 24 --optimizer Fides --output results.jld --profile
+```powershell
+julia --threads <N> --project=bngl_julia main.jl --yaml petab_problem.yml --n-starts 24 --optimizer Fides --output estimation_output_small.jld --profile
 ```
 
 ## Generate PEtab data (Python)
@@ -91,7 +92,7 @@ observables_mapping:
 
 Then run:
 
-```bash
+```powershell
 python generate_ss_data.py --config config.yml
 ```
 
@@ -110,15 +111,15 @@ Make sure your PEtab YAML (e.g., `petab_problem.yml`) points to these TSVs.
 
 Common flags:
 
-```bash
-julia --threads=<N> \
-      --project=. \
-      [--sysimage=<path_to_sysimage>] \
-      main.jl \
-      --yaml petab_problem.yml \
-      --output results.jld \
-      --n-starts 24 \
-      --optimizer Fides
+```powershell
+julia --threads <N> `
+  --project=bngl_julia `
+  [--sysimage <path_to_sysimage>] `
+  main.jl `
+  --yaml petab_problem.yml `
+  --output estimation_output_small.jld `
+  --n-starts 24 `
+  --optimizer Fides
 ```
 
 Useful options:
@@ -146,6 +147,23 @@ Defaults and tuning in this repo:
   - `parameters.tsv`: per‑observable sigma parameter fixed to the selected noise level (set `estimate=1` to fit it)
 - To change noise level, update the config and re-run the Python generator.
 
+## Likelihood profiling (optional)
+
+If you pass `--profile`, the script will run a minimal LikelihoodProfiler pass on the best-fit parameters and write one PNG per parameter into `./likelihood_profiles/`.
+
+Current defaults in `src/profiling.jl`:
+
+- Parameter selection: all non-noise, non-initial-condition parameters (names not starting with `noiseParameter` and not ending with `_0`)
+- Profiler backend: `OptimizationProfiler` with `IPNewton()`
+- Stepper: `FixedStep(initial_step=0.005)`
+- Iterations: `maxiters=5000` per profile (threaded across parameters)
+- Objective: robust NLLH, strips Dual numbers and guards non-finite values
+- CI line: draws `threshold=1.92` (95% CI for 1 dof) on each profile plot; legend at `:topright`
+
+Outputs are saved as `likelihood_profiles/profile_<param>.png`.
+
+To tweak these, edit `src/profiling.jl`.
+
 ## Tips
 
 - Prefer multistart threading.
@@ -157,6 +175,8 @@ Defaults and tuning in this repo:
 - `generate_ss_data.py`: BNGL simulation, pre-equilibration, PEtab TSV generation (log-normal noise, configurable CV)
 - `main.jl`: CLI entry, loads PEtab, builds ODE/SS problems, runs multistart, saves results, produces plots
 - `src/optimization.jl`: Optimizer selection and multistart call (Fides/Optim options tuned)
-- `src/profiling.jl`: Likelihood profiling utilities
+- `src/profiling.jl`: Likelihood profiling utilities (IPNewton + FixedStep, threaded; saves plots under `likelihood_profiles/`)
 - `src/visualization.jl`: Diagnostic and result plots
 - `precompile_workload.jl`: Optional PEtab-specific precompilation workload
+
+Julia environment files live under `bngl_julia/` (this is the active project for running the Julia code in this repo).

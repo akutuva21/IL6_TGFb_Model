@@ -28,15 +28,15 @@ function run_likelihood_profiling(
     println("\n--- Likelihood Profiling (minimal) ---"); flush(stdout)
     t_start = time()
 
-    # Build a fresh PEtab ODE problem with provided solvers
-    petab_problem = PEtabODEProblem(petab_model; odesolver=odesolver, ss_solver=steadystate_solver)
+    petab_problem = PEtabODEProblem(petab_model; odesolver=odesolver, ss_solver=steadystate_solver, verbose=false)
 
     all_names = string.(keys(θ_mle))
-    # Filter: exclude noise params and initial conditions (ending with _0)
     cand = [n for n in all_names if !startswith(n, "noiseParameter") && !endswith(n, "_0")]
-    target = debug ? 4 : 8
-    params = first(cand, min(length(cand), target))
+    #target = 8 # always take up to 8
+    #params = first(cand, min(length(cand), target))
+    params = cand
     if isempty(params)
+        @warn "No dynamic parameters found for profiling, selecting from all parameters."
         params = first(all_names, min(length(all_names), target))
     end
     println("[Profiling] Parameters: $(params)")
@@ -45,57 +45,75 @@ function run_likelihood_profiling(
     lb = collect(petab_problem.lower_bounds)
     ub = collect(petab_problem.upper_bounds)
 
-    # Indices for selected params
-    idxs = Int[]
-    for p in params
-        i = findfirst(==(p), all_names)
-        if i !== nothing && ub[i] - lb[i] > 1e-9
-            push!(idxs, i)
-        else
-            println("[Profiling] Skipping fixed param $p")
-        end
-    end
+    idxs = [findfirst(==(p), all_names) for p in params if findfirst(==(p), all_names) !== nothing && (ub[findfirst(==(p), all_names)] - lb[findfirst(==(p), all_names)] > 1e-9)]
     if isempty(idxs)
         println("[Profiling] No variable parameters to profile; aborting.")
         return Dict{String,Any}()
     end
 
-    # Objective
     function obj(θ_est, _)
         θ_work = eltype(θ_est) <: ForwardDiff.Dual ? ForwardDiff.value.(θ_est) : θ_est
+        if any(!isfinite, θ_work)
+            return 1e8
+        end
         try
-            petab_problem.nllh(θ_work; prior=false)
+            val = petab_problem.nllh(θ_work; prior=false)
+            return isfinite(val) ? val : 1e8
         catch
-            1e6
+            return 1e8
         end
     end
 
-    optf = OptimizationFunction(obj, Optimization.AutoFiniteDiff())
+    # Explicitly use AutoForwardDiff for the gradient to avoid second-order warnings with IPNewton
+    optf = OptimizationFunction(obj, Optimization.AutoForwardDiff())
     optprob = OptimizationProblem(optf, θ_init; lb=lb, ub=ub)
-    plprob = LikelihoodProfiler.PLProblem(optprob, θ_init)
+    # Add threshold for 95% confidence intervals
+    threshold = 1.92  # χ²(1, 0.05)/2 for 95% CI
+    plprob = LikelihoodProfiler.PLProblem(optprob, θ_init; threshold=threshold)
+
     profiler = LikelihoodProfiler.OptimizationProfiler(
-    optimizer = OptimizationOptimJL.LBFGS(),
-    stepper = LikelihoodProfiler.FixedStep(; initial_step = 0.1)
+        optimizer = OptimizationOptimJL.IPNewton(),
+        stepper = LikelihoodProfiler.FixedStep(; initial_step = 0.005)
     )
-    println("[Profiling] Profiler constructed with LBFGS + FixedStep(0.1)")
+        println("[Profiling] Profiler constructed with IPNewton + FixedStep(0.01)")
 
     println("[Profiling] Running threaded profiling on $(length(idxs)) parameters...")
-    res = LikelihoodProfiler.profile(plprob, profiler; idxs=idxs, maxiters=maxiters, parallel_type=:threads)
+    res = LikelihoodProfiler.profile(plprob, profiler; idxs=idxs, maxiters=5000, parallel_type=:threads)
 
-    prof_dir = joinpath(pwd(), "likelihood_profiles"); mkpath(prof_dir)
+    prof_dir = joinpath(pwd(), "likelihood_profiles")
+    mkpath(prof_dir)
     out = Dict{String,Any}()
-    profiles_array = getproperty(res, :profiles)
+
+    sol = res
     for (j, p) in enumerate(params)
-        if j <= length(profiles_array)
-            pr = profiles_array[j]
-            out[p] = pr
+        if j <= length(sol.profiles)
+            param_sol = sol[j]
+            out[p] = param_sol
             try
-                plt = plot(pr, 1; xlabel=p, ylabel="Δ Log-Likelihood", title="Profile: $p")
-                hline!(plt, [1.92]; color=:red, linestyle=:dash, label="95% CI")
+                # Use the built-in plotting
+                plt = plot(param_sol; xlabel=p, ylabel="Δ Log-Likelihood", 
+                          title="Profile: $p", legend=:topright)
+                hline!(plt, [threshold], color=:red, linestyle=:dash, label="95% CI")
                 savefig(plt, joinpath(prof_dir, "profile_$(p).png"))
-                println("[Profiling] Saved $p")
+                println("[Profiling] Saved plot for $p")
             catch e
-                println("[Profiling] Plot failed for $p: $e")
+                @warn "Plot failed for $p: $e"
+                # Fallback to manual extraction if needed
+                try
+                    profile_points = param_sol.profile
+                    if !isempty(profile_points)
+                        xs = [pt[1] for pt in profile_points]
+                        ys = [pt[2] for pt in profile_points]
+                        ys_delta = ys .- minimum(ys)
+                        plt = plot(xs, ys_delta, seriestype=:path, marker=:circle,
+                                  xlabel=p, ylabel="Δ Log-Likelihood", title="Profile: $p")
+                        hline!(plt, [threshold], color=:red, linestyle=:dash, label="95% CI")
+                        savefig(plt, joinpath(prof_dir, "profile_$(p).png"))
+                        println("[Profiling] Saved fallback plot for $p")
+                    end
+                catch e2
+                    @warn "Fallback plot also failed for $p: $e2"
+                end
             end
         end
     end

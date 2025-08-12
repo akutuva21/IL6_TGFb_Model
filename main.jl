@@ -303,7 +303,7 @@ function run_analysis()
             profiling_steadystate_solver,
             multi_start_res.xmin;
             debug=parsed_args["debug"],
-            maxiters=20,
+            maxiters=50,
         )
         elapsed_prof = round(time() - start_prof_wall; digits=2)
     @info "[ProfilingGate] Profiling wall time: $(elapsed_prof)s"; flush(stdout); flush(stderr)
