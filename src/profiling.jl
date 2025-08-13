@@ -7,11 +7,41 @@ using Plots
 using PEtab
 using ForwardDiff
 
+function plot_profile_delta_chi2!(
+    plt,
+    x::AbstractVector,
+    nll::AbstractVector;
+    pname::AbstractString,
+    nll_anchor::Float64,
+    ymax::Float64=4.0,
+    show_99::Bool=true,
+    autox::Bool=true
+)
+    Δχ2 = 2.0 .* (nll .- nll_anchor)
+    plot!(plt, x, Δχ2; lw=2, label=nothing)
+    ylabel!(plt, "Δχ²")
+    xlabel!(plt, pname)
+    title!(plt, "Likelihood profile: $(pname)")
+    hline!(plt, [3.84]; lc=:orange, ls=:dash, label="95%")
+    if show_99
+        hline!(plt, [9.0]; lc=:red, ls=:dashdot, label="99%")
+    end
+    ylims!(plt, (0.0, ymax))
+    if autox
+        idx = findall(Δχ2 .<= ymax)
+        if !isempty(idx)
+            xlo, xhi = minimum(x[idx]), maximum(x[idx])
+            xpad = 0.02 * max(abs(xhi - xlo), eps())
+            xlims!(plt, (xlo - xpad, xhi + xpad))
+        end
+    end
+    return plt
+end
+
 """
 run_likelihood_profiling(petab_model, odesolver, steadystate_solver, θ_mle; debug=false, maxiters=20)
 
 Minimal threaded likelihood profiling:
-  - Selects a small set of non-initial, non-noise parameters (<=8; <=4 in debug)
   - Uses finite-difference gradients (AutoFiniteDiff)
   - Strips Dual numbers defensively
   - Saves one PNG per parameter under ./likelihood_profiles
@@ -21,23 +51,22 @@ function run_likelihood_profiling(
     petab_model::PEtabModel,
     odesolver,
     steadystate_solver,
-    θ_mle::ComponentVector;
+    θ_mle::ComponentVector,
+    true_param_values::Dict;
     debug::Bool=false,
     maxiters::Int=20
 )
-    println("\n--- Likelihood Profiling (minimal) ---"); flush(stdout)
+    println("\n--- Likelihood Profiling (with True Value for Robustness Testing) ---"); flush(stdout)
     t_start = time()
 
     petab_problem = PEtabODEProblem(petab_model; odesolver=odesolver, ss_solver=steadystate_solver, verbose=false)
 
     all_names = string.(keys(θ_mle))
     cand = [n for n in all_names if !startswith(n, "noiseParameter") && !endswith(n, "_0")]
-    #target = 8 # always take up to 8
-    #params = first(cand, min(length(cand), target))
     params = cand
     if isempty(params)
         @warn "No dynamic parameters found for profiling, selecting from all parameters."
-        params = first(all_names, min(length(all_names), target))
+        params = first(all_names, min(length(all_names), 8))
     end
     println("[Profiling] Parameters: $(params)")
 
@@ -64,21 +93,30 @@ function run_likelihood_profiling(
         end
     end
 
-    # Explicitly use AutoForwardDiff for the gradient to avoid second-order warnings with IPNewton
     optf = OptimizationFunction(obj, Optimization.AutoForwardDiff())
     optprob = OptimizationProblem(optf, θ_init; lb=lb, ub=ub)
-    # Add threshold for 95% confidence intervals
-    threshold = 1.92  # χ²(1, 0.05)/2 for 95% CI
-    plprob = LikelihoodProfiler.PLProblem(optprob, θ_init; threshold=threshold)
+    
+    # Let the library calculate the threshold from a confidence level
+    plprob = LikelihoodProfiler.PLProblem(optprob, θ_init; conf_level=0.95)
 
     profiler = LikelihoodProfiler.OptimizationProfiler(
         optimizer = OptimizationOptimJL.IPNewton(),
         stepper = LikelihoodProfiler.FixedStep(; initial_step = 0.005)
     )
-        println("[Profiling] Profiler constructed with IPNewton + FixedStep(0.01)")
+    println("[Profiling] Profiler constructed with IPNewton + FixedStep(0.005)")
 
     println("[Profiling] Running threaded profiling on $(length(idxs)) parameters...")
-    res = LikelihoodProfiler.profile(plprob, profiler; idxs=idxs, maxiters=5000, parallel_type=:threads)
+    res = LikelihoodProfiler.profile(plprob, profiler; idxs=idxs, maxiters=200, parallel_type=:threads)
+
+    # Compute global best NLL at the provided MLE to anchor Δχ²
+    best_nll = begin
+        θmle_vec = collect(θ_mle)
+        try
+            petab_problem.nllh(θmle_vec; prior=false)
+        catch
+            Inf
+        end
+    end
 
     prof_dir = joinpath(pwd(), "likelihood_profiles")
     mkpath(prof_dir)
@@ -90,30 +128,26 @@ function run_likelihood_profiling(
             param_sol = sol[j]
             out[p] = param_sol
             try
-                # Use the built-in plotting
-                plt = plot(param_sol; xlabel=p, ylabel="Δ Log-Likelihood", 
-                          title="Profile: $p", legend=:topright)
-                hline!(plt, [threshold], color=:red, linestyle=:dash, label="95% CI")
+                xvals = getfield(param_sol, :params; default=nothing)
+                nllvals = getfield(param_sol, :objective_values; default=nothing)
+                if xvals === nothing || nllvals === nothing
+                    xvals = getfield(param_sol, :theta; default=nothing)
+                    nllvals = getfield(param_sol, :fun_values; default=nothing)
+                end
+                if xvals === nothing || nllvals === nothing
+                    @warn "Unknown profile fields; cannot plot Δχ² for $p"
+                    continue
+                end
+                anchor = isfinite(best_nll) ? best_nll : minimum(nllvals)
+                plt = plot()
+                plot_profile_delta_chi2!(plt, xvals, nllvals; pname=p, nll_anchor=anchor, ymax=4.0)
+                if haskey(true_param_values, p)
+                    vline!(plt, [true_param_values[p]]; label="True Value", color=:purple, linestyle=:dash)
+                end
                 savefig(plt, joinpath(prof_dir, "profile_$(p).png"))
-                println("[Profiling] Saved plot for $p")
+                println("[Profiling] Saved plot for $p (Δχ², y≤4)")
             catch e
                 @warn "Plot failed for $p: $e"
-                # Fallback to manual extraction if needed
-                try
-                    profile_points = param_sol.profile
-                    if !isempty(profile_points)
-                        xs = [pt[1] for pt in profile_points]
-                        ys = [pt[2] for pt in profile_points]
-                        ys_delta = ys .- minimum(ys)
-                        plt = plot(xs, ys_delta, seriestype=:path, marker=:circle,
-                                  xlabel=p, ylabel="Δ Log-Likelihood", title="Profile: $p")
-                        hline!(plt, [threshold], color=:red, linestyle=:dash, label="95% CI")
-                        savefig(plt, joinpath(prof_dir, "profile_$(p).png"))
-                        println("[Profiling] Saved fallback plot for $p")
-                    end
-                catch e2
-                    @warn "Fallback plot also failed for $p: $e2"
-                end
             end
         end
     end

@@ -293,17 +293,18 @@ function run_analysis()
     @info "[ProfilingGate] profile flag parsed as: $(parsed_args["profile"])"; flush(stdout); flush(stderr)
     if parsed_args["profile"]
         @info "[ProfilingGate] Preparing likelihood profiling run..."; flush(stdout); flush(stderr)
-        profiling_odesol = ODESolver(Rodas5P(), abstol=1e-4, reltol=1e-4)
-        profiling_steadystate_solver = SteadyStateSolver(:Simulate, abstol=1e-4, reltol=1e-4)
+        profiling_odesol = ODESolver(Rodas5P(), abstol=1e-8, reltol=1e-8)
+        profiling_steadystate_solver = SteadyStateSolver(:Simulate, abstol=1e-8, reltol=1e-8)
         start_prof_wall = time()
         @info "[ProfilingGate] Entering run_likelihood_profiling()"; flush(stdout); flush(stderr)
         prof_result = @time run_likelihood_profiling(
             petab_model,
             profiling_odesol,
             profiling_steadystate_solver,
-            multi_start_res.xmin;
+            multi_start_res.xmin,
+            true_param_values;
             debug=parsed_args["debug"],
-            maxiters=50,
+            maxiters=50
         )
         elapsed_prof = round(time() - start_prof_wall; digits=2)
     @info "[ProfilingGate] Profiling wall time: $(elapsed_prof)s"; flush(stdout); flush(stderr)

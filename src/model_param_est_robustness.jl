@@ -15,7 +15,6 @@ function setup_petab_problem(path_to_yaml::String)
     
     println("--- PEtab Problem Setup Complete ---")
     
-    # --- START: DEFINITIVE FIX FOR TRUE VALUES ---
     true_param_values = Dict{String, Float64}()
     
     if hasfield(typeof(petab_model), :petab_tables) && haskey(petab_model.petab_tables, :parameters)
@@ -32,7 +31,6 @@ function setup_petab_problem(path_to_yaml::String)
     else
         @warn "Could not extract parameter table for true values"
     end
-    # --- END: DEFINITIVE FIX ---
 
     return (petab_model=petab_model, true_values=true_param_values)
 end

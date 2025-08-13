@@ -3,6 +3,10 @@
 using PEtab
 using Optim
 using PyCall
+using Base.Threads
+using CSV
+using DataFrames
+using QuasiMonteCarlo
 
 """
     get_optimizer_and_options(optimizer_name::Symbol, debug_mode::Bool)
@@ -53,6 +57,125 @@ function get_optimizer_and_options(optimizer_name::Symbol, debug_mode::Bool)
     end
 end
 
+function calibrate_multistart_threaded(prob::PEtabODEProblem, alg, nmultistarts::Integer; 
+                                     dirsave=nothing, 
+                                     sampling_method=LatinHypercubeSample(),
+                                     sample_prior::Bool=true,
+                                     save_trace::Bool=false,
+                                     seed=nothing,
+                                     options=nothing)::PEtabMultistartResult
+    
+    # Set up paths for saving intermediate results (same logic as original)
+    paths_save = Dict{Symbol, String}()
+    if !isnothing(dirsave)
+        !isdir(dirsave) && mkpath(dirsave)
+        i = 1
+        while true
+            path_x0 = joinpath(dirsave, "startguesses$i.csv")
+            !isfile(path_x0) && break
+            i += 1
+        end
+        paths_save[:x0] = joinpath(dirsave, "startguesses" * string(i) * ".csv")
+        paths_save[:res] = joinpath(dirsave, "results" * string(i) * ".csv")
+        paths_save[:xmin] = joinpath(dirsave, "xmins" * string(i) * ".csv")
+        if save_trace == true
+            paths_save[:trace] = joinpath(dirsave, "trace" * string(i) * ".csv")
+        end
+    end
+
+    # Generate starting guesses
+    if !isnothing(seed)
+        Random.seed!(seed)
+    end
+    xstarts = get_startguesses(prob, nmultistarts; sampling_method = sampling_method,
+                               sample_prior = sample_prior)
+    
+    # Save starting guesses to file
+    if !isempty(paths_save)
+        xnames = propertynames(xstarts[1]) |> collect
+        xstarts_df = DataFrame(vcat(reduce(vcat, xstarts')), xnames)
+        xstarts_df[!, "startguess"] = 1:nrow(xstarts_df)
+        CSV.write(paths_save[:x0], xstarts_df)
+    end
+
+    # Use ReentrantLock instead of RemoteChannel for thread synchronization
+    mutex = ReentrantLock()
+    
+    # Preallocate results vector
+    runs = Vector{Union{Nothing, PEtabOptimisationResult}}(undef, nmultistarts)
+
+    # Run calibrations in parallel using threads instead of processes
+    Threads.@threads for i in 1:nmultistarts
+        runs[i] = _calibrate_startguess_threaded(xstarts[i], i, prob, alg, save_trace,
+                                               options, paths_save, mutex)
+    end
+
+    # Filter out failed runs and find best result
+    valid_runs = filter(!isnothing, runs)
+    if isempty(valid_runs)
+        error("All optimization runs failed")
+    end
+
+    bestrun = valid_runs[argmin([isnan(r.fmin) ? Inf : r.fmin for r in valid_runs])]
+    fmin = bestrun.fmin
+    xmin = bestrun.xmin
+    
+    # Format sampling method string (same as original)
+    sampling_method_str = string(sampling_method)[1:findfirst(x -> x == '(',
+                                                              string(sampling_method))][1:(end - 1)]
+    
+    return PEtabMultistartResult(xmin, fmin, bestrun.alg, nmultistarts, sampling_method_str,
+                                 dirsave, runs)
+end
+
+function _calibrate_startguess_threaded(xstart, i, prob::PEtabODEProblem, alg, save_trace::Bool,
+                                       options, paths_save, mutex::ReentrantLock)
+    if !isempty(xstart)
+        try
+            res = calibrate(prob, xstart, alg; save_trace = save_trace, options = options)
+        catch e
+            @warn "Calibration failed for start $i: $e"
+            return nothing
+        end
+    else
+        # Handle edge case where no parameters to estimate
+        xstart, xmin = ComponentArray{Float64}(), ComponentArray{Float64}()
+        xtrace, ftrace = Vector{Vector{Float64}}(undef, 0), Vector{Float64}(undef, 0)
+        fmin = prob.nllh(xstart)
+        res = PEtabOptimisationResult(xmin, fmin, xstart, :alg, 0, 0.0, xtrace, ftrace,
+                                      true, nothing)
+    end
+    
+    # Thread-safe saving of intermediate results
+    if !isempty(paths_save)
+        lock(mutex) do
+            _save_multistart_results_threaded(paths_save, res, i)
+        end
+    end
+    return res
+end
+
+function _save_multistart_results_threaded(paths_save::Dict{Symbol, String},
+                                          res::PEtabOptimisationResult, i::Int64)::Nothing
+    xnames = propertynames(res.xmin) |> collect
+    res_df = DataFrame(fmin = res.fmin, alg = res.alg, runtime = res.runtime,
+                       niterations = res.niterations, converged = res.converged,
+                       startguess = i)
+    x_df = DataFrame(Matrix(res.xmin'), xnames)
+    x_df[!, "startguess"] = [i]
+    
+    CSV.write(paths_save[:res], res_df, append = isfile(paths_save[:res]))
+    CSV.write(paths_save[:xmin], x_df, append = isfile(paths_save[:xmin]))
+    
+    if haskey(paths_save, :trace) && !isnothing(res.ftrace) && !isempty(res.ftrace)
+        trace_df = DataFrame(Matrix(reduce(vcat, res.xtrace')), xnames)
+        trace_df[!, "ftrace"] = res.ftrace
+        trace_df[!, "startguess"] = repeat([i], length(res.ftrace))
+        CSV.write(paths_save[:trace], trace_df, append = isfile(paths_save[:trace]))
+    end
+    return nothing
+end
+
 
 """
 Run the multi-start parameter estimation using PEtab.jl's built-in robust functionality.
@@ -90,20 +213,19 @@ function run_parameter_estimation(parsed_args, petab_problem)
     println("Configuration:")
     println("  • Optimizer: $(typeof(optimizer_alg))")
     println("  • Multi-starts: $n_starts")
-    println("  • Threading: Enabled via Julia --threads flag")
+    println("  • Threading: CUSTOM multithreaded implementation")
+    println("  • Available threads: $(Threads.nthreads())")
     
     start_time = time()
     multi_start_res = nothing
 
     try
-        # This single call now works for Fides, IPNewton, etc. without needing an if/else
-        multi_start_res = PEtab.calibrate_multistart(
+        multi_start_res = calibrate_multistart_threaded(
             petab_problem,
-            optimizer_alg, # Pass the algorithm object directly
+            optimizer_alg,
             n_starts;
-            options=options,
-            save_trace=false,
-            dirsave=(debug_mode ? "Intermediate_results" : nothing) # avoid heavy I/O unless debugging
+            dirsave="Intermediate_results",
+            options=options
         )
     catch e
         @error "Multi-start parameter estimation failed: $e"

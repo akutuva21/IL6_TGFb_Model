@@ -169,10 +169,20 @@ def discover_species_map(model: bionetgen.bngmodel, params_to_trace: list) -> di
     return param_to_sbml_id
 
 def add_noise(data_series: pd.Series, noise_level: float, rng: np.random.Generator) -> pd.Series:
-    """Adds multiplicative noise to a pandas Series."""
-    noise = rng.normal(loc=0.0, scale=noise_level * np.abs(data_series))
-    noisy_series = data_series + noise
-    return noisy_series.clip(lower=0)
+    """
+    Adds unbiased log-normal multiplicative noise with constant CV = noise_level.
+    noise_level is the fractional CV (e.g., 0.05 for 5%).
+    """
+    if noise_level <= 0:
+        return data_series.copy()
+
+    sigma = float(np.sqrt(np.log(1.0 + noise_level**2)))
+    # Draw one factor per element
+    eps = np.exp(rng.normal(loc=-0.5 * sigma**2, scale=sigma, size=len(data_series)))
+    noisy_series = data_series.to_numpy(dtype=float) * eps
+    # Log-normal factor is > 0, so no need to clip; keep clip for robustness if desired
+    # noisy_series = np.clip(noisy_series, a_min=0.0, a_max=None)
+    return pd.Series(noisy_series, index=data_series.index)
 
 # --------------------------------------------------------------------------
 #                   TIME-COURSE WORKFLOW WITH CORRECT SAVING
@@ -502,8 +512,9 @@ def generate_time_course_petab(config):
                     
                     # Add noise if configured: log-normal (natural log) for constant CV
                     if noise_conf['add']:
-                        measurement_val = measurement_val * np.exp(rng.normal(0.0, sigma_logn))
-                        measurement_val = max(0.0, measurement_val)  # Clip to non-negative
+                        # Unbiased multiplicative log-normal noise: E[exp(N(-σ²/2, σ²))] = 1
+                        eps = np.exp(rng.normal(loc=-0.5 * sigma_logn**2, scale=sigma_logn))
+                        measurement_val = measurement_val * eps
                     
                     measurement_rows.append({
                         'observableId': obs_name,
@@ -516,7 +527,30 @@ def generate_time_course_petab(config):
     # 8. Create DataFrames and save
     measurement_df = pd.DataFrame(measurement_rows)
 
-    # --- ADD PRE-EQUILIBRATION CONDITION ---
+    noise_conf = tc_settings['noise']
+    is_noisy = noise_conf['add'] and noise_conf['level_percent'] > 0
+
+    if is_noisy:
+        lod_map = {}
+        for obs_id in measurement_df['observableId'].unique():
+            pos_vals = measurement_df.loc[
+                (measurement_df['observableId'] == obs_id) & (measurement_df['measurement'] > 0.0),
+                'measurement'
+            ].to_numpy()
+            if len(pos_vals) > 0:
+                lod = float(0.5 * np.min(pos_vals))  # conservative LOD below smallest positive
+            else:
+                lod = 1e-12  # fallback if all zero
+            lod_map[obs_id] = lod
+
+        # Replace zeros and negatives with the LOD for that observable
+        def _apply_lod(row):
+            return lod_map[row['observableId']] if row['measurement'] <= 0.0 else row['measurement']
+
+        mask = measurement_df['measurement'] <= 0.0
+        if mask.any():
+            measurement_df.loc[mask, 'measurement'] = measurement_df.loc[mask].apply(_apply_lod, axis=1)
+    
     # Ensure the 'preeq_ss' condition is included in the conditions file
     # Use the baseline (TREG) stimuli values for pre-equilibration
     baseline_cond = tc_settings['conditions'].get('TREG', {})
@@ -551,62 +585,66 @@ def generate_time_course_petab(config):
 #                   PEtab FILE CREATION
 # --------------------------------------------------------------------------
 
-def create_observables_petab(measurements_df, observables_mapping, output_path):
-    """Create observables.tsv file from measurements data."""
-    logging.info("Creating observables PEtab file...")
-    
-    # Get unique observableIds from measurements
+def create_observables_petab(config, measurements_df, observables_mapping, output_path):
+    logging.info("Creating observables PEtab file (log-normal with shared sigma)...")
+
+    noise_conf = config['time_course_settings']['noise']
+    is_noisy = noise_conf['add'] and noise_conf['level_percent'] > 0
+
     observable_ids = measurements_df['observableId'].unique()
-    
     observables_data = []
+
     for obs_id in observable_ids:
+        # Use one shared sigma for all observables
+        noise_formula = "sigma_log_shared" if is_noisy else "1e-8"
+        noise_dist = "logNormal"
+
         observables_data.append({
             'observableId': obs_id,
             'observableName': observables_mapping.get(obs_id, obs_id),
-            'observableFormula': obs_id,  # Using observableId as formula
-            'noiseFormula': f"noiseParameter1_{obs_id}",
-            'noiseDistribution': 'logNormal'
+            'observableFormula': obs_id,
+            'noiseFormula': noise_formula,
+            'noiseDistribution': noise_dist
         })
-    
+
     observables_df = pd.DataFrame(observables_data)
     observables_df.to_csv(output_path, sep='\t', index=False)
     logging.info(f"✅ Observables file saved: {output_path}")
 
 def create_parameters_petab(config, model, measurements_df, output_path):
-    """Create parameters.tsv file from config and measurements."""
-    logging.info("Creating parameters PEtab file...")
-    
+    """Create parameters.tsv with a single shared sigma_log for log-normal noise."""
+    logging.info("Creating parameters PEtab file (log-normal, shared sigma)...")
+
     parameters_data = []
-    
+
     # Define which parameters should NOT be estimated (they are controlled by the conditions file)
     stimulus_params = {'IL6_0', 'TGFb_0'}
-    
+
     # Define custom bounds for initial concentration parameters if needed
     initial_concentration_params = {'IL6R_0', 'SMAD3_0', 'SMAD4_0', 'STAT3m_0', 'PKA_0'}
 
-    # Iterate through all parameters defined in the BNGL model
+    # Add model parameters (unchanged)
     for param_name in model.parameters:
         param_obj = model.parameters[param_name]
         nominal_value = float(param_obj.value)
-        
-        # Determine if the parameter should be estimated
-        if param_name in stimulus_params:
-            should_estimate = 0  # These are set in the conditions file
-        else:
-            should_estimate = 1  # All other kinetic parameters will be estimated
 
-        # Set reasonable default bounds
+        if param_name in stimulus_params:
+            should_estimate = 0
+        else:
+            should_estimate = 1
+
         if param_name in initial_concentration_params:
-            lower_bound = 0.01
+            lower_bound = 1.0
             upper_bound = 200.0
         else:
-            lower_bound = nominal_value / 10.0
-            upper_bound = nominal_value * 10.0
-        # For fixed parameters, ensure bounds are not identical
+            lower_bound = nominal_value / 100.0 if nominal_value != 0 else 1e-6
+            upper_bound = nominal_value * 100.0 if nominal_value != 0 else 1e6
+
         if should_estimate == 0:
             epsilon = abs(nominal_value) * 1e-10 + 1e-10
             lower_bound = nominal_value - epsilon
             upper_bound = nominal_value + epsilon
+
         parameters_data.append({
             'parameterId': param_name,
             'parameterName': param_name,
@@ -617,26 +655,32 @@ def create_parameters_petab(config, model, measurements_df, output_path):
             'estimate': should_estimate
         })
 
-    # Add noise parameters for each observable: sigma in natural-log space (logNormal)
+    # Shared sigma for log-normal noise
     noise_conf = config['time_course_settings']['noise']
-    noise_fraction = noise_conf['level_percent'] / 100.0
-    sigma_logn = (
-        float(np.sqrt(np.log(1.0 + noise_fraction**2)))
-        if noise_conf['add'] else 0.0
-    )
+    is_noisy = noise_conf['add'] and noise_conf['level_percent'] > 0
+    noise_fraction = noise_conf['level_percent'] / 100.0 if is_noisy else 0.0
 
-    observable_ids = measurements_df['observableId'].unique()
-    for obs_id in observable_ids:
-        parameters_data.append({
-            'parameterId': f'noiseParameter1_{obs_id}',
-            'parameterName': f'noiseParameter1_{obs_id}',
-            'parameterScale': 'lin',
-            'lowerBound': 0.001,
-            'upperBound': 1.0,
-            'nominalValue': sigma_logn if sigma_logn > 0 else 0.0,
-            'estimate': 0
-        })
-    
+    if is_noisy:
+        sigma_log_nominal = float(np.sqrt(np.log(1.0 + noise_fraction**2)))  # CV hint
+        sigma_estimate_flag = 1  # estimate shared sigma
+        sigma_lower = 1e-4       # practical lower bound
+        sigma_upper = 1.0        # practical upper bound
+    else:
+        sigma_log_nominal = 1e-8
+        sigma_estimate_flag = 0
+        sigma_lower = 1e-8
+        sigma_upper = 1e-4
+
+    parameters_data.append({
+        'parameterId': 'sigma_log_shared',
+        'parameterName': 'sigma_log_shared',
+        'parameterScale': 'lin',
+        'lowerBound': sigma_lower,
+        'upperBound': sigma_upper,
+        'nominalValue': sigma_log_nominal,
+        'estimate': sigma_estimate_flag
+    })
+
     parameters_df = pd.DataFrame(parameters_data)
     parameters_df.to_csv(output_path, sep='\t', index=False)
     logging.info(f"✅ Parameters file saved: {output_path}")
@@ -663,10 +707,18 @@ def main():
     output_dir = "petab_files"
     os.makedirs(output_dir, exist_ok=True)
     
-    observables_path = os.path.join(output_dir, "observables.tsv")
-    parameters_path = os.path.join(output_dir, "parameters.tsv")
+    # Add noise suffix to filenames if noise is enabled
+    noise_conf = config['time_course_settings']['noise']
+    if noise_conf['add'] and noise_conf['level_percent'] > 0:
+        noise_suffix = f"_noise{int(noise_conf['level_percent'])}"
+    else:
+        noise_suffix = ""
+    
+    observables_path = os.path.join(output_dir, f"observables{noise_suffix}.tsv")
+    parameters_path = os.path.join(output_dir, f"parameters{noise_suffix}.tsv")
     
     create_observables_petab(
+        config,
         measurements_df, 
         config['observables_mapping'], 
         observables_path

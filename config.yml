@@ -41,7 +41,7 @@ time_course_settings:
 
   noise:
     add: false
-    level_percent: 0.0
+    level_percent: 5.0
 
 # UNIFIED MAPPING for all run modes
 observables_mapping:

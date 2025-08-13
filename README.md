@@ -156,7 +156,7 @@ Current defaults in `src/profiling.jl`:
 - Parameter selection: all non-noise, non-initial-condition parameters (names not starting with `noiseParameter` and not ending with `_0`)
 - Profiler backend: `OptimizationProfiler` with `IPNewton()`
 - Stepper: `FixedStep(initial_step=0.005)`
-- Iterations: `maxiters=5000` per profile (threaded across parameters)
+- Iterations: `maxiters=200` per profile (threaded across parameters)
 - Objective: robust NLLH, strips Dual numbers and guards non-finite values
 - CI line: draws `threshold=1.92` (95% CI for 1 dof) on each profile plot; legend at `:topright`
 
