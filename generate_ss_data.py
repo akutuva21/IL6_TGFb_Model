@@ -637,8 +637,8 @@ def create_parameters_petab(config, model, measurements_df, output_path):
             lower_bound = 1.0
             upper_bound = 200.0
         else:
-            lower_bound = nominal_value / 100.0 if nominal_value != 0 else 1e-4
-            upper_bound = nominal_value * 100.0 if nominal_value != 0 else 1e4
+            lower_bound = nominal_value / 2.0 if nominal_value != 0 else 1e-4
+            upper_bound = nominal_value * 2.0 if nominal_value != 0 else 1e4
 
         if should_estimate == 0:
             epsilon = abs(nominal_value) * 1e-10 + 1e-10
@@ -663,7 +663,7 @@ def create_parameters_petab(config, model, measurements_df, output_path):
     if is_noisy:
         sigma_log_nominal = float(np.sqrt(np.log(1.0 + noise_fraction**2)))  # CV hint
         sigma_estimate_flag = 1  # estimate shared sigma
-        sigma_lower = 1e-4    # Convert to log10: log10(0.0001) = -4
+        sigma_lower = 1e-2    # Convert to log10: log10(0.01) = -2
         sigma_upper = 1.0     # Convert to log10: log10(1.0) = 0
     else:
         sigma_log_nominal = 1e-8

@@ -7,6 +7,7 @@ using Base.Threads
 using CSV
 using DataFrames
 using QuasiMonteCarlo
+using Random
 
 """
     get_optimizer_and_options(optimizer_name::Symbol, debug_mode::Bool)
@@ -65,7 +66,10 @@ function calibrate_multistart_threaded(prob::PEtabODEProblem, alg, nmultistarts:
                                      seed=nothing,
                                      options=nothing)::PEtabMultistartResult
     
-    # Set up paths for saving intermediate results (same logic as original)
+    println("🚀 Starting thread-safe multithreaded multistart with $(Threads.nthreads()) threads")
+    println("   Creating separate PEtabODEProblem copies for each thread...")
+    
+    # Set up paths for saving intermediate results
     paths_save = Dict{Symbol, String}()
     if !isnothing(dirsave)
         !isdir(dirsave) && mkpath(dirsave)
@@ -98,19 +102,38 @@ function calibrate_multistart_threaded(prob::PEtabODEProblem, alg, nmultistarts:
         CSV.write(paths_save[:x0], xstarts_df)
     end
 
-    # Use ReentrantLock instead of RemoteChannel for thread synchronization
-    mutex = ReentrantLock()
+    # Create thread-local PEtabODEProblem copies using a simpler approach
+    thread_problems = Dict{Int, Any}()
+    problems_lock = ReentrantLock()
+
+    # Initialize one copy per thread
+    Threads.@threads for i in 1:Threads.nthreads()
+        thread_id = Threads.threadid()
+        lock(problems_lock) do
+            if !haskey(thread_problems, thread_id)
+                thread_problems[thread_id] = deepcopy(prob)
+                println("   Created PEtabODEProblem copy for thread $thread_id")
+            end
+        end
+    end
+
+    # Create mutex for file operations - MUST be defined before the main loop
+    file_mutex = ReentrantLock()
     
     # Preallocate results vector
     runs = Vector{Union{Nothing, PEtabOptimisationResult}}(undef, nmultistarts)
 
-    # Run calibrations in parallel using threads instead of processes
+    # Main optimization loop with proper variable capture
     Threads.@threads for i in 1:nmultistarts
-        runs[i] = _calibrate_startguess_threaded(xstarts[i], i, prob, alg, save_trace,
-                                               options, paths_save, mutex)
+        thread_id = Threads.threadid()
+        local_problem = thread_problems[thread_id]  # Thread-local problem copy
+        
+        # Call the helper function with all necessary variables
+        runs[i] = _calibrate_startguess_threaded(xstarts[i], i, local_problem, alg, save_trace,
+                                               options, paths_save, file_mutex)
     end
 
-    # Filter out failed runs and find best result
+    # Process results (same as before)
     valid_runs = filter(!isnothing, runs)
     if isempty(valid_runs)
         error("All optimization runs failed")
@@ -120,13 +143,14 @@ function calibrate_multistart_threaded(prob::PEtabODEProblem, alg, nmultistarts:
     fmin = bestrun.fmin
     xmin = bestrun.xmin
     
-    # Format sampling method string (same as original)
+    # Format sampling method string
     sampling_method_str = string(sampling_method)[1:findfirst(x -> x == '(',
                                                               string(sampling_method))][1:(end - 1)]
     
     return PEtabMultistartResult(xmin, fmin, bestrun.alg, nmultistarts, sampling_method_str,
                                  dirsave, runs)
 end
+
 
 function _calibrate_startguess_threaded(xstart, i, prob::PEtabODEProblem, alg, save_trace::Bool,
                                        options, paths_save, mutex::ReentrantLock)

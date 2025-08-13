@@ -56,7 +56,7 @@ function create_petab_problem_with_callbacks(petab_model, odesolver, steadystate
             odesolver = odesolver,
             ss_solver = steadystate_solver,
             gradient_method = :ForwardDiff,
-            hessian_method = :GaussNewton,
+            hessian_method = :ForwardDiff,
             verbose=false
         )
     
@@ -191,14 +191,12 @@ function run_analysis()
     else # Normal (non-debug) mode
         println("INFO: Normal mode - using Rodas5P with ForwardDiff for robust optimization")
         odesol = ODESolver(Rodas5P(), 
-                          abstol=1e-8, 
-                          reltol=1e-8, 
-                          maxiters=400000,
-                          dtmin=1e-15)
+                          abstol=1e-6, 
+                          reltol=1e-6, 
+                          dtmin=1e-12)
         steadystate_solver = SteadyStateSolver(:Simulate, 
-                                             abstol=1e-8, 
-                                             reltol=1e-8, 
-                                             maxiters=400000)
+                                             abstol=1e-6, 
+                                             reltol=1e-6)
     end
 
     @info "✅ Enhanced solver configuration completed:"; flush(stdout); flush(stderr)

@@ -6,8 +6,8 @@ begin parameters
     IL6_0               0.0
 
     # IL-6 Pathway
-    kf_il6_bind         0.01
-    kr_il6_bind         0.01
+    kf_il6_bind         0.1
+    kr_il6_bind         0.1
     k_act_il6r          0.5
     k_inact_il6r        0.05
 
@@ -16,8 +16,11 @@ begin parameters
     k_dephos_smad3      0.05
 
     # STAT3 dynamics
-    k_act_stat3_by_il6r 0.02
-    k_deact_stat3       0.05
+    #k_act_stat3_by_il6r 0.02
+    kf_stat3_bind       1.0  # New parameter
+    kr_stat3_bind       0.1  # New parameter
+    k_stat3_dimer       0.1  # New parameter
+    k_deact_stat3      0.05
 
     # Complex formation
     kf_s3s4             1.0
@@ -83,7 +86,8 @@ begin reaction rules
     R2_Dephos_SMAD3: SMAD3(phos~P,smad4_site,stat3_site,pka_site) -> SMAD3(phos~U,smad4_site,stat3_site,pka_site) k_dephos_smad3
 
     # 3. STAT3 Monomer Activation to Dimer,catalyzed by active IL6R complex
-    R3_Act_STAT3: STAT3m() + STAT3m() + IL6(r!+).IL6R(l_bind!+,activity~A) -> STAT3d_active(s3_site) + IL6(r!+).IL6R(l_bind!+,activity~A) k_act_stat3_by_il6r
+    R3a_Bind_STAT3: STAT3m() + IL6(r!+).IL6R(l_bind!+,activity~A) <-> STAT3m().IL6(r!+).IL6R(l_bind!+,activity~A) kf_stat3_bind, kr_stat3_bind
+    R3b_Dimerize_STAT3: STAT3m().IL6(r!+).IL6R(l_bind!+,activity~A) + STAT3m() -> STAT3d_active(s3_site) + IL6(r!+).IL6R(l_bind!+,activity~A) k_stat3_dimer
 
     # 4. Active STAT3 Dimer Deactivation
     R4_Deact_STAT3: STAT3d_active(s3_site) -> STAT3m() + STAT3m() k_deact_stat3
