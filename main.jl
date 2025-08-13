@@ -56,7 +56,7 @@ function create_petab_problem_with_callbacks(petab_model, odesolver, steadystate
             odesolver = odesolver,
             ss_solver = steadystate_solver,
             gradient_method = :ForwardDiff,
-            hessian_method = :ForwardDiff,
+            hessian_method = :GaussNewton,
             verbose=false
         )
     
@@ -194,7 +194,7 @@ function run_analysis()
                           abstol=1e-8, 
                           reltol=1e-8, 
                           maxiters=400000,
-                          dtmin=1e-12)
+                          dtmin=1e-15)
         steadystate_solver = SteadyStateSolver(:Simulate, 
                                              abstol=1e-8, 
                                              reltol=1e-8, 
