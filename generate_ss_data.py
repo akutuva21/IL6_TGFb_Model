@@ -379,7 +379,7 @@ def create_parameters_petab(config, model, output_path):
         lower_bound = nominal_value / 2.0
         upper_bound = nominal_value * 2.0
         
-        if param_name in stimulus_params:
+        if param_name in stimulus_params or param_name.endswith("_0"):
             estimate = 0
             parameter_scale = 'lin'
             # For fixed params, bounds are just the nominal value
@@ -388,9 +388,6 @@ def create_parameters_petab(config, model, output_path):
         else:
             estimate = 1
             parameter_scale = 'log10'
-            if param_name.endswith("_0"): # Simple check for initial concentrations
-                lower_bound = 1.0
-                upper_bound = 200.0
 
         parameters_data.append({
             'parameterId': param_name,

@@ -1,361 +1,142 @@
 # main.jl
 
+# --- 1. INCLUDES and USING STATEMENTS ---
 include("src/model_param_est_robustness.jl")
 include("src/visualization.jl")
 include("src/optimization.jl")
 include("src/profiling.jl")
 
-using LinearAlgebra
-using ArgParse
-using JLD2
-using Base.Threads
-using DiffEqCallbacks
-using Logging
-using SciMLSensitivity
-using ReverseDiff
+using ArgParse, JLD2, Logging, PEtab, SciMLSensitivity, ReverseDiff, DiffEqCallbacks, OrdinaryDiffEq, Sundials, LinearAlgebra
 
-# --- Cluster/Batch Output Setup ---
-if !isinteractive()
-    global_logger(ConsoleLogger(stdout, Logging.Info))
-    ENV["JULIA_DEBUG"] = "all"  # Optional: set to "all" for debug
-end
-ENV["PYTHONUNBUFFERED"] = "1"  # For PyCall/Python output
-
-# Helper for periodic progress logging
-function log_progress(i, total, task_name)
-    if i % max(1, total ÷ 10) == 0
-        percentage = round(Int, 100 * i / total)
-        @info "$task_name: $percentage% complete ($i/$total)"
-        flush(stdout); flush(stderr)
-    end
-end
-
-function create_petab_problem_with_callbacks(petab_model, odesolver, steadystate_solver)
-    # previously contained callback for positive domain, now removed
-    @time petab_problem = PEtabODEProblem(
-            petab_model,
-            odesolver = odesolver,
-            ss_solver = steadystate_solver,
-            gradient_method = :Adjoint,
-            sensealg = InterpolatingAdjoint(autojacvec=ReverseDiffVJP()),
-            verbose=false
-        )
-    
-    @info "✅ PEtabODEProblem created successfully"
-    return petab_problem
-end
-
-function run_analysis()
-    parsed_args = PARSED_ARGS  # Use globally parsed arguments
-
-    # Setup logging level
-    if parsed_args["debug"]
-        global_logger(ConsoleLogger(stderr, Logging.Debug))
-        @info "Debug mode enabled - using faster, less accurate settings and debug logging."
-    else
-        global_logger(ConsoleLogger(stderr, Logging.Info))
-    end
-
-    # Apply debug mode adjustments
-    if parsed_args["debug"]
-        # In debug mode, run only a few starts for faster testing
-        if parsed_args["n-starts"] == 0
-            # Default to 10 starts in debug mode
-            parsed_args["n-starts"] = 10
-        end
-        @info "Debug mode will use faster tolerances and fewer starts: $(parsed_args["n-starts"])"
-    end
-
-    # Dynamically set n_starts based on available threads
-    if parsed_args["n-starts"] == 0
-        n_threads = Threads.nthreads()
-        parsed_args["n-starts"] = n_threads
-        @info "--n-starts not provided, defaulting to $(parsed_args["n-starts"]) based on $(n_threads) threads"
-    end
-
-    # File paths from command line
-    yaml_path = parsed_args["yaml"]
-    output_filename = parsed_args["output"]
-
-    @info "--- Starting Full Analysis ---"; flush(stdout); flush(stderr)
-    @info "Using PEtab YAML file: '$yaml_path'"; flush(stdout); flush(stderr)
-    @info "Using output file: '$output_filename'"; flush(stdout); flush(stderr)
-
-    # --- 1. Load existing results if available ---
-    local multi_start_res = nothing
-    if isfile(output_filename)
-        @info "Found existing '$output_filename'. Attempting to load results..."
-        try
-            best_mle = nothing
-            best_cost = nothing
-            
-            try
-                JLD2.@load output_filename best_mle best_cost
-                if !isnothing(best_mle) && !isnothing(best_cost)
-                    @info "✅ Successfully loaded essential estimation data!"
-                    @info "  - Best cost: $best_cost"
-                    @info "  - Parameter count: $(length(best_mle))"
-                                        
-                    # 1. Create a minimal PEtabOptimisationResult to represent the loaded best fit.
-                    best_run_reconstructed = PEtab.PEtabOptimisationResult(
-                        best_mle,         # xmin
-                        best_cost,        # fmin
-                        best_mle,         # x0 (can use xmin as a placeholder)
-                        :LoadedFromFile,  # alg
-                        0,                # niterations
-                        0.0,              # runtime
-                        [],               # xtrace
-                        [],               # ftrace
-                        true,             # converged
-                        nothing           # original
-                    )
-
-                    # 2. Create the PEtabMultistartResult with a list containing our single reconstructed run.
-                    multi_start_res = PEtab.PEtabMultistartResult(
-                        best_mle,            # xmin (the overall best)
-                        best_cost,           # fmin (the overall best)
-                        :LoadedFromFile,     # alg (placeholder)
-                        1,                   # nmultistarts (placeholder)
-                        "LoadedFromFile",    # sampling_method (placeholder)
-                        nothing,             # dirsave
-                        [best_run_reconstructed] # runs <-- NOW CONTAINS ONE VALID RUN
-                    )
-
-                else
-                    @warn "Essential data is incomplete. Will re-run estimation."
-                    multi_start_res = nothing
-                end
-            catch
-                @info "Attempting to load legacy format..."
-                JLD2.@load output_filename multi_start_res
-                
-                if !isnothing(multi_start_res) && hasfield(typeof(multi_start_res), :xmin) && hasfield(typeof(multi_start_res), :fmin)
-                    @info "Successfully loaded legacy 'multi_start_res' object!"
-                    @info "  - Best cost: $(multi_start_res.fmin)"
-                    @info "  - Parameter count: $(length(multi_start_res.xmin))"
-                else
-                    @warn "Loaded object is not a valid multi-start result. Will re-run estimation."
-                    multi_start_res = nothing
-                end
-            end
-            
-        catch e
-            @warn "Could not load results from file. Will re-run estimation. Error: $e"
-            multi_start_res = nothing
-        end
-    end
-
-    # --- 2. Setup the core PEtabModel from YAML file ---
-    @info "Setting up PEtab Model from YAML file..."
-
-    @time setup_results = setup_petab_problem(yaml_path)
-    if isnothing(setup_results)
-        @error "Failed to build PEtabModel from '$yaml_path'. Cannot proceed."
-        return
-    end
-
-    petab_model = setup_results.petab_model
-    true_param_values = setup_results.true_values
-    @info "Successfully loaded PEtab model with $(length(true_param_values)) parameters"; flush(stdout); flush(stderr)
-    
-    # --- 3. Define robust solver options ---
-    @info "Defining robust solver for simulation and steady-state..."
-        
-    local odesol
-
-    if parsed_args["debug"]
-        println("INFO: Debug mode - using Rodas5P with ForwardDiff for faster compilation")
-        odesol = ODESolver(Rodas5P(), 
-                          abstol=1e-4, 
-                          reltol=1e-4)
-        steadystate_solver = SteadyStateSolver(:Simulate, abstol=1e-4, reltol=1e-4)
-    else # Normal (non-debug) mode
-        println("INFO: Normal mode - using KenCarp47 with ForwardDiff for robust optimization")
-        odesol = ODESolver(KenCarp47(autodiff=false), 
-                          abstol=1e-6, 
-                          reltol=1e-6, 
-                          dtmin=1e-12)
-        steadystate_solver = SteadyStateSolver(:Simulate, 
-                                             abstol=1e-6, 
-                                             reltol=1e-6)
-    end
-
-    @info "✅ Enhanced solver configuration completed:"; flush(stdout); flush(stderr)
-    @info "   • ODE Solver: $(typeof(odesol.solver))"; flush(stdout); flush(stderr)
-    @info "   • Absolute tolerance: $(odesol.abstol)"; flush(stdout); flush(stderr)
-    @info "   • Relative tolerance: $(odesol.reltol)"; flush(stdout); flush(stderr)
-    @info "   • Steady-state solver: Using PEtab.jl defaults"; flush(stdout); flush(stderr)
-    @info "   • Expected benefits: Avoids CompositeAlgorithm conflicts, default steady-state handling"; flush(stdout); flush(stderr)
-
-    # --- 4. Create PEtabProblem (centralized) ---
-    local petab_problem
-    @info "Building PEtabODEProblem..."
-    petab_problem = create_petab_problem_with_callbacks(petab_model, odesol, steadystate_solver)
-
-    # testing correct parameters
-    @info "Testing objective function at nominal parameters..."
-
-    # Use your true/nominal parameter values
-    x_nominal = [0.1, 0.1, 0.5, 0.05, 0.1, 0.05, 1.0, 0.1, 0.1, 0.05, 
-             1.0, 0.1, 1.0, 0.1, 1.0, 0.1, 100.0, 100.0, 50.0, 100.0, 50.0, 0.05]
-
-    @time begin
-        try
-            obj_val = petab_problem.nllh(x_nominal)
-            @info "Objective value at nominal: $obj_val"
-            @info "✅ Model evaluation works!"
-        catch e
-            @warn "❌ Model evaluation failed: $e"
-        end
-    end
-
-    # --- 5. Run estimation ONLY if no results were loaded ---
-    if isnothing(multi_start_res)
-        @info "Starting parameter estimation..."
-        multi_start_res = run_parameter_estimation(parsed_args, petab_problem)
-         
-        if isnothing(multi_start_res)
-            @error "Parameter estimation failed. Cannot proceed."
-            return
-        end
-
-        try
-            best_mle = multi_start_res.xmin
-            best_cost = multi_start_res.fmin
-            
-            @info "Best parameters found: $best_mle"
-            @info "Best cost: $best_cost"
-            
-            # Save only the essential data, avoiding complex Optim objects
-            JLD2.@save output_filename best_mle best_cost
-            @info "✅ Essential estimation data saved successfully to '$output_filename'"
-            @info "   (Saved MLE parameters and cost, avoiding JLD2 warnings)"
-        catch e
-            @error "Failed to save essential data to '$output_filename'. Error: $e"
-        end
-    end
-
-    # --- 6. Generate Plots and Final Visualizations ---
-    if !isnothing(multi_start_res)
-        @info "\n--- Diagnosing Multistart Data ---"; flush(stdout); flush(stderr)
-        diagnose_multistart_data(multi_start_res, petab_problem)
-        
-        @info "\n--- Generating Waterfall Plot ---"; flush(stdout); flush(stderr)
-        try
-            plot_waterfall(multi_start_res)
-        catch e
-            @warn "Primary waterfall plot failed: $e"; flush(stdout); flush(stderr)
-            @info "Attempting fallback implementation..."; flush(stdout); flush(stderr)
-            try
-                plot_waterfall_custom_fallback(multi_start_res)
-            catch e2
-                @warn "Fallback waterfall plot also failed: $e2"; flush(stdout); flush(stderr)
-                try
-                    plot_waterfall_native_fallback(multi_start_res, petab_problem)
-                catch e3
-                    @error "All waterfall plot implementations failed. Last error: $e3"; flush(stdout); flush(stderr)
-                end
-            end
-        end
-        
-        @info "\n--- Generating Parameter Distribution Plot ---"; flush(stdout); flush(stderr)
-        
-        # Use the true parameter values from the BNGL model as reference
-        @info "Using true parameter values from BNGL model as reference"; flush(stdout); flush(stderr)
-        
-        plot_parameter_distribution(multi_start_res, petab_problem, reference_values=true_param_values)
-    end
-
-    saved_results = (
-        theta_optim=multi_start_res.xmin, 
-        cost=multi_start_res.fmin,
-        names_est_opt=string.(propertynames(multi_start_res.xmin))
-    )
-    
-    @info "\n--- Starting Visualization ---"; flush(stdout); flush(stderr)
-    @info "\n[Timing] Running visualization..."; flush(stdout); flush(stderr)
-    @time try
-        run_visualization(
-            collect(saved_results.theta_optim),
-            petab_problem,
-            odesol
-        )
-        @info "✅ Visualization completed successfully!"; flush(stdout); flush(stderr)
-    catch e
-        @error "Failed to generate visualization plots." exception=(e, catch_backtrace()); flush(stdout); flush(stderr)
-    end
-
-    # --- 7. Run Likelihood Profiling if Requested ---
-    @info "[ProfilingGate] profile flag parsed as: $(parsed_args["profile"])"; flush(stdout); flush(stderr)
-    if parsed_args["profile"]
-        @info "[ProfilingGate] Preparing likelihood profiling run..."; flush(stdout); flush(stderr)
-        profiling_odesol = ODESolver(QNDF(), abstol=1e-8, reltol=1e-8)
-        profiling_steadystate_solver = SteadyStateSolver(:Simulate, abstol=1e-8, reltol=1e-8)
-        start_prof_wall = time()
-        @info "[ProfilingGate] Entering run_likelihood_profiling()"; flush(stdout); flush(stderr)
-        prof_result = @time run_likelihood_profiling(
-            petab_model,
-            profiling_odesol,
-            profiling_steadystate_solver,
-            multi_start_res.xmin,
-            true_param_values;
-            debug=parsed_args["debug"],
-            maxiters=50
-        )
-        elapsed_prof = round(time() - start_prof_wall; digits=2)
-    @info "[ProfilingGate] Profiling wall time: $(elapsed_prof)s"; flush(stdout); flush(stderr)
-        if !isnothing(prof_result)
-            @info "✅ Likelihood profiling completed."; flush(stdout); flush(stderr)
-        else
-            @warn "Profiling returned no results."; flush(stdout); flush(stderr)
-        end
-    else
-        @info "[ProfilingGate] Skipping profiling (flag not set)."; flush(stdout); flush(stderr)
-    end
-end
-
-# --- DEFINE AND PARSE ARGUMENTS ---
+# --- 2. ARGUMENT PARSER DEFINITION ---
 function define_argument_parser()
-    s = ArgParseSettings(description="Run parameter estimation and visualization using a PEtab YAML file.")
+    s = ArgParseSettings(description="Run PEtab parameter estimation, collation, or profiling.")
     @add_arg_table! s begin
-        "--yaml"
+        "--yaml", "-y"
+            help = "Path to the PEtab YAML file."
             arg_type = String
             default = "petab_problem.yml"
         "--output", "-o"
-            help = "Path to the JLD2 output file for saving/loading results."
+            help = "Path to the output file for the current task."
             arg_type = String
-            default = "estimation_output_small.jld"
         "--n-starts"
-            help = "Number of multi-starts. Defaults to thread-based parallel execution."
+            help = "Total number of multi-starts in the array."
+            arg_type = Int
+            default = 96
+        "--optimizer"
+            help = "Optimization algorithm. Options: IPNewton, LBFGS, Fides"
+            arg_type = String
+            default = "IPNewton"
+        "--task-id"
+            help = "Worker ID for a job array task. Runs a single optimization."
             arg_type = Int
             default = 0
-        "--optimizer"
-            help = "Optimization algorithm. Options: auto, Fides, IPNewton, LBFGS, BFGS (auto=most robust available)"
-            arg_type = String
-            default = "auto"
-        "--debug"
-            help = "Enable debug mode for faster, less accurate testing."
+        "--collate"
+            help = "Run in collation mode to find the best result."
             action = :store_true
         "--profile"
-            help = "Run likelihood profiling on the best-fit parameters."
+            help = "Run likelihood profiling on a best-fit parameter set."
+            action = :store_true
+        "--load-fit"
+            help = "Path to a .jld2 file containing best-fit parameters for profiling."
+            arg_type = String
+            default = "best_fit.jld2"
+        "--debug"
+            help = "Enable debug mode for faster, less accurate testing."
             action = :store_true
     end
     return s
 end
 
-const PARSED_ARGS = parse_args(ARGS, define_argument_parser())
-@info "[ArgsDebug] Parsed arguments: $(PARSED_ARGS)"; flush(stdout); flush(stderr)
+# --- 3. MAIN CONTROLLER FUNCTION ---
+function main()
+    # Basic setup
+    parsed_args = parse_args(ARGS, define_argument_parser())
+    if parsed_args["debug"]
+        global_logger(ConsoleLogger(stderr, Logging.Debug))
+    else
+        global_logger(ConsoleLogger(stderr, Logging.Info))
+    end
+    
+    # --- MODE SELECTION ---
+    if parsed_args["task-id"] > 0
+        # --- WORKER MODE ---
+        @info "--- Running in WORKER mode for Task ID: $(parsed_args["task-id"]) ---"
+        
+        setup_results = setup_petab_problem(parsed_args["yaml"])
+        odesolver = ODESolver(KenCarp47(autodiff=false), abstol=1e-8, reltol=1e-8)
+        ss_solver = SteadyStateSolver(:Simulate, abstol=1e-8, reltol=1e-8)
+        
+        petab_problem = PEtabODEProblem(setup_results.petab_model, odesolver=odesolver, ss_solver=ss_solver,
+                                        gradient_method=:Adjoint, sensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP()))
+        
+        run_single_optimization(parsed_args, petab_problem)
 
-# ===================================================================
-# --- 2. THREADING SETUP ---
-# ===================================================================
+    elseif parsed_args["collate"]
+        # --- COLLATION & VISUALIZATION MODE ---
+        @info "--- Running in COLLATION & VISUALIZATION mode ---"
+        
+        # --- Collation Part ---
+        n_starts = parsed_args["n-starts"]
+        best_cost = Inf
+        best_params = nothing
+        best_file = ""
 
-println("INFO: Using threading for parallel processing")
-println("INFO: Available threads: $(Threads.nthreads())")
+        for i in 1:n_starts
+            filepath = joinpath("results", "run_$(i).jld2")
+            if isfile(filepath)
+                res = JLD2.load(filepath, "result")
+                if !isnothing(res) && res.fmin < best_cost
+                    best_cost = res.fmin
+                    best_params = res.xmin
+                    best_file = filepath
+                end
+            end
+        end
+        
+        if isnothing(best_params)
+            @error "Collation failed: No valid result files found in 'results/' directory."
+            return
+        end
 
-const PROJECT_PATH = abspath(dirname(Base.active_project()))
-println("INFO: Project path: $PROJECT_PATH")
+        @info "✅ Collation complete. Best result found in: $(best_file)"
+        @info "   - Best cost (nllh): $(best_cost)"
+        
+        JLD2.save("best_fit.jld2", Dict("best_mle" => best_params, "best_cost" => best_cost))
+        @info "   - Best parameters saved to best_fit.jld2"
 
+        # --- Visualization Part ---
+        @info "--- Starting visualization for the best fit ---"
+        # Set up the PEtab problem again to run the simulation
+        setup_results = setup_petab_problem(parsed_args["yaml"])
+        odesolver = ODESolver(KenCarp47(autodiff=false), abstol=1e-8, reltol=1e-8)
+        petab_problem = PEtabODEProblem(setup_results.petab_model, odesolver=odesolver)
+
+        # Call the visualization function with the best parameters we just found
+        run_visualization(
+            collect(best_params),
+            petab_problem,
+            odesolver
+        )
+
+    elseif parsed_args["profile"]
+        # --- PROFILING MODE ---
+        @info "--- Running in PROFILING mode ---"
+        
+        fit_data = JLD2.load(parsed_args["load-fit"])
+        best_mle = fit_data["best_mle"]
+        
+        setup_results = setup_petab_problem(parsed_args["yaml"])
+        profiling_odesol = ODESolver(KenCarp47(autodiff=false), abstol=1e-8, reltol=1e-8)
+        profiling_ss_solver = SteadyStateSolver(:Simulate, abstol=1e-8, reltol=1e-8)
+
+        run_likelihood_profiling(setup_results.petab_model, profiling_odesol, profiling_ss_solver, 
+                                 best_mle, setup_results.true_values)
+    else
+        @error "No mode selected. Please specify --task-id, --collate, or --profile."
+    end
+end
+
+# --- 4. SCRIPT EXECUTION ---
 BLAS.set_num_threads(1)
-
-run_analysis()
+main()

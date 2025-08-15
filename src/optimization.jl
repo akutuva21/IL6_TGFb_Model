@@ -3,292 +3,80 @@
 using PEtab
 using Optim
 using PyCall
-using Base.Threads
-using CSV
-using DataFrames
+using JLD2
 using QuasiMonteCarlo
 using Random
 
-"""
-    get_optimizer_and_options(optimizer_name::Symbol, debug_mode::Bool)
-
-Returns a tuple containing the optimizer algorithm object and its corresponding options dictionary.
-This function ensures all return values are consistent.
-"""
+# This helper function for setting optimizer options remains useful
 function get_optimizer_and_options(optimizer_name::Symbol, debug_mode::Bool)
+    max_run_time = 3600.0  # 1 hour per run
 
-    max_run_time = 3600.0
-    
     if optimizer_name === :Fides
-        # 1. Correctly create the Fides algorithm object.
-        #    The Hessian update strategy is an argument to the constructor.
         fides_alg = PEtab.Fides(:BFGS; verbose=false)
         
-        # 2. Options must be a Python dictionary. Do not put "hessian_update" here.
+        # Fides options are passed as a Python dictionary
         fides_opts = py"{
-            'maxiter': $(debug_mode ? 150 : 500),
-            'fatol': 1e-5,
-            'frtol': 1e-7,
-            'gtol': 1e-6
+            'maxiter': $(debug_mode ? 200 : 1000),
+            'fatol': 1e-6,
+            'frtol': 1e-8,
+            'gtol': 1e-6,
+            'maxtime': $(max_run_time)
         }"
 
-        println("Using Fides via PEtab.jl's built-in wrapper with BFGS updates.")
+        @info "Using Fides optimizer with BFGS hessian approximation."
         return fides_alg, fides_opts
 
     else
-        # This part for Optim.jl solvers is correct and needs no changes.
+        # This section for Optim.jl solvers remains as a fallback
         optim_options = Optim.Options(
-            iterations = debug_mode ? 200 : 800,
+            iterations = debug_mode ? 200 : 1000,
             g_tol      = 1e-6,
-            f_reltol   = debug_mode ? 1e-6 : 1e-8,
-            time_limit = max_run_time,  # Added time limit for Optim.jl solvers
+            f_reltol   = 1e-8,
+            time_limit = max_run_time,
             show_trace = false
         )
-
         if optimizer_name === :IPNewton
-            @info "Using IPNewton: Robust interior-point Newton"
+            @info "Using Optim.jl Optimizer: IPNewton"
             return Optim.IPNewton(), optim_options
         elseif optimizer_name === :LBFGS
-            @info "Using LBFGS: Reliable quasi-Newton, memory efficient"
+            @info "Using Optim.jl Optimizer: LBFGS"
             return Optim.LBFGS(), optim_options
-        elseif optimizer_name === :BFGS
-            @info "Using BFGS: Fast quasi-Newton for medium problems"
-            return Optim.BFGS(), optim_options
         else
-            @error "Unknown optimizer: $optimizer_name"
-            throw(ArgumentError("Invalid optimizer specified."))
+            @error "Unknown optimizer: $optimizer_name. Defaulting to IPNewton."
+            return Optim.IPNewton(), optim_options
         end
     end
 end
 
-function calibrate_multistart_threaded(prob::PEtabODEProblem, alg, nmultistarts::Integer; 
-                                     dirsave=nothing, 
-                                     sampling_method=LatinHypercubeSample(),
-                                     sample_prior::Bool=true,
-                                     save_trace::Bool=false,
-                                     seed=nothing,
-                                     options=nothing)::PEtabMultistartResult
+# This is now the main function for a worker job. It runs ONE optimization.
+function run_single_optimization(parsed_args, petab_problem)
+    println("\n🧪 Running Single Parameter Estimation for Task ID: $(parsed_args["task-id"])")
     
-    println("🚀 Starting thread-safe multithreaded multistart with $(Threads.nthreads()) threads")
-    println("   Creating separate PEtabODEProblem copies for each thread...")
-    
-    # ADD THIS BLOCK HERE:
-    @info "nthreads=$(Threads.nthreads())"
-    @info "JULIA_NUM_THREADS=" * get(ENV, "JULIA_NUM_THREADS", "NOT SET")
-    
-    # Set up paths for saving intermediate results
-    paths_save = Dict{Symbol, String}()
-    if !isnothing(dirsave)
-        !isdir(dirsave) && mkpath(dirsave)
-        i = 1
-        while true
-            path_x0 = joinpath(dirsave, "startguesses$i.csv")
-            !isfile(path_x0) && break
-            i += 1
-        end
-        paths_save[:x0] = joinpath(dirsave, "startguesses" * string(i) * ".csv")
-        paths_save[:res] = joinpath(dirsave, "results" * string(i) * ".csv")
-        paths_save[:xmin] = joinpath(dirsave, "xmins" * string(i) * ".csv")
-        if save_trace == true
-            paths_save[:trace] = joinpath(dirsave, "trace" * string(i) * ".csv")
-        end
-    end
+    n_starts_total = parsed_args["n-starts"]
+    task_id = parsed_args["task-id"]
 
-    # Generate starting guesses
-    if !isnothing(seed)
-        Random.seed!(seed)
-    end
-    xstarts = get_startguesses(prob, nmultistarts; sampling_method = sampling_method,
-                               sample_prior = sample_prior)
-    
-    # Save starting guesses to file
-    if !isempty(paths_save)
-        xnames = propertynames(xstarts[1]) |> collect
-        xstarts_df = DataFrame(vcat(reduce(vcat, xstarts')), xnames)
-        xstarts_df[!, "startguess"] = 1:nrow(xstarts_df)
-        CSV.write(paths_save[:x0], xstarts_df)
-    end
-
-    # Create thread-local PEtabODEProblem copies using a simpler approach
-    thread_problems = Dict{Int, Any}()
-    problems_lock = ReentrantLock()
-
-    # Initialize one copy per thread
-    Threads.@threads for i in 1:Threads.nthreads()
-        thread_id = Threads.threadid()
-        @info "initializing thread_id=$thread_id"  # ADD THIS LINE
-        lock(problems_lock) do
-            if !haskey(thread_problems, thread_id)
-                thread_problems[thread_id] = deepcopy(prob)
-                println("   Created PEtabODEProblem copy for thread $thread_id")
-            end
-        end
-    end
-
-    # Create mutex for file operations - MUST be defined before the main loop
-    file_mutex = ReentrantLock()
-    
-    # Preallocate results vector
-    runs = Vector{Union{Nothing, PEtabOptimisationResult}}(undef, nmultistarts)
-
-    # Main optimization loop with proper variable capture
-    Threads.@threads for i in 1:nmultistarts
-        thread_id = Threads.threadid()
-        local_problem = thread_problems[thread_id]  # Thread-local problem copy
-        
-        # ADD THESE TIMING LINES:
-        @info "start=$i thread=$thread_id beginning"
-        tstart = time()
-        
-        # Call the helper function with all necessary variables
-        runs[i] = _calibrate_startguess_threaded(xstarts[i], i, local_problem, alg, save_trace,
-                                               options, paths_save, file_mutex)
-        
-        # ADD THESE TIMING LINES:
-        tend = time()
-        @info "done start=$i thread=$thread_id elapsed=$(round(tend-tstart, digits=1))s"
-    end
-
-    # Process results (same as before)
-    valid_runs = filter(!isnothing, runs)
-    if isempty(valid_runs)
-        error("All optimization runs failed")
-    end
-
-    bestrun = valid_runs[argmin([isnan(r.fmin) ? Inf : r.fmin for r in valid_runs])]
-    fmin = bestrun.fmin
-    xmin = bestrun.xmin
-    
-    # Format sampling method string
-    sampling_method_str = string(sampling_method)[1:findfirst(x -> x == '(',
-                                                              string(sampling_method))][1:(end - 1)]
-    
-    return PEtabMultistartResult(xmin, fmin, bestrun.alg, nmultistarts, sampling_method_str,
-                                 dirsave, runs)
-end
-
-
-function _calibrate_startguess_threaded(xstart, i, prob::PEtabODEProblem, alg, save_trace::Bool,
-                                       options, paths_save, mutex::ReentrantLock)
-    if !isempty(xstart)
-        try
-            res = calibrate(prob, xstart, alg; save_trace = save_trace, options = options)
-        catch e
-            @warn "Calibration failed for start $i: $e"
-            return nothing
-        end
-    else
-        # Handle edge case where no parameters to estimate
-        xstart, xmin = ComponentArray{Float64}(), ComponentArray{Float64}()
-        xtrace, ftrace = Vector{Vector{Float64}}(undef, 0), Vector{Float64}(undef, 0)
-        fmin = prob.nllh(xstart)
-        res = PEtabOptimisationResult(xmin, fmin, xstart, :alg, 0, 0.0, xtrace, ftrace,
-                                      true, nothing)
-    end
-    
-    # Thread-safe saving of intermediate results
-    if !isempty(paths_save)
-        lock(mutex) do
-            _save_multistart_results_threaded(paths_save, res, i)
-        end
-    end
-    return res
-end
-
-function _save_multistart_results_threaded(paths_save::Dict{Symbol, String},
-                                          res::PEtabOptimisationResult, i::Int64)::Nothing
-    xnames = propertynames(res.xmin) |> collect
-    res_df = DataFrame(fmin = res.fmin, alg = res.alg, runtime = res.runtime,
-                       niterations = res.niterations, converged = res.converged,
-                       startguess = i)
-    x_df = DataFrame(Matrix(res.xmin'), xnames)
-    x_df[!, "startguess"] = [i]
-    
-    CSV.write(paths_save[:res], res_df, append = isfile(paths_save[:res]))
-    CSV.write(paths_save[:xmin], x_df, append = isfile(paths_save[:xmin]))
-    
-    if haskey(paths_save, :trace) && !isnothing(res.ftrace) && !isempty(res.ftrace)
-        trace_df = DataFrame(Matrix(reduce(vcat, res.xtrace')), xnames)
-        trace_df[!, "ftrace"] = res.ftrace
-        trace_df[!, "startguess"] = repeat([i], length(res.ftrace))
-        CSV.write(paths_save[:trace], trace_df, append = isfile(paths_save[:trace]))
-    end
-    return nothing
-end
-
-
-"""
-Run the multi-start parameter estimation using PEtab.jl's built-in robust functionality.
-"""
-function run_parameter_estimation(parsed_args, petab_problem)
-    println("\n🧪 SCIENTIFIC PARAMETER ESTIMATION")
-    println("="^70)
-
-    # Step 0: Check parameter setup
-    println("\n📋 Parameter Setup Validation")
-    println("Number of parameters to estimate: $(petab_problem.nparameters_estimate)")
-    
-    if petab_problem.nparameters_estimate == 0
-        @error "❌ No parameters marked for estimation! Check your parameter file."
-        @error "Make sure some parameters have 'estimate = 1' in the parameters table."
-        return nothing
-    end
-    
-    println("✅ Found $(petab_problem.nparameters_estimate) parameters to estimate")
-    println("Parameter names: $(petab_problem.xnames)")
-
-    # Step 1: Configure optimization strategy
-    println("\n⚙️  Step 1: Optimization Strategy Configuration")
-    
-    debug_mode = get(parsed_args, "debug", false)
-    # Convert string from command line to Symbol for our function
-    optimizer_name = Symbol(get(parsed_args, "optimizer", "Fides")) 
-    n_starts = get(parsed_args, "n-starts", min(Threads.nthreads(), petab_problem.nparameters_estimate * 2))
-    
-    # This call is now robust and returns a consistent two-part tuple
-    optimizer_alg, options = get_optimizer_and_options(optimizer_name, debug_mode)
-    
-    # Step 2: Execute robust multi-start parameter estimation
-    println("\n🚀 Step 2: Multi-Start Parameter Estimation")
-    println("Configuration:")
-    println("  • Optimizer: $(typeof(optimizer_alg))")
-    println("  • Multi-starts: $n_starts")
-    println("  • Threading: CUSTOM multithreaded implementation")
-    println("  • Available threads: $(Threads.nthreads())")
-    
-    # ADD THESE LINES HERE:
-    @info "Environment check: JULIA_NUM_THREADS=" * get(ENV, "JULIA_NUM_THREADS", "NOT SET")
-    @info "Environment check: SLURM_CPUS_PER_TASK=" * get(ENV, "SLURM_CPUS_PER_TASK", "NOT SET")
-    
-    start_time = time()
-    multi_start_res = nothing
-
-    try
-        multi_start_res = calibrate_multistart_threaded(
-            petab_problem,
-            optimizer_alg,
-            n_starts;
-            dirsave="Intermediate_results",
-            options=options
-        )
-        println("✅ Threaded multistart completed successfully!")
-    catch e
-        @error "Threaded multistart failed: $e"
-        showerror(stdout, e, catch_backtrace())
+    if !(1 <= task_id <= n_starts_total)
+        @error "Invalid --task-id provided. Must be between 1 and $(n_starts_total)."
         return nothing
     end
 
-    total_elapsed = time() - start_time
-    
-    if isnothing(multi_start_res) || (hasproperty(multi_start_res, :runs) && isempty(multi_start_res.runs))
-        @error "All optimization attempts failed. Check model stability and parameter bounds."
-        return nothing
-    end
+    optimizer_alg, options = get_optimizer_and_options(Symbol(parsed_args["optimizer"]), parsed_args["debug"])
 
-    println("\n✅ Multi-start estimation completed!")
-    println("   • Total time: $(round(total_elapsed/60, digits=1)) minutes")
-    println("   • Successful runs: $(length(multi_start_res.runs))/$n_starts")
-    println("   • Best cost: $(round(multi_start_res.fmin, digits=3))")
+    # Generate all potential start-guesses but only select the one for this task
+    # A seed ensures that every job generates the same list and picks its unique start
+    Random.seed!(1234)
+    x_starts_all = get_startguesses(petab_problem, n_starts_total; sampling_method=LatinHypercubeSample())
+    x_start_this_job = x_starts_all[task_id]
     
-    return multi_start_res
+    println("Starting optimization from guess #$(task_id)...")
+    
+    # Calibrate performs a single optimization run
+    result = calibrate(petab_problem, x_start_this_job, optimizer_alg; options=options)
+
+    # Save the result of this single run to its unique output file
+    output_filename = parsed_args["output"]
+    JLD2.save(output_filename, Dict("result" => result, "task_id" => task_id))
+    
+    println("✅ Task $(task_id) finished. Cost=$(result.fmin). Saved to $(output_filename).")
+    return result
 end
