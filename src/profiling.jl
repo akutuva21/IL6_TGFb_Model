@@ -6,6 +6,26 @@ using ComponentArrays
 using Plots
 using PEtab
 using ForwardDiff
+using DiffEqCallbacks
+
+function create_petab_problem_for_profiling(petab_model, odesolver, steadystate_solver)
+    @info "Creating PEtabODEProblem for profiling with PositiveDomain callback..."
+    
+    positive_domain_cb = PositiveDomain()
+    combined_callbacks = CallbackSet(petab_model.callbacks, positive_domain_cb)
+
+    petab_problem = PEtabODEProblem(
+        petab_model,
+        odesolver=odesolver,
+        ss_solver=steadystate_solver,
+        # Use the dedicated keyword argument for callbacks
+        callback=combined_callbacks, 
+        verbose=false
+    )
+    
+    @info "✅ PEtabODEProblem for profiling created successfully."
+    return petab_problem
+end
 
 function plot_profile_delta_chi2!(
     plt,
@@ -24,7 +44,7 @@ function plot_profile_delta_chi2!(
     title!(plt, "Likelihood profile: $(pname)")
     hline!(plt, [3.84]; lc=:orange, ls=:dash, label="95%")
     if show_99
-        hline!(plt, [9.0]; lc=:red, ls=:dashdot, label="99%")
+        hline!(plt, [6.63]; lc=:red, ls=:dashdot, label="99%")
     end
     ylims!(plt, (0.0, ymax))
     if autox
@@ -41,11 +61,11 @@ end
 """
 run_likelihood_profiling(petab_model, odesolver, steadystate_solver, θ_mle; debug=false, maxiters=20)
 
-Minimal threaded likelihood profiling:
-  - Uses finite-difference gradients (AutoFiniteDiff)
-  - Strips Dual numbers defensively
-  - Saves one PNG per parameter under ./likelihood_profiles
-Returns Dict{name => profile_result}.
+Idiomatic likelihood profiling using integrated PEtab.jl and LikelihoodProfiler.jl helpers:
+  - Uses library-provided objective function (no manual AD handling)
+  - Leverages get_pl_problem for robust setup
+  - Saves Δχ² plots with confidence intervals
+Returns profile results object.
 """
 function run_likelihood_profiling(
     petab_model::PEtabModel,
@@ -56,102 +76,71 @@ function run_likelihood_profiling(
     debug::Bool=false,
     maxiters::Int=20
 )
-    println("\n--- Likelihood Profiling (with True Value for Robustness Testing) ---"); flush(stdout)
+    println("\n--- Likelihood Profiling (Idiomatic Version) ---"); flush(stdout)
     t_start = time()
 
-    petab_problem = PEtabODEProblem(petab_model; odesolver=odesolver, ss_solver=steadystate_solver, verbose=false)
-
-    all_names = string.(keys(θ_mle))
-    cand = [n for n in all_names if !startswith(n, "noiseParameter") && !endswith(n, "_0")]
-    params = cand
-    if isempty(params)
-        @warn "No dynamic parameters found for profiling, selecting from all parameters."
-        params = first(all_names, min(length(all_names), 8))
-    end
-    println("[Profiling] Parameters: $(params)")
-
-    θ_init = collect(θ_mle)
-    lb = collect(petab_problem.lower_bounds)
-    ub = collect(petab_problem.upper_bounds)
-
-    idxs = [findfirst(==(p), all_names) for p in params if findfirst(==(p), all_names) !== nothing && (ub[findfirst(==(p), all_names)] - lb[findfirst(==(p), all_names)] > 1e-9)]
-    if isempty(idxs)
-        println("[Profiling] No variable parameters to profile; aborting.")
-        return Dict{String,Any}()
-    end
-
-    function obj(θ_est, _)
-        θ_work = eltype(θ_est) <: ForwardDiff.Dual ? ForwardDiff.value.(θ_est) : θ_est
-        if any(!isfinite, θ_work)
-            return 1e8
-        end
-        try
-            val = petab_problem.nllh(θ_work; prior=false)
-            return isfinite(val) ? val : 1e8
-        catch
-            return 1e8
-        end
-    end
-
-    optf = OptimizationFunction(obj, Optimization.AutoForwardDiff())
-    optprob = OptimizationProblem(optf, θ_init; lb=lb, ub=ub)
+    # 1. Create the PEtabProblem with the PositiveDomain callback
+    petab_problem = create_petab_problem_for_profiling(petab_model, odesolver, steadystate_solver)
     
-    # Let the library calculate the threshold from a confidence level
-    plprob = LikelihoodProfiler.PLProblem(optprob, θ_init; conf_level=0.95)
+    # 2. Select parameters to profile (your logic here is great, no changes needed)
+    all_names = string.(keys(θ_mle))
+    params_to_profile = [n for n in all_names if !startswith(n, "sigma") && !endswith(n, "_0")]
+    if isempty(params_to_profile)
+        @warn "No dynamic parameters found for profiling, selecting from all parameters."
+        params_to_profile = all_names
+    end
+    # Get the indices of the parameters to profile
+    param_indices = [findfirst(==(p), all_names) for p in params_to_profile]
+    println("[Profiling] Parameters to profile: $(params_to_profile)")
 
-    profiler = LikelihoodProfiler.OptimizationProfiler(
+    # 3. Use the integrated helper to create the LikelihoodProfiler problem
+    #    This automatically handles the objective function, bounds, and AD.
+    #    No need for a manual `obj` function!
+    @info "Setting up LikelihoodProfiler Problem..."
+    pl_problem = LikelihoodProfiler.get_pl_problem(petab_problem, θ_mle)
+
+    # 4. Define the profiler algorithm (your setup is good)
+    profiler_alg = LikelihoodProfiler.OptimizationProfiler(
         optimizer = OptimizationOptimJL.IPNewton(),
         stepper = LikelihoodProfiler.FixedStep(; initial_step = 0.005)
     )
-    println("[Profiling] Profiler constructed with IPNewton + FixedStep(0.005)")
 
-    println("[Profiling] Running threaded profiling on $(length(idxs)) parameters...")
-    res = LikelihoodProfiler.profile(plprob, profiler; idxs=idxs, maxiters=200, parallel_type=:threads)
+    # 5. Run the profiling
+    println("[Profiling] Running threaded profiling on $(length(param_indices)) parameters...")
+    @time profile_res = LikelihoodProfiler.profile(
+        pl_problem, 
+        profiler_alg; 
+        idxs = param_indices,
+        parallel_type = :threads,
+        maxiters=maxiters # Use the function argument
+    )
 
-    # Compute global best NLL at the provided MLE to anchor Δχ²
-    best_nll = begin
-        θmle_vec = collect(θ_mle)
-        try
-            petab_problem.nllh(θmle_vec; prior=false)
-        catch
-            Inf
-        end
-    end
-
+    # 6. Plot the results
+    println("[Profiling] Plotting results...")
     prof_dir = joinpath(pwd(), "likelihood_profiles")
     mkpath(prof_dir)
-    out = Dict{String,Any}()
+    
+    # The best NLL is stored in the results object
+    nll_mle = profile_res.maximum_log_likelihood
 
-    sol = res
-    for (j, p) in enumerate(params)
-        if j <= length(sol.profiles)
-            param_sol = sol[j]
-            out[p] = param_sol
-            try
-                xvals = getfield(param_sol, :params; default=nothing)
-                nllvals = getfield(param_sol, :objective_values; default=nothing)
-                if xvals === nothing || nllvals === nothing
-                    xvals = getfield(param_sol, :theta; default=nothing)
-                    nllvals = getfield(param_sol, :fun_values; default=nothing)
-                end
-                if xvals === nothing || nllvals === nothing
-                    @warn "Unknown profile fields; cannot plot Δχ² for $p"
-                    continue
-                end
-                anchor = isfinite(best_nll) ? best_nll : minimum(nllvals)
-                plt = plot()
-                plot_profile_delta_chi2!(plt, xvals, nllvals; pname=p, nll_anchor=anchor, ymax=4.0)
-                if haskey(true_param_values, p)
-                    vline!(plt, [true_param_values[p]]; label="True Value", color=:purple, linestyle=:dash)
-                end
-                savefig(plt, joinpath(prof_dir, "profile_$(p).png"))
-                println("[Profiling] Saved plot for $p (Δχ², y≤4)")
-            catch e
-                @warn "Plot failed for $p: $e"
-            end
+    for (param_name, profile_result) in profile_res.profiles
+        plt = plot()
+        
+        # The result object has clean, documented fields
+        x_vals = [p[1] for p in profile_result.points]
+        nll_vals = [p[2] for p in profile_result.points]
+        
+        plot_profile_delta_chi2!(plt, x_vals, nll_vals; pname=string(param_name), nll_anchor=nll_mle)
+        
+        # Add true value if it exists
+        if haskey(true_param_values, string(param_name))
+            vline!(plt, [true_param_values[string(param_name)]]; label="True Value", color=:purple, linestyle=:dash)
         end
+        
+        savefig(plt, joinpath(prof_dir, "profile_$(param_name).png"))
+        println("[Profiling] Saved plot for $(param_name)")
     end
 
     println("[Profiling] Done in $(round(time()-t_start; digits=2)) s")
-    return out
+    return profile_res
 end

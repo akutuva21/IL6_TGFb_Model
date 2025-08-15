@@ -16,6 +16,8 @@ Returns a tuple containing the optimizer algorithm object and its corresponding 
 This function ensures all return values are consistent.
 """
 function get_optimizer_and_options(optimizer_name::Symbol, debug_mode::Bool)
+
+    max_run_time = 3600.0
     
     if optimizer_name === :Fides
         # 1. Correctly create the Fides algorithm object.
@@ -39,17 +41,18 @@ function get_optimizer_and_options(optimizer_name::Symbol, debug_mode::Bool)
             iterations = debug_mode ? 200 : 800,
             g_tol      = 1e-6,
             f_reltol   = debug_mode ? 1e-6 : 1e-8,
+            time_limit = max_run_time,  # Added time limit for Optim.jl solvers
             show_trace = false
         )
 
         if optimizer_name === :IPNewton
-            println("Using IPNewton: Robust interior-point Newton (Julia native)")
+            @info "Using IPNewton: Robust interior-point Newton"
             return Optim.IPNewton(), optim_options
         elseif optimizer_name === :LBFGS
-            println("Using LBFGS: Reliable quasi-Newton, memory efficient")
+            @info "Using LBFGS: Reliable quasi-Newton, memory efficient"
             return Optim.LBFGS(), optim_options
         elseif optimizer_name === :BFGS
-            println("Using BFGS: Fast quasi-Newton for medium problems")
+            @info "Using BFGS: Fast quasi-Newton for medium problems"
             return Optim.BFGS(), optim_options
         else
             @error "Unknown optimizer: $optimizer_name"
@@ -68,6 +71,10 @@ function calibrate_multistart_threaded(prob::PEtabODEProblem, alg, nmultistarts:
     
     println("🚀 Starting thread-safe multithreaded multistart with $(Threads.nthreads()) threads")
     println("   Creating separate PEtabODEProblem copies for each thread...")
+    
+    # ADD THIS BLOCK HERE:
+    @info "nthreads=$(Threads.nthreads())"
+    @info "JULIA_NUM_THREADS=" * get(ENV, "JULIA_NUM_THREADS", "NOT SET")
     
     # Set up paths for saving intermediate results
     paths_save = Dict{Symbol, String}()
@@ -109,6 +116,7 @@ function calibrate_multistart_threaded(prob::PEtabODEProblem, alg, nmultistarts:
     # Initialize one copy per thread
     Threads.@threads for i in 1:Threads.nthreads()
         thread_id = Threads.threadid()
+        @info "initializing thread_id=$thread_id"  # ADD THIS LINE
         lock(problems_lock) do
             if !haskey(thread_problems, thread_id)
                 thread_problems[thread_id] = deepcopy(prob)
@@ -128,9 +136,17 @@ function calibrate_multistart_threaded(prob::PEtabODEProblem, alg, nmultistarts:
         thread_id = Threads.threadid()
         local_problem = thread_problems[thread_id]  # Thread-local problem copy
         
+        # ADD THESE TIMING LINES:
+        @info "start=$i thread=$thread_id beginning"
+        tstart = time()
+        
         # Call the helper function with all necessary variables
         runs[i] = _calibrate_startguess_threaded(xstarts[i], i, local_problem, alg, save_trace,
                                                options, paths_save, file_mutex)
+        
+        # ADD THESE TIMING LINES:
+        tend = time()
+        @info "done start=$i thread=$thread_id elapsed=$(round(tend-tstart, digits=1))s"
     end
 
     # Process results (same as before)
@@ -240,6 +256,10 @@ function run_parameter_estimation(parsed_args, petab_problem)
     println("  • Threading: CUSTOM multithreaded implementation")
     println("  • Available threads: $(Threads.nthreads())")
     
+    # ADD THESE LINES HERE:
+    @info "Environment check: JULIA_NUM_THREADS=" * get(ENV, "JULIA_NUM_THREADS", "NOT SET")
+    @info "Environment check: SLURM_CPUS_PER_TASK=" * get(ENV, "SLURM_CPUS_PER_TASK", "NOT SET")
+    
     start_time = time()
     multi_start_res = nothing
 
@@ -251,8 +271,9 @@ function run_parameter_estimation(parsed_args, petab_problem)
             dirsave="Intermediate_results",
             options=options
         )
+        println("✅ Threaded multistart completed successfully!")
     catch e
-        @error "Multi-start parameter estimation failed: $e"
+        @error "Threaded multistart failed: $e"
         showerror(stdout, e, catch_backtrace())
         return nothing
     end

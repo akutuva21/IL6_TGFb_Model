@@ -11,6 +11,8 @@ using JLD2
 using Base.Threads
 using DiffEqCallbacks
 using Logging
+using SciMLSensitivity
+using ReverseDiff
 
 # --- Cluster/Batch Output Setup ---
 if !isinteractive()
@@ -29,34 +31,13 @@ function log_progress(i, total, task_name)
 end
 
 function create_petab_problem_with_callbacks(petab_model, odesolver, steadystate_solver)
-    @info "Adding PositiveDomain callback to PEtabModel to enforce non-negative concentrations."
-    
-    positive_domain_cb = PositiveDomain()
-    combined_callbacks = CallbackSet(petab_model.callbacks, positive_domain_cb)
-
-    petab_model_with_callback = PEtabModel(
-        petab_model.name,
-        petab_model.h,
-        petab_model.u0!,
-        petab_model.u0,
-        petab_model.sd,
-        petab_model.float_tspan,
-        petab_model.paths,
-        petab_model.sys,
-        petab_model.sys_mutated,
-        petab_model.parametermap,
-        petab_model.speciemap,
-        petab_model.petab_tables,
-        combined_callbacks,
-        petab_model.defined_in_julia
-    )
-    
+    # previously contained callback for positive domain, now removed
     @time petab_problem = PEtabODEProblem(
-            petab_model_with_callback, # Use model augmented with PositiveDomain callback
+            petab_model,
             odesolver = odesolver,
             ss_solver = steadystate_solver,
-            gradient_method = :ForwardDiff,
-            hessian_method = :ForwardDiff,
+            gradient_method = :Adjoint,
+            sensealg = InterpolatingAdjoint(autojacvec=ReverseDiffVJP()),
             verbose=false
         )
     
@@ -176,7 +157,7 @@ function run_analysis()
     petab_model = setup_results.petab_model
     true_param_values = setup_results.true_values
     @info "Successfully loaded PEtab model with $(length(true_param_values)) parameters"; flush(stdout); flush(stderr)
-
+    
     # --- 3. Define robust solver options ---
     @info "Defining robust solver for simulation and steady-state..."
         
@@ -189,8 +170,8 @@ function run_analysis()
                           reltol=1e-4)
         steadystate_solver = SteadyStateSolver(:Simulate, abstol=1e-4, reltol=1e-4)
     else # Normal (non-debug) mode
-        println("INFO: Normal mode - using Rodas5P with ForwardDiff for robust optimization")
-        odesol = ODESolver(Rodas5P(), 
+        println("INFO: Normal mode - using KenCarp47 with ForwardDiff for robust optimization")
+        odesol = ODESolver(KenCarp47(autodiff=false), 
                           abstol=1e-6, 
                           reltol=1e-6, 
                           dtmin=1e-12)
@@ -210,6 +191,23 @@ function run_analysis()
     local petab_problem
     @info "Building PEtabODEProblem..."
     petab_problem = create_petab_problem_with_callbacks(petab_model, odesol, steadystate_solver)
+
+    # testing correct parameters
+    @info "Testing objective function at nominal parameters..."
+
+    # Use your true/nominal parameter values
+    x_nominal = [0.1, 0.1, 0.5, 0.05, 0.1, 0.05, 1.0, 0.1, 0.1, 0.05, 
+             1.0, 0.1, 1.0, 0.1, 1.0, 0.1, 100.0, 100.0, 50.0, 100.0, 50.0, 0.05]
+
+    @time begin
+        try
+            obj_val = petab_problem.nllh(x_nominal)
+            @info "Objective value at nominal: $obj_val"
+            @info "✅ Model evaluation works!"
+        catch e
+            @warn "❌ Model evaluation failed: $e"
+        end
+    end
 
     # --- 5. Run estimation ONLY if no results were loaded ---
     if isnothing(multi_start_res)
@@ -291,7 +289,7 @@ function run_analysis()
     @info "[ProfilingGate] profile flag parsed as: $(parsed_args["profile"])"; flush(stdout); flush(stderr)
     if parsed_args["profile"]
         @info "[ProfilingGate] Preparing likelihood profiling run..."; flush(stdout); flush(stderr)
-        profiling_odesol = ODESolver(Rodas5P(), abstol=1e-8, reltol=1e-8)
+        profiling_odesol = ODESolver(QNDF(), abstol=1e-8, reltol=1e-8)
         profiling_steadystate_solver = SteadyStateSolver(:Simulate, abstol=1e-8, reltol=1e-8)
         start_prof_wall = time()
         @info "[ProfilingGate] Entering run_likelihood_profiling()"; flush(stdout); flush(stderr)

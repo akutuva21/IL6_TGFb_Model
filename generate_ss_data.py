@@ -8,7 +8,7 @@ import logging
 import sys
 
 # --------------------------------------------------------------------------
-#                   LOGGING CONFIGURATION
+#                    LOGGING CONFIGURATION
 # --------------------------------------------------------------------------
 
 def setup_logging(level=logging.INFO):
@@ -121,10 +121,28 @@ def run_simulation_from_preeq(
     # 2. Set the initial concentrations to the provided steady-state vector
     simulator.model.setFloatingSpeciesConcentrations(ss_concentrations)
 
+    # --- START DIAGNOSTIC LOGGING ---
+    # Find the simulator ID for IL6(r) to check its value. 
+    # This is inefficient to do every time, but fine for a quick debug.
+    il6_species_id = None
+    for species_id in simulator.model.getFloatingSpeciesIds():
+        if "IL6(r)" in species_id: # Find the species ID for IL6
+            il6_species_id = species_id
+            break
+    
+    if il6_species_id:
+        logging.debug(f"    [DEBUG] IL-6 concentration AFTER loading pre-eq state: {simulator.model[il6_species_id]}")
+    # --- END DIAGNOSTIC LOGGING ---
+
     # 3. Apply the specific stimuli for the current experimental condition
     for species_id, value in stimuli.items():
         simulator.model[species_id] = value
     
+    # --- START DIAGNOSTIC LOGGING ---
+    if il6_species_id:
+        logging.debug(f"    [DEBUG] IL-6 concentration AFTER applying stimulus: {simulator.model[il6_species_id]}")
+    # --- END DIAGNOSTIC LOGGING ---
+
     # 4. Apply robust integrator settings
     simulator.integrator.stiff = True
     simulator.integrator.absolute_tolerance = 1e-8
@@ -185,217 +203,14 @@ def add_noise(data_series: pd.Series, noise_level: float, rng: np.random.Generat
     return pd.Series(noisy_series, index=data_series.index)
 
 # --------------------------------------------------------------------------
-#                   TIME-COURSE WORKFLOW WITH CORRECT SAVING
-# --------------------------------------------------------------------------
-
-def generate_time_course_excel(config):
-    """
-    Generates time-course data with a consistent pre-equilibration step
-    and saves it to a single Excel file in "wide" format.
-    """
-    logging.info(f"--- Running Time-Course Data Generation (Consistent Preeq) ---")
-    
-    # 1. Load settings and model
-    tc_settings = config['time_course_settings']
-    output_dir = config['output_dir']
-    model_path = config['model_path']
-    rng = np.random.default_rng(config['random_seed'])
-    
-    logging.info(f"Loading BNGL model from: {model_path}")
-    bng_model = bionetgen.bngmodel(model_path)
-    os.makedirs(output_dir, exist_ok=True)
-
-    # 2. Discover mappings and get true parameters
-    variable_stimuli = set(tc_settings.get('variable_stimuli', []))
-    constant_stimuli_names = set(tc_settings.get('constant_stimuli', []))
-    all_stimuli_params = variable_stimuli.union(constant_stimuli_names)
-
-    # Use a temporary model instance for species mapping discovery to avoid contaminating the main model
-    logging.info("  Creating temporary model instance for species mapping discovery...")
-    temp_model_for_tracing = bionetgen.bngmodel(model_path)
-    param_to_sbml_id = discover_species_map(temp_model_for_tracing, list(all_stimuli_params))
-    # After this, temp_model_for_tracing can be discarded. The main 'bng_model' object is still clean.
-    
-    true_kinetic_params = get_true_parameters(bng_model, all_stimuli_params)
-
-    # 3. Calculate the single, shared pre-equilibration steady state
-    # Separate the stimuli into those that should be zero vs constant
-    stimuli_to_zero_map = {p: i for p, i in param_to_sbml_id.items() if p in variable_stimuli}
-    
-    # Get the actual values for the constant stimuli from the TREG condition (or any baseline)
-    baseline_condition = tc_settings['conditions']['TREG']
-    constant_stimuli_map = {
-        param_to_sbml_id[p]: baseline_condition[p] 
-        for p in constant_stimuli_names if p in baseline_condition
-    }
-
-    ss_concentrations = calculate_preeq_steadystate(
-        bng_model, true_kinetic_params, stimuli_to_zero_map, constant_stimuli_map, param_to_sbml_id
-    )
-
-    # 4. Run simulation for each condition from the shared steady state
-    time_course_results = {}
-    for condition_name, stimuli_values in tc_settings['conditions'].items():
-        logging.info(f"\n--- Processing Condition: {condition_name} ---")
-        stimuli_with_ids = {param_to_sbml_id[p]: v for p, v in stimuli_values.items()}
-        
-        df_sim = run_simulation_from_preeq(
-            bng_model, 
-            ss_concentrations,
-            true_kinetic_params,
-            stimuli_with_ids,
-            tc_settings['simulation']['duration'],
-            tc_settings['simulation']['steps']
-        )
-        time_course_results[condition_name] = df_sim
-
-    # 5. Save the results to a single Excel file in the correct "wide" format
-    noise_conf = tc_settings['noise']
-    noise_str = f"_noise{int(noise_conf['level_percent'])}" if noise_conf['add'] else ""
-    filename = os.path.join(output_dir, f"preeq{noise_str}.xlsx")
-    
-    logging.info(f"\n--- Formatting and saving data to '{filename}' ---")
-    
-    # Get observable names from the model object
-    all_observables = [obs.name for obs_key in bng_model.observables for obs in [bng_model.observables[obs_key]]]
-    logging.info(f"INFO: Found observables to save: {all_observables}")
-
-    with pd.ExcelWriter(filename) as writer:
-        for obs_name in sorted(all_observables):
-            # Check if the observable column exists in the first simulation result
-            if obs_name not in time_course_results[list(tc_settings['conditions'].keys())[0]].columns:
-                logging.warning(f"WARNING: Observable '{obs_name}' not found in simulation output. Skipping.")
-                continue
-
-            # Create a new DataFrame for this observable's sheet
-            sheet_df = pd.DataFrame()
-            # Use the time column from the first condition's results
-            sheet_df['Time'] = time_course_results[list(tc_settings['conditions'].keys())[0]]['time']
-
-            # Add a column for each condition
-            for condition_name, result_df in time_course_results.items():
-                data_col = result_df[obs_name]
-                if noise_conf['add']:
-                    noise_fraction = noise_conf['level_percent'] / 100.0
-                    data_col = add_noise(data_col, noise_fraction, rng)
-                sheet_df[condition_name] = data_col
-            
-            # Write this observable's DataFrame to a sheet in the Excel file
-            sheet_df.to_excel(writer, sheet_name=obs_name, index=False)
-            
-    logging.info(f"✅ Data saved successfully to {filename}")
-    sys.stdout.flush()
-
-
-# --------------------------------------------------------------------------
-#                   DOSE-RESPONSE WORKFLOW
-# --------------------------------------------------------------------------
-
-def excel_to_petab_dose_response(config):
-    """
-    Reads a dose-response Excel file, converts it to PEtab format,
-    and saves the measurement and condition files.
-    """
-    logging.info("--- Running Dose-Response Data Processing ---")
-    
-    # 1. Load settings
-    dr_settings = config['dose_response_settings']
-    input_conf = dr_settings['input_data']
-    output_dir = config['output_dir']
-    os.makedirs(output_dir, exist_ok=True)
-
-    if not input_conf['load_from_file']:
-        logging.info("This script is configured to process an existing file. Skipping.")
-        return
-
-    # 2. Read the Excel data
-    filepath = input_conf['filepath']
-    dose_col = input_conf['dose_column_name']
-    col_map = input_conf['column_to_observable_map']
-    
-    logging.info(f"  Reading data from '{filepath}'...")
-    try:
-        df_wide = pd.read_excel(filepath)
-    except FileNotFoundError:
-        logging.error(f"ERROR: Data file not found at '{filepath}'")
-        return
-
-    # 3. Convert from wide to long format (PEtab measurements table)
-    logging.info("  Converting data to PEtab long format...")
-    
-    # Melt the DataFrame to turn it into a long format
-    df_long = df_wide.melt(
-        id_vars=[dose_col],
-        var_name="measurement_col",
-        value_name="measurement"
-    )
-    
-    # Map the original measurement columns to PEtab observableIds
-    df_long['observableId'] = df_long['measurement_col'].map(col_map)
-    
-    # Drop rows where the mapping didn't exist (e.g., columns not in the map)
-    df_long.dropna(subset=['observableId'], inplace=True)
-
-    # 4. Create PEtab DataFrames
-    
-    # --- Measurement DataFrame ---
-    measurement_df = pd.DataFrame()
-    measurement_df['observableId'] = df_long['observableId']
-    
-    # Create a unique simulation condition for each dose level
-    measurement_df['simulationConditionId'] = [f"dose_{d}" for d in df_long[dose_col]]
-    
-    # For steady-state, time is infinite
-    measurement_df['time'] = np.inf
-    measurement_df['measurement'] = df_long['measurement']
-    
-    # Add placeholder for preequilibration (can be defined later if needed)
-    measurement_df['preequilibrationConditionId'] = 'preeq_ss'
-    
-    # --- Condition DataFrame ---
-    dose_parameter = dr_settings['dose_parameter']
-    constant_params = dr_settings['constant_parameters']
-    
-    unique_doses = df_wide[dose_col].unique()
-    condition_ids = [f"dose_{d}" for d in unique_doses]
-    
-    condition_df = pd.DataFrame({
-        'conditionId': condition_ids,
-        dose_parameter: unique_doses
-    })
-    
-    # Add any constant parameters
-    for param, value in constant_params.items():
-        condition_df[param] = value
-        
-    # Add the preequilibration condition
-    preeq_cond = {'conditionId': 'preeq_ss', dose_parameter: 0.0}
-    for param, value in constant_params.items():
-        preeq_cond[param] = value
-    condition_df = pd.concat([condition_df, pd.DataFrame([preeq_cond])], ignore_index=True)
-
-    # 5. Save to CSV
-    measurement_path = os.path.join(output_dir, "measurements_dose_response.tsv")
-    condition_path = os.path.join(output_dir, "conditions_dose_response.tsv")
-    
-    measurement_df.to_csv(measurement_path, index=False, sep='\t')
-    condition_df.to_csv(condition_path, index=False, sep='\t')
-    
-    logging.info(f"✅ PEtab files created successfully:")
-    logging.info(f"   - Measurements: {measurement_path}")
-    logging.info(f"   - Conditions:   {condition_path}")
-    sys.stdout.flush()
-
-
-# --------------------------------------------------------------------------
 #                   TIME-COURSE WORKFLOW WITH PEtab TSV OUTPUT
 # --------------------------------------------------------------------------
 
 def generate_time_course_petab(config):
     """
-    Generates time-course data with consistent pre-equilibration step
-    and saves it in PEtab-standard TSV format (long format).
-    This is the recommended method for PEtab compliance.
+    Generates time-course data with consistent pre-equilibration,
+    handles zero values with a Limit of Detection (LOD), adds noise,
+    and saves it in PEtab-standard TSV format.
     """
     logging.info(f"--- Running Time-Course Data Generation (PEtab TSV Format) ---")
     
@@ -403,189 +218,121 @@ def generate_time_course_petab(config):
     tc_settings = config['time_course_settings']
     output_dir = config['output_dir']
     os.makedirs(output_dir, exist_ok=True)
-    
     model_path = config['model_path']
     model = bionetgen.bngmodel(model_path)
-
-    # indicate what file you are loading
     logging.info(f"Loading BNGL model from: {model_path}")
     
-    # 2. Extract parameters
-    conditions_list = tc_settings['conditions'].keys()
-    logging.info(f"  Identified conditions: {list(conditions_list)}")
-    
-    # Get stimulus parameters from the variable_stimuli and constant_stimuli lists
+    # 2. Extract parameters and discover species map
     variable_stimuli = set(tc_settings.get('variable_stimuli', []))
     constant_stimuli_names = set(tc_settings.get('constant_stimuli', []))
     condition_params = variable_stimuli.union(constant_stimuli_names)
-    logging.info(f"  Identified stimulus (condition) parameters: {list(condition_params)}")
-    
     true_params = get_true_parameters(model, condition_params)
-    
-    # 5. Discover the species map using a temporary model instance.
-    #    This prevents the main model object from being modified with tracer values.
-    logging.info("  Creating temporary model instance for species mapping discovery...")
     temp_model_for_tracing = bionetgen.bngmodel(model_path)
     param_to_sbml_id = discover_species_map(temp_model_for_tracing, list(condition_params))
-    # After this, temp_model_for_tracing can be discarded. The main 'model' object is still clean.
     
-    # 3. Get pre-equilibration steady-state
-    variable_stimuli = set(tc_settings.get('variable_stimuli', []))
-    constant_stimuli_names = set(tc_settings.get('constant_stimuli', []))
-    
-    stimuli_to_zero = {}
-    for param in variable_stimuli:
-        stimuli_to_zero[param] = 0.0
-    
-    # Get constant stimuli values from baseline condition
+    # 3. Calculate pre-equilibration steady-state
+    stimuli_to_zero = {param: 0.0 for param in variable_stimuli}
     baseline_condition = tc_settings['conditions']['TREG']
-    constant_stimuli = {}
-    for param in constant_stimuli_names:
-        if param in baseline_condition:
-            constant_stimuli[param] = baseline_condition[param]
-    
-    # Now this call will work because param_to_sbml_id is defined.
+    constant_stimuli = {param: baseline_condition[param] for param in constant_stimuli_names if param in baseline_condition}
     preeq_ss = calculate_preeq_steadystate(model, true_params, stimuli_to_zero, constant_stimuli, param_to_sbml_id)
     logging.info(f"  Pre-equilibration steady-state calculated.")
     
-    # 4. Simulation settings
-    sim_confs = tc_settings['simulation']
-    t_end = sim_confs['duration']
-    n_points = sim_confs['steps']
-    
-    # 6. Run simulations for each condition
+    # 4. Run simulations and generate "perfect" data
     time_course_results = {}
-    
     for condition_name, condition_values in tc_settings['conditions'].items():
         logging.info(f"  Simulating condition: {condition_name}")
-        
-        # Create the dictionary with the correct simulator IDs
         stimuli_with_ids = {param_to_sbml_id[p]: v for p, v in condition_values.items()}
-        
         result_df = run_simulation_from_preeq(
-            model, preeq_ss, true_params, stimuli_with_ids, t_end, n_points
+            model, preeq_ss, true_params, stimuli_with_ids, 
+            tc_settings['simulation']['duration'], tc_settings['simulation']['steps']
         )
         time_course_results[condition_name] = result_df
-    
-    # 7. Convert to PEtab long format
-    logging.info("  Converting data to PEtab long format...")
-    
-    # Create noise generator
-    noise_conf = tc_settings['noise']
-    seed = tc_settings.get('random_seed', 42)
-    rng = np.random.default_rng(seed)
-    # Precompute sigma on natural log scale for a constant coefficient of variation
-    # sigma_logn = sqrt(log(1 + CV^2))
-    noise_fraction = noise_conf['level_percent'] / 100.0
-    sigma_logn = (
-        float(np.sqrt(np.log(1.0 + noise_fraction**2)))
-        if noise_conf['add'] else 0.0
-    )
-    
-    # Prepare measurement and condition DataFrames
+        
+    # 5. Convert to long format DataFrame (still noise-free)
     measurement_rows = []
-    condition_rows = []
-    
-    # Get observable names from the model object
-    all_observables = [obs.name for obs_key in model.observables for obs in [model.observables[obs_key]]]
-    logging.info(f"INFO: Found observables to save: {all_observables}")
-
-    # NOTE: We don't add preeq_ss to the main conditions table because it's only used
-    # for pre-equilibration and doesn't have corresponding measurements. PEtab will
-    # handle pre-equilibration internally using the preequilibrationConditionId column.
-    
-    # Process each condition
-    for condition_name, condition_values in tc_settings['conditions'].items():
-        result_df = time_course_results[condition_name]
-        
-        # Add condition to conditions table - use the actual stimulus values
-        condition_row = {'conditionId': condition_name}
-        condition_row.update(condition_values)  # This contains IL6_0, TGFb_0, etc.
-        condition_rows.append(condition_row)
-        
-        # Add measurements for each observable and time point
+    all_observables = [obs_name for obs_name in model.observables]
+    for condition_name, result_df in time_course_results.items():
         for _, row in result_df.iterrows():
             time_val = row['time']
             for obs_name in all_observables:
                 if obs_name in row:
-                    measurement_val = row[obs_name]
-                    
-                    # Add noise if configured: log-normal (natural log) for constant CV
-                    if noise_conf['add']:
-                        # Unbiased multiplicative log-normal noise: E[exp(N(-σ²/2, σ²))] = 1
-                        eps = np.exp(rng.normal(loc=-0.5 * sigma_logn**2, scale=sigma_logn))
-                        measurement_val = measurement_val * eps
-                    
                     measurement_rows.append({
                         'observableId': obs_name,
                         'simulationConditionId': condition_name,
                         'time': time_val,
-                        'measurement': measurement_val,
+                        'measurement': row[obs_name],
                         'preequilibrationConditionId': 'preeq_ss'
                     })
     
-    # 8. Create DataFrames and save
     measurement_df = pd.DataFrame(measurement_rows)
 
+    # 6. Apply Limit of Detection (LOD) and Noise
     noise_conf = tc_settings['noise']
-    is_noisy = noise_conf['add'] and noise_conf['level_percent'] > 0
-
-    if is_noisy:
+    if noise_conf['add']:
+        logging.info("  Applying Limit of Detection (LOD) to zero-valued measurements...")
         lod_map = {}
         for obs_id in measurement_df['observableId'].unique():
-            pos_vals = measurement_df.loc[
-                (measurement_df['observableId'] == obs_id) & (measurement_df['measurement'] > 0.0),
+            non_zero_vals = measurement_df.loc[
+                (measurement_df['observableId'] == obs_id) & (measurement_df['measurement'] > 0), 
                 'measurement'
-            ].to_numpy()
-            if len(pos_vals) > 0:
-                lod = float(0.5 * np.min(pos_vals))  # conservative LOD below smallest positive
+            ]
+            if not non_zero_vals.empty:
+                # Heuristic: LOD is half the smallest positive measurement
+                lod = 0.5 * non_zero_vals.min()
+                lod_map[obs_id] = max(lod, 1e-12) # Add a floor value
             else:
-                lod = 1e-12  # fallback if all zero
-            lod_map[obs_id] = lod
+                # Fallback for observables that are always zero
+                lod_map[obs_id] = 1e-12
 
-        # Replace zeros and negatives with the LOD for that observable
-        def _apply_lod(row):
-            return lod_map[row['observableId']] if row['measurement'] <= 0.0 else row['measurement']
+        def apply_lod(row):
+            if row['measurement'] <= 0:
+                return lod_map[row['observableId']]
+            return row['measurement']
+        
+        measurement_df['measurement'] = measurement_df.apply(apply_lod, axis=1)
+        logging.info("  ...LOD applied successfully.")
+        
+        logging.info(f"  Adding {noise_conf['level_percent']}% lognormal noise...")
+        seed = tc_settings.get('random_seed', 42)
+        rng = np.random.default_rng(seed)
+        noise_fraction = noise_conf['level_percent'] / 100.0
+        
+        # Apply noise to the entire measurement column at once
+        measurement_df['measurement'] = add_noise(measurement_df['measurement'], noise_fraction, rng)
+        logging.info("  ...Noise added successfully.")
 
-        mask = measurement_df['measurement'] <= 0.0
-        if mask.any():
-            measurement_df.loc[mask, 'measurement'] = measurement_df.loc[mask].apply(_apply_lod, axis=1)
+    # 7. Create and save PEtab files
+    condition_rows = []
+    for condition_name, condition_values in tc_settings['conditions'].items():
+        condition_row = {'conditionId': condition_name}
+        condition_row.update(condition_values)
+        condition_rows.append(condition_row)
     
-    # Ensure the 'preeq_ss' condition is included in the conditions file
-    # Use the baseline (TREG) stimuli values for pre-equilibration
     baseline_cond = tc_settings['conditions'].get('TREG', {})
     preeq_row = {'conditionId': 'preeq_ss'}
     preeq_row.update(baseline_cond)
     condition_rows.append(preeq_row)
-
     condition_df = pd.DataFrame(condition_rows)
     
-    # Create filename suffix based on noise configuration
-    if noise_conf['add']:
-        noise_percent = int(noise_conf['level_percent'])
-        filename_suffix = f"_noise{noise_percent}"
-    else:
-        filename_suffix = "_no_noise"
-        
+    filename_suffix = f"_noise{int(noise_conf['level_percent'])}" if noise_conf['add'] else "_no_noise"
     measurement_path = os.path.join(output_dir, f"measurements_time_course{filename_suffix}.tsv")
     condition_path = os.path.join(output_dir, f"conditions_time_course{filename_suffix}.tsv")
     
-    measurement_df.to_csv(measurement_path, index=False, sep='\t')
+    measurement_df.to_csv(measurement_path, index=False, sep='\t', float_format='%.8g')
     condition_df.to_csv(condition_path, index=False, sep='\t')
     
     logging.info(f"✅ PEtab time-course files created successfully:")
     logging.info(f"   - Measurements: {measurement_path}")
     logging.info(f"   - Conditions:   {condition_path}")
-    sys.stdout.flush()
     
     return measurement_df, condition_df, model
-
 
 # --------------------------------------------------------------------------
 #                   PEtab FILE CREATION
 # --------------------------------------------------------------------------
 
 def create_observables_petab(config, measurements_df, observables_mapping, output_path):
+    """Creates a PEtab observables file with a shared noise parameter."""
     logging.info("Creating observables PEtab file (log-normal with shared sigma)...")
 
     noise_conf = config['time_course_settings']['noise']
@@ -595,7 +342,7 @@ def create_observables_petab(config, measurements_df, observables_mapping, outpu
     observables_data = []
 
     for obs_id in observable_ids:
-        # Use one shared sigma for all observables
+        # Use one shared sigma for all observables for simplicity and robustness
         noise_formula = "sigma_log_shared" if is_noisy else "1e-8"
         noise_dist = "logNormal"
 
@@ -611,78 +358,75 @@ def create_observables_petab(config, measurements_df, observables_mapping, outpu
     observables_df.to_csv(output_path, sep='\t', index=False)
     logging.info(f"✅ Observables file saved: {output_path}")
 
-def create_parameters_petab(config, model, measurements_df, output_path):
-    """Create parameters.tsv with a single shared sigma_log for log-normal noise."""
-    logging.info("Creating parameters PEtab file (log-normal, shared sigma)...")
+
+def create_parameters_petab(config, model, output_path):
+    """
+    Creates a parameters.tsv file with raw (linear) values, which is the
+    format expected by PEtab.jl and other common toolboxes.
+    """
+    logging.info("Creating parameters PEtab file with raw (linear) values...")
 
     parameters_data = []
+    stimulus_params = set(config['time_course_settings']['variable_stimuli']) | set(config['time_course_settings']['constant_stimuli'])
 
-    # Define which parameters should NOT be estimated (they are controlled by the conditions file)
-    stimulus_params = {'IL6_0', 'TGFb_0'}
-
-    # Define custom bounds for initial concentration parameters if needed
-    initial_concentration_params = {'IL6R_0', 'SMAD3_0', 'SMAD4_0', 'STAT3m_0', 'PKA_0'}
-
-    # Add model parameters (unchanged)
     for param_name in model.parameters:
+        # Get the parameter OBJECT using the name as a key
         param_obj = model.parameters[param_name]
+        # Access the .value attribute from the OBJECT
         nominal_value = float(param_obj.value)
-
+        
+        # Default bounds for kinetic rates
+        lower_bound = nominal_value / 2.0
+        upper_bound = nominal_value * 2.0
+        
         if param_name in stimulus_params:
-            should_estimate = 0
+            estimate = 0
+            parameter_scale = 'lin'
+            # For fixed params, bounds are just the nominal value
+            lower_bound = nominal_value
+            upper_bound = nominal_value
         else:
-            should_estimate = 1
-
-        if param_name in initial_concentration_params:
-            lower_bound = 1.0
-            upper_bound = 200.0
-        else:
-            lower_bound = nominal_value / 2.0 if nominal_value != 0 else 1e-4
-            upper_bound = nominal_value * 2.0 if nominal_value != 0 else 1e4
-
-        if should_estimate == 0:
-            epsilon = abs(nominal_value) * 1e-10 + 1e-10
-            lower_bound = nominal_value - epsilon
-            upper_bound = nominal_value + epsilon
+            estimate = 1
+            parameter_scale = 'log10'
+            if param_name.endswith("_0"): # Simple check for initial concentrations
+                lower_bound = 1.0
+                upper_bound = 200.0
 
         parameters_data.append({
             'parameterId': param_name,
             'parameterName': param_name,
-            'parameterScale': 'log10',
+            'parameterScale': parameter_scale,
             'lowerBound': lower_bound,
             'upperBound': upper_bound,
             'nominalValue': nominal_value,
-            'estimate': should_estimate
+            'estimate': estimate
         })
 
-    # Shared sigma for log-normal noise
+    # Add the shared noise parameter
     noise_conf = config['time_course_settings']['noise']
-    is_noisy = noise_conf['add'] and noise_conf['level_percent'] > 0
-    noise_fraction = noise_conf['level_percent'] / 100.0 if is_noisy else 0.0
-
+    is_noisy = noise_conf.get('add', False) and noise_conf.get('level_percent', 0) > 0
+    
     if is_noisy:
-        sigma_log_nominal = float(np.sqrt(np.log(1.0 + noise_fraction**2)))  # CV hint
-        sigma_estimate_flag = 1  # estimate shared sigma
-        sigma_lower = 1e-2    # Convert to log10: log10(0.01) = -2
-        sigma_upper = 1.0     # Convert to log10: log10(1.0) = 0
+        cv = noise_conf['level_percent'] / 100.0
+        # Nominal value for sigma on linear scale, derived from CV
+        sigma_nominal = float(np.sqrt(np.log(1.0 + cv**2)))
+        parameters_data.append({
+            'parameterId': 'sigma_log_shared', 'parameterName': 'sigma_log_shared',
+            'parameterScale': 'log10', # The optimizer still sees this on a log scale
+            'lowerBound': 1e-2,       # Linear bound
+            'upperBound': 0.25,        # Linear bound
+            'nominalValue': sigma_nominal, # Linear nominal value
+            'estimate': 0
+        })
     else:
-        sigma_log_nominal = 1e-8
-        sigma_estimate_flag = 0
-        sigma_lower = 1e-8   # Convert to log10: log10(1e-8) = -8
-        sigma_upper = 1e-4    # Convert to log10: log10(1e-4) = -4
+        # Add a fixed noise parameter if data is noise-free
+        parameters_data.append({
+            'parameterId': 'sigma_log_shared', 'parameterName': 'sigma_log_shared',
+            'parameterScale': 'log10', 'lowerBound': 1e-8, 'upperBound': 1e-4,
+            'nominalValue': 1e-8, 'estimate': 0
+        })
 
-    parameters_data.append({
-        'parameterId': 'sigma_log_shared',
-        'parameterName': 'sigma_log_shared',
-        'parameterScale': 'log10',
-        'lowerBound': sigma_lower,
-        'upperBound': sigma_upper,
-        'nominalValue': sigma_log_nominal,
-        'estimate': sigma_estimate_flag
-    })
-
-    parameters_df = pd.DataFrame(parameters_data)
-    parameters_df.to_csv(output_path, sep='\t', index=False)
+    pd.DataFrame(parameters_data).to_csv(output_path, sep='\t', index=False, float_format='%.16g')
     logging.info(f"✅ Parameters file saved: {output_path}")
 
 # --------------------------------------------------------------------------
@@ -727,7 +471,6 @@ def main():
     create_parameters_petab(
         config,
         model,
-        measurements_df, 
         parameters_path
     )
     
@@ -736,6 +479,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # excel_to_petab_dose_response(config)
-    # generate_time_course_excel(config)
     main()
