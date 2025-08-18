@@ -80,16 +80,20 @@ function main()
         n_starts = parsed_args["n-starts"]
         best_cost = Inf
         best_params = nothing
+        all_runs = PEtab.PEtabOptimisationResult[] # Store all valid runs
         best_file = ""
 
         for i in 1:n_starts
             filepath = joinpath("results", "run_$(i).jld2")
             if isfile(filepath)
                 res = JLD2.load(filepath, "result")
-                if !isnothing(res) && res.fmin < best_cost
-                    best_cost = res.fmin
-                    best_params = res.xmin
-                    best_file = filepath
+                if !isnothing(res) && isfinite(res.fmin)
+                    push!(all_runs, res) # Add the full result object to our list
+                    if res.fmin < best_cost
+                        best_cost = res.fmin
+                        best_params = res.xmin
+                        best_file = filepath
+                    end
                 end
             end
         end
@@ -102,17 +106,26 @@ function main()
         @info "✅ Collation complete. Best result found in: $(best_file)"
         @info "   - Best cost (nllh): $(best_cost)"
         
-        JLD2.save("best_fit.jld2", Dict("best_mle" => best_params, "best_cost" => best_cost))
-        @info "   - Best parameters saved to best_fit.jld2"
+        # Reconstruct the PEtabMultistartResult object for plotting functions
+        multistart_res = PEtab.PEtabMultistartResult(best_params, best_cost, :collate, n_starts, "Loaded", nothing, all_runs)
+        
+        # Save the single best result AND the full multistart object for diagnostics
+        JLD2.save("best_fit.jld2", Dict("best_mle" => best_params, "best_cost" => best_cost, "multistart_result" => multistart_res))
+        @info "   - Best parameters and full multistart results saved to best_fit.jld2"
 
-        # --- Visualization Part ---
-        @info "--- Starting visualization for the best fit ---"
-        # Set up the PEtab problem again to run the simulation
+        # --- Set up the PEtab problem once for all plotting ---
         setup_results = setup_petab_problem(parsed_args["yaml"])
         odesolver = ODESolver(KenCarp47(autodiff=false), abstol=1e-8, reltol=1e-8)
         petab_problem = PEtabODEProblem(setup_results.petab_model, odesolver=odesolver)
 
-        # Call the visualization function with the best parameters we just found
+        # --- NEW: Generate Diagnostic Plots ---
+        @info "--- Generating diagnostic plots ---"
+        plot_waterfall(multistart_res)
+        plot_parameter_distribution(multistart_res, petab_problem, reference_values=setup_results.true_values)
+        # ------------------------------------
+
+        # --- Visualization Part ---
+        @info "--- Starting visualization for the best fit ---"
         run_visualization(
             collect(best_params),
             petab_problem,

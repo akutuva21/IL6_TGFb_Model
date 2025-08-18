@@ -121,7 +121,6 @@ def run_simulation_from_preeq(
     # 2. Set the initial concentrations to the provided steady-state vector
     simulator.model.setFloatingSpeciesConcentrations(ss_concentrations)
 
-    # --- START DIAGNOSTIC LOGGING ---
     # Find the simulator ID for IL6(r) to check its value. 
     # This is inefficient to do every time, but fine for a quick debug.
     il6_species_id = None
@@ -132,16 +131,13 @@ def run_simulation_from_preeq(
     
     if il6_species_id:
         logging.debug(f"    [DEBUG] IL-6 concentration AFTER loading pre-eq state: {simulator.model[il6_species_id]}")
-    # --- END DIAGNOSTIC LOGGING ---
 
     # 3. Apply the specific stimuli for the current experimental condition
     for species_id, value in stimuli.items():
         simulator.model[species_id] = value
     
-    # --- START DIAGNOSTIC LOGGING ---
     if il6_species_id:
         logging.debug(f"    [DEBUG] IL-6 concentration AFTER applying stimulus: {simulator.model[il6_species_id]}")
-    # --- END DIAGNOSTIC LOGGING ---
 
     # 4. Apply robust integrator settings
     simulator.integrator.stiff = True
@@ -269,28 +265,16 @@ def generate_time_course_petab(config):
     # 6. Apply Limit of Detection (LOD) and Noise
     noise_conf = tc_settings['noise']
     if noise_conf['add']:
-        logging.info("  Applying Limit of Detection (LOD) to zero-valued measurements...")
-        lod_map = {}
-        for obs_id in measurement_df['observableId'].unique():
-            non_zero_vals = measurement_df.loc[
-                (measurement_df['observableId'] == obs_id) & (measurement_df['measurement'] > 0), 
-                'measurement'
-            ]
-            if not non_zero_vals.empty:
-                # Heuristic: LOD is half the smallest positive measurement
-                lod = 0.5 * non_zero_vals.min()
-                lod_map[obs_id] = max(lod, 1e-12) # Add a floor value
-            else:
-                # Fallback for observables that are always zero
-                lod_map[obs_id] = 1e-12
-
-        def apply_lod(row):
-            if row['measurement'] <= 0:
-                return lod_map[row['observableId']]
+        # --- REPLACE THE apply_lod FUNCTION ---
+        def apply_floor(row):
+            # If measurement is zero, replace it with a tiny value before adding noise
+            # This prevents issues with log-normal noise on zero.
+            if row['measurement'] <= 1e-12: # Use a small threshold
+                return 1e-8
             return row['measurement']
-        
-        measurement_df['measurement'] = measurement_df.apply(apply_lod, axis=1)
-        logging.info("  ...LOD applied successfully.")
+            
+        measurement_df['measurement'] = measurement_df.apply(apply_floor, axis=1)
+        logging.info("  ...Floor value applied to non-positive measurements.")
         
         logging.info(f"  Adding {noise_conf['level_percent']}% lognormal noise...")
         seed = tc_settings.get('random_seed', 42)
@@ -379,12 +363,15 @@ def create_parameters_petab(config, model, output_path):
         lower_bound = nominal_value / 2.0
         upper_bound = nominal_value * 2.0
         
-        if param_name in stimulus_params or param_name.endswith("_0"):
+        if param_name in stimulus_params:
             estimate = 0
             parameter_scale = 'lin'
             # For fixed params, bounds are just the nominal value
             lower_bound = nominal_value
             upper_bound = nominal_value
+        elif param_name.endswith("_0"):
+            estimate = 0
+            parameter_scale = 'log10'
         else:
             estimate = 1
             parameter_scale = 'log10'

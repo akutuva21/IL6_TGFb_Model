@@ -17,9 +17,9 @@ kf_s3stat3d	kf_s3stat3d	log10	0.5	2	1	1
 kr_s3stat3d	kr_s3stat3d	log10	0.05	0.2	0.1	1
 kf_pka_bind	kf_pka_bind	log10	0.5	2	1	1
 kr_pka_bind	kr_pka_bind	log10	0.05	0.2	0.1	1
-IL6R_0	IL6R_0	lin	100	100	100	0
-SMAD3_0	SMAD3_0	lin	100	100	100	0
-SMAD4_0	SMAD4_0	lin	50	50	50	0
-STAT3m_0	STAT3m_0	lin	100	100	100	0
-PKA_0	PKA_0	lin	50	50	50	0
+IL6R_0	IL6R_0	log10	50	200	100	0
+SMAD3_0	SMAD3_0	log10	50	200	100	0
+SMAD4_0	SMAD4_0	log10	25	100	50	0
+STAT3m_0	STAT3m_0	log10	50	200	100	0
+PKA_0	PKA_0	log10	25	100	50	0
 sigma_log_shared	sigma_log_shared	log10	1e-08	0.0001	1e-08	0
