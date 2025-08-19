@@ -9,6 +9,15 @@ using Random
 
 # This helper function is still perfect, no changes needed.
 function get_optimizer_and_options(optimizer_name::Symbol, debug_mode::Bool)
+    if optimizer_name === :Fides
+        # Safety: Fides requires process-based parallelism, not threading
+        if Threads.nthreads() > 1
+            error("Fides optimizer detected with $(Threads.nthreads()) threads. " *
+                  "Fides requires JULIA_NUM_THREADS=1 with process-based parallelism.")
+        end
+        @info "Using Fides optimizer with process-based parallelism"
+    end
+    
     max_run_time = 3600.0  # 1 hour per run
 
     if optimizer_name === :Fides

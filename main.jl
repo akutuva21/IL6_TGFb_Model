@@ -5,8 +5,10 @@ include("src/model_param_est_robustness.jl")
 include("src/visualization.jl")
 include("src/optimization.jl")
 include("src/profiling.jl")
+include("src/config_resolve.jl")
 
-using ArgParse, JLD2, Logging, PEtab, SciMLSensitivity, ReverseDiff, DiffEqCallbacks, OrdinaryDiffEq, Sundials, LinearAlgebra, CSV, DataFrames, ComponentArrays
+using ArgParse, JLD2, Logging, PEtab, SciMLSensitivity, ReverseDiff, DiffEqCallbacks, OrdinaryDiffEq, Sundials, LinearAlgebra, CSV, DataFrames, ComponentArrays, YAML
+using .ConfigResolve
 
 # --- 2. ARGUMENT PARSER DEFINITION ---
 function define_argument_parser()
@@ -63,17 +65,26 @@ function main()
         global_logger(ConsoleLogger(stderr, Logging.Info))
     end
     
+    # --- CONFIG-DRIVEN PETAB RESOLUTION ---
+    paths = resolve_petab_paths("config.yml")
+    log_resolved_files(paths)
+    
+    # Create temporary YAML with resolved paths
+    temp_yaml = ".petab_resolved.yaml"
+    write_temp_petab_yaml(temp_yaml, paths)
+    @info "Created temporary PEtab YAML: $temp_yaml"
+    
     # --- MODE SELECTION ---
     if parsed_args["batch-id"] > 0
         # --- BATCH WORKER MODE ---
         @info "--- Running in BATCH WORKER mode for Batch ID: $(parsed_args["batch-id"]) ---"
         
-        setup_results = setup_petab_problem(parsed_args["yaml"])
+        setup_results = setup_petab_problem(temp_yaml)
         odesolver = ODESolver(KenCarp47(autodiff=false), abstol=1e-8, reltol=1e-8)
         ss_solver = SteadyStateSolver(:Simulate, abstol=1e-8, reltol=1e-8)
         
         petab_problem = PEtabODEProblem(setup_results.petab_model, odesolver=odesolver, ss_solver=ss_solver,
-                                        gradient_method=:Adjoint, sensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP()))
+                                        gradient_method=:ForwardDiff)
         
         # This new function will handle the batch logic
         run_batch_optimization(parsed_args, petab_problem)
@@ -159,7 +170,7 @@ function main()
         @info "   - Best parameters and full multistart results saved to best_fit.jld2"
 
         # --- Set up the PEtab problem once for all plotting ---
-        setup_results = setup_petab_problem(parsed_args["yaml"])
+        setup_results = setup_petab_problem(temp_yaml)
         odesolver = ODESolver(KenCarp47(autodiff=false), abstol=1e-8, reltol=1e-8)
         petab_problem = PEtabODEProblem(setup_results.petab_model, odesolver=odesolver)
 
@@ -177,13 +188,12 @@ function main()
         )
 
     elseif parsed_args["profile"]
-        # --- PROFILING MODE (no changes needed here) ---
         @info "--- Running in PROFILING mode ---"
         
         fit_data = JLD2.load(parsed_args["load-fit"])
         best_mle = fit_data["best_mle"]
         
-        setup_results = setup_petab_problem(parsed_args["yaml"])
+        setup_results = setup_petab_problem(temp_yaml)
         profiling_odesol = ODESolver(KenCarp47(autodiff=false), abstol=1e-8, reltol=1e-8)
         profiling_ss_solver = SteadyStateSolver(:Simulate, abstol=1e-8, reltol=1e-8)
 
