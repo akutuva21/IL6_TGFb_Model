@@ -7,27 +7,21 @@ using JLD2
 using QuasiMonteCarlo
 using Random
 
-# This helper function for setting optimizer options remains useful
+# This helper function is still perfect, no changes needed.
 function get_optimizer_and_options(optimizer_name::Symbol, debug_mode::Bool)
     max_run_time = 3600.0  # 1 hour per run
 
     if optimizer_name === :Fides
         fides_alg = PEtab.Fides(:BFGS; verbose=false)
-        
-        # Fides options are passed as a Python dictionary
         fides_opts = py"{
             'maxiter': $(debug_mode ? 200 : 1000),
-            'fatol': 1e-6,
-            'frtol': 1e-8,
-            'gtol': 1e-6,
+            'fatol': 1e-6, 'frtol': 1e-8, 'gtol': 1e-6,
             'maxtime': $(max_run_time)
         }"
-
         @info "Using Fides optimizer with BFGS hessian approximation."
         return fides_alg, fides_opts
-
     else
-        # This section for Optim.jl solvers remains as a fallback
+        # Fallback for Optim.jl solvers
         optim_options = Optim.Options(
             iterations = debug_mode ? 200 : 1000,
             g_tol      = 1e-6,
@@ -48,35 +42,53 @@ function get_optimizer_and_options(optimizer_name::Symbol, debug_mode::Bool)
     end
 end
 
-# This is now the main function for a worker job. It runs ONE optimization.
-function run_single_optimization(parsed_args, petab_problem)
-    println("\n🧪 Running Single Parameter Estimation for Task ID: $(parsed_args["task-id"])")
-    
+
+# NEW function to run a batch of optimizations in parallel
+function run_batch_optimization(parsed_args, petab_problem)
+    # 1. Extract batch information from arguments
     n_starts_total = parsed_args["n-starts"]
-    task_id = parsed_args["task-id"]
+    n_batches = parsed_args["n-batches"]
+    batch_id = parsed_args["batch-id"]
+    n_procs = parsed_args["n-procs"]
 
-    if !(1 <= task_id <= n_starts_total)
-        @error "Invalid --task-id provided. Must be between 1 and $(n_starts_total)."
-        return nothing
+    @info "Starting Batch #$batch_id of $n_batches"
+
+    # 2. Determine which slice of start-guesses this batch is responsible for
+    starts_per_batch = ceil(Int, n_starts_total / n_batches)
+    start_index = (batch_id - 1) * starts_per_batch + 1
+    end_index = min(batch_id * starts_per_batch, n_starts_total)
+    n_starts_this_batch = end_index - start_index + 1
+
+    if n_starts_this_batch <= 0
+        @warn "Batch #$batch_id has no starts to run. Exiting."
+        return
     end
+    @info "This batch will run $n_starts_this_batch optimizations (indices $start_index to $end_index)."
 
-    optimizer_alg, options = get_optimizer_and_options(Symbol(parsed_args["optimizer"]), parsed_args["debug"])
-
-    # Generate all potential start-guesses but only select the one for this task
-    # A seed ensures that every job generates the same list and picks its unique start
+    # 3. Generate ALL start guesses but only use the slice for this batch
+    # The fixed seed ensures every batch job generates the same master list
     Random.seed!(1234)
     x_starts_all = get_startguesses(petab_problem, n_starts_total; sampling_method=LatinHypercubeSample())
-    x_start_this_job = x_starts_all[task_id]
-    
-    println("Starting optimization from guess #$(task_id)...")
-    
-    # Calibrate performs a single optimization run
-    result = calibrate(petab_problem, x_start_this_job, optimizer_alg; options=options)
+    x_starts_this_batch = x_starts_all[start_index:end_index]
 
-    # Save the result of this single run to its unique output file
-    output_filename = parsed_args["output"]
-    JLD2.save(output_filename, Dict("result" => result, "task_id" => task_id))
-    
-    println("✅ Task $(task_id) finished. Cost=$(result.fmin). Saved to $(output_filename).")
-    return result
+    # 4. Get optimizer settings
+    optimizer_alg, options = get_optimizer_and_options(Symbol(parsed_args["optimizer"]), parsed_args["debug"])
+
+    # 5. Define where to save intermediate results for this batch
+    dir_save = joinpath("results", "batch_$(batch_id)")
+    mkpath(dir_save)
+    @info "Intermediate results for this batch will be saved in: $dir_save"
+
+    # 6. Run the multi-start optimization for this batch in parallel
+    @info "Launching calibrate_multistart with nprocs = $n_procs..."
+    batch_result = calibrate_multistart(
+        petab_problem,
+        optimizer_alg,
+        x_starts_this_batch; # Pass the specific list of start guesses
+        nprocs=n_procs,
+        dirsave=dir_save,
+        options=options
+    )
+
+    @info "✅ Batch #$batch_id finished. Best cost in this batch: $(batch_result.fmin)."
 end
