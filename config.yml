@@ -40,8 +40,8 @@ time_course_settings:
     steps: 8
 
   noise:
-    add: true
-    level_percent: 10.0
+    add: false
+    level_percent: 2.0
 
 # UNIFIED MAPPING for all run modes
 observables_mapping:

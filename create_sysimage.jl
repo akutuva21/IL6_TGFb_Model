@@ -3,13 +3,30 @@ using Pkg, PackageCompiler
 
 # 1. Define the final, desired list of packages. JuliaFormatter is NOT on this list.
 final_pkgs = [
+    # Core differential equations and scientific computing
     "DifferentialEquations", "OrdinaryDiffEq", "Sundials", "SciMLBase",
     "SciMLSensitivity", "DiffEqCallbacks", "ModelingToolkit", "Catalyst",
-    "Symbolics", "SymbolicUtils", "ReactionNetworkImporters", "PEtab",
-    "Optimization", "OptimizationOptimJL", "Optim", "ADTypes",
-    "LikelihoodProfiler", "ReverseDiff", "DataFrames", "CSV", "JLD2",
-    "XLSX", "YAML", "Plots", "Colors", "RecipesBase", "ComponentArrays",
-    "ArgParse", "PackageCompiler"
+    "Symbolics", "SymbolicUtils", "ReactionNetworkImporters", 
+    
+    # PEtab ecosystem and optimization
+    "PEtab", "Optimization", "OptimizationOptimJL", "Optim", "ADTypes",
+    "LikelihoodProfiler", "CICOBase", "PyCall", "QuasiMonteCarlo",
+    
+    # Automatic differentiation
+    "ReverseDiff", "ForwardDiff",
+    
+    # Data handling and I/O
+    "DataFrames", "CSV", "JLD2", "XLSX", "YAML", "DataInterpolations",
+    
+    # Plotting and visualization
+    "Plots", "Colors", "RecipesBase",
+    
+    # Utilities and arrays
+    "ComponentArrays", "ArgParse", "Random", "LinearAlgebra", "Logging",
+    "Dates", "Printf",
+    
+    # Build tools
+    "PackageCompiler", "Pkg"
 ]
 unique!(sort!(final_pkgs))
 

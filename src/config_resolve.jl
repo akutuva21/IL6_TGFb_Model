@@ -16,19 +16,26 @@ function resolve_petab_paths(config_path::String)
     # Extract noise settings from time_course_settings
     tc = cfg["time_course_settings"]
     noise = tc["noise"]
-    
-    # Determine suffix based on noise settings
-    suffix = if get(noise, "add", false) && get(noise, "level_percent", 0) > 0
+        
+    # Suffix for parameter and observable files
+    petab_file_suffix = if get(noise, "add", false) && get(noise, "level_percent", 0) > 0
         "_noise$(Int(noise["level_percent"]))"
     else
-        "_no_noise"
+        "" # No suffix for noise-free
+    end
+
+    # Suffix for measurement and condition data files
+    data_file_suffix = if get(noise, "add", false) && get(noise, "level_percent", 0) > 0
+        "_noise$(Int(noise["level_percent"]))"
+    else
+        "_no_noise" # Suffix is '_no_noise' for data files
     end
     
-    # Build resolved file paths (matching your current structure)
-    parameters_tsv   = "petab_files/parameters$(suffix).tsv"
-    observables_tsv  = "petab_files/observables$(suffix).tsv"
-    measurements_tsv = "SimData/measurements_time_course$(suffix).tsv"
-    conditions_tsv   = "SimData/conditions_time_course$(suffix).tsv"
+    # Build resolved file paths using the correct suffix for each file type
+    parameters_tsv   = "petab_files/parameters$(petab_file_suffix).tsv"
+    observables_tsv  = "petab_files/observables$(petab_file_suffix).tsv"
+    measurements_tsv = "SimData/measurements_time_course$(data_file_suffix).tsv"
+    conditions_tsv   = "SimData/conditions_time_course$(data_file_suffix).tsv"
     
     # Fail-fast if any files are missing
     missing_files = String[]
@@ -42,12 +49,15 @@ function resolve_petab_paths(config_path::String)
     end
     
     if !isempty(missing_files)
-        error("Missing PEtab files for suffix '$suffix':\n" * 
+        # Create a more informative suffix for the error message
+        error_suffix = isempty(petab_file_suffix) ? "'no_noise'" : "'$petab_file_suffix'"
+        error("Missing PEtab files for configuration $error_suffix:\n" * 
               join(missing_files, "\n") * 
-              "\nRun 'python generate_ss_data.py' to regenerate data.")
+              "\nRun 'python generate_ss_data.py' with the correct noise settings to regenerate data.")
     end
     
-    return (suffix=suffix,
+    # Return the main suffix for logging purposes
+    return (suffix=petab_file_suffix,
             parameters_tsv=parameters_tsv,
             observables_tsv=observables_tsv,
             measurements_tsv=measurements_tsv,
