@@ -38,6 +38,10 @@ function define_argument_parser()
             help = "Path to a .jld2 file containing best-fit parameters for profiling."
             arg_type = String
             default = "best_fit.jld2"
+        "--profiling-method"
+            help = "Method for profiling. Options: cico, manual"
+            arg_type = String
+            default = "cico"
         "--debug"
             help = "Enable debug mode for faster, less accurate testing."
             action = :store_true
@@ -143,8 +147,17 @@ function main()
         profiling_odesol = ODESolver(KenCarp47(autodiff=false), abstol=1e-8, reltol=1e-8)
         profiling_ss_solver = SteadyStateSolver(:Simulate, abstol=1e-8, reltol=1e-8)
 
-        run_likelihood_profiling(setup_results.petab_model, profiling_odesol, profiling_ss_solver, 
-                                 best_mle, setup_results.true_values)
+        # Pass the method as a Symbol
+        prof_method = Symbol(parsed_args["profiling-method"])
+
+        run_likelihood_profiling(
+            setup_results.petab_model, 
+            profiling_odesol, 
+            profiling_ss_solver, 
+            best_mle, 
+            setup_results.true_values;
+            profiling_method = prof_method # Pass the selected method
+        )
     else
         @error "No mode selected. Please specify --task-id or --collate."
     end

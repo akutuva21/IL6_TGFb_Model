@@ -360,8 +360,8 @@ def create_parameters_petab(config, model, output_path):
         nominal_value = float(param_obj.value)
         
         # Default bounds for kinetic rates
-        lower_bound = nominal_value / 10.0
-        upper_bound = nominal_value * 10.0
+        lower_bound = nominal_value / 100.0
+        upper_bound = nominal_value * 100.0
         
         if param_name in stimulus_params:
             estimate = 0

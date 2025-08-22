@@ -20,7 +20,6 @@ include(joinpath(project_path, "src", "model_param_est_robustness.jl"))
 include(joinpath(project_path, "src", "visualization.jl"))
 include(joinpath(project_path, "src", "optimization.jl"))
 include(joinpath(project_path, "src", "profiling.jl"))
-include(joinpath(project_path, "src", "config_resolve.jl"))
 println("  ✓ Project source files included.")
 # --- END OF FIX ---
 
@@ -35,19 +34,7 @@ function run_workload()
 
         println("  Project path found: ", project_path)
 
-        # Test config resolution first
-        println("  Step 0: Precompiling config resolution...")
-        config_file = joinpath(project_path, "config.yml")
-        if isfile(config_file)
-            paths = ConfigResolve.resolve_petab_paths(config_file)
-            temp_yaml = joinpath(project_path, ".petab_resolved_precompile.yaml")
-            ConfigResolve.write_temp_petab_yaml(temp_yaml, paths)
-            ConfigResolve.log_resolved_files(paths)
-            yaml_file = temp_yaml
-            println("  ✓ Config resolution compiled")
-        else
-            yaml_file = joinpath(project_path, "petab_problem.yml")
-        end
+        yaml_file = joinpath(project_path, "petab_problem.yml")
         if !isfile(yaml_file)
             error("YAML file not found at $yaml_file. Aborting workload.")
         end
@@ -72,25 +59,16 @@ function run_workload()
         println("  ✓ Cost function evaluation compiled (cost: $(round(cost_val, digits=2)))")
 
         println("  Step 4: Precompiling optimization...")
-        # Test both Optim.jl and PEtab.calibrate
+        # Test single optimization (embarrassingly parallel approach)
         optimizer_alg, options = get_optimizer_and_options(:LBFGS, true)
         result = calibrate(petab_problem, x0[1], optimizer_alg; options=options)
-        println("  ✓ Optimization stack compiled (final cost: $(round(result.fmin, digits=2)))")
+        println("  ✓ Single optimization compiled (final cost: $(round(result.fmin, digits=2)))")
 
-        println("  Step 5: Precompiling batch optimization components...")
-        # Test calibrate_multistart functionality 
-        try
-            batch_result = calibrate_multistart(petab_problem, optimizer_alg, 2; nprocs=1, options=options, seed=1234)
-            println("  ✓ Batch optimization compiled")
-        catch e
-            println("  ⚠️ Batch optimization skipped: $(typeof(e))")
-        end
-
-        println("  Step 6: Precompiling visualization components...")
+        println("  Step 5: Precompiling visualization components...")
         PEtab.solve_all_conditions(result.xmin, petab_problem, odesolver.solver; abstol=odesolver.abstol, reltol=odesolver.reltol)
         println("  ✓ Visualization ODE solving compiled")
 
-        println("  Step 7: Precompiling profiling components...")
+        println("  Step 6: Precompiling profiling components...")
         # Test manual profiling setup
         try
             θ_mle = ComponentArray(result.xmin)
@@ -104,7 +82,7 @@ function run_workload()
             println("  ⚠️ Profiling precompile skipped: $(typeof(e))")
         end
 
-        println("  Step 8: Precompiling I/O operations...")
+        println("  Step 7: Precompiling I/O operations...")
         temp_file = "temp_precompile_test.jld2"
         JLD2.jldsave(temp_file; result)
         rm(temp_file)
@@ -119,9 +97,7 @@ function run_workload()
         println("  ✓ CSV operations compiled")
 
         # Clean up temporary files
-        if occursin("precompile", yaml_file) && isfile(yaml_file)
-            rm(yaml_file)
-        end
+        # (No temporary YAML files to clean up in embarrassingly parallel mode)
 
         println("✅ Complete PEtab workflow precompilation successful!")
         println("--- Precompilation workload finished ---")

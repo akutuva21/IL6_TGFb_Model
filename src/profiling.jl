@@ -10,9 +10,10 @@ using ForwardDiff
 using DiffEqCallbacks
 using DataInterpolations
 
-function LikelihoodProfiler.interpolate_endpoint(profile_values::LikelihoodProfiler.ProfileValues)
-    @info "--- EXECUTING ROBUST INTERPOLATION ---"
+# Thread-safe plotting lock to prevent font loading race conditions
+const PLOT_LOCK = ReentrantLock()
 
+function LikelihoodProfiler.interpolate_endpoint(profile_values::LikelihoodProfiler.ProfileValues)
     obj_level = LikelihoodProfiler.get_obj_level(profile_values)
     
     if length(profile_values.x) < 2
@@ -120,157 +121,201 @@ function plot_profile_delta_chi2!(
     return plt
 end
 
-"""
-run_likelihood_profiling(petab_model, odesolver, steadystate_solver, θ_mle; debug=false, maxiters=20)
+function robust_manual_profiling(pl_problem, safe_indices, safe_params, true_param_values)
+    prof_dir = joinpath(pwd(), "likelihood_profiles")
+    mkpath(prof_dir)
+    
+    nll_mle = pl_problem.optprob.f(pl_problem.optpars, pl_problem.optprob.p)
+    θ_mle = pl_problem.optpars
+    
+    robustness_results = Dict()
+    
+    for (i, idx) in enumerate(safe_indices)
+        param_name = safe_params[i]
+        @info "Robustness profiling $param_name..."
+        
+        # Adaptive grid around MLE + true value
+        θ_center = θ_mle[idx]
+        
+        # Get true value, handling log10_ prefixes correctly
+        base_name = string(param_name)
+        if startswith(base_name, "log10_")
+            base_name = base_name[7:end]
+        end
+        θ_true = haskey(true_param_values, base_name) ? log10(true_param_values[base_name]) : θ_center
+        
+        # Grid covering both MLE and true value with margin
+        θ_min = min(θ_center, θ_true) - 2.0
+        θ_max = max(θ_center, θ_true) + 2.0
+        param_range = range(θ_min, θ_max, length=200)
+        
+        x_vals = Float64[]
+        nll_vals = Float64[]
+        
+        for θ_val in param_range
+            θ_test = copy(θ_mle)
+            θ_test[idx] = θ_val
+            
+            try
+                nll = pl_problem.optprob.f(θ_test, pl_problem.optprob.p)
+                push!(x_vals, θ_val)
+                push!(nll_vals, isfinite(nll) ? nll : Inf)
+            catch
+                push!(x_vals, θ_val)
+                push!(nll_vals, Inf)
+            end
+        end
+        
+        # Calculate robustness metrics
+        delta_chi2 = 2.0 .* (nll_vals .- nll_mle)
+        ci_95_indices = findall(delta_chi2 .<= 3.84)
+        
+        robustness_info = Dict(
+            "param_name" => param_name,
+            "mle_value" => θ_center,
+            "true_value" => θ_true,
+            "ci_width" => length(ci_95_indices) > 0 ? maximum(x_vals[ci_95_indices]) - minimum(x_vals[ci_95_indices]) : Inf,
+            "contains_true" => θ_true in x_vals[ci_95_indices],
+            "profile_success" => any(isfinite.(nll_vals))
+        )
+        
+        robustness_results[param_name] = robustness_info
+        
+        # Plot results with thread-safe plotting
+        lock(PLOT_LOCK) do
+            plt = plot()
+            plot_profile_delta_chi2!(plt, x_vals, nll_vals; pname=param_name, nll_anchor=nll_mle)
+            vline!(plt, [θ_true]; label="True Value", color=:purple, linestyle=:dash, lw=2)
+            vline!(plt, [θ_center]; label="MLE", color=:green, linestyle=:solid, lw=2)
+            
+            savefig(plt, joinpath(prof_dir, "robustness_profile_$(param_name).png"))
+        end
+        
+        @info "✓ $param_name: CI width = $(round(robustness_info["ci_width"], digits=3)), Contains true = $(robustness_info["contains_true"])"
+    end
+    
+    return robustness_results
+end
 
-Idiomatic likelihood profiling using integrated PEtab.jl and LikelihoodProfiler.jl helpers:
-  - Uses library-provided objective function (no manual AD handling)
-  - Leverages get_pl_problem for robust setup
-  - Saves Δχ² plots with confidence intervals
-Returns profile results object.
-"""
 function run_likelihood_profiling(
     petab_model::PEtabModel,
     odesolver,
     steadystate_solver,
     θ_mle::ComponentVector,
     true_param_values::Dict;
+    profiling_method::Symbol = :cico, # NEW: Toggle between :cico and :manual
     debug::Bool=false,
-    maxiters::Int=20
+    maxiters::Int=200
 )
-    println("\n--- Likelihood Profiling (Corrected Order) ---"); flush(stdout)
+    println("\n--- Likelihood Profiling ---"); flush(stdout)
+    @info "Using profiling method: :$profiling_method"
     t_start = time()
 
-    # Steps 1-3: Setup is all correct
+    # 1. Create the PEtab problem with robust callbacks
     petab_problem = create_petab_problem_for_profiling(petab_model, odesolver, steadystate_solver)
     
+    # 2. Identify parameters to profile (excluding noise/initial conditions)
     all_names = string.(keys(θ_mle))
     params_to_profile = [n for n in all_names if !startswith(n, "sigma") && !endswith(n, "_0")]
     param_indices = [findfirst(==(p), all_names) for p in params_to_profile]
-    println("[Profiling] Parameters to profile: $(params_to_profile)")
+    
+    # 3. Filter out parameters at bounds
+    lb_orig = collect(petab_problem.lower_bounds)
+    ub_orig = collect(petab_problem.upper_bounds)
+    θ_init = collect(θ_mle)
+    safe_indices = Int[]
+    safe_params = String[]
 
-    @info "Setting up Profiling Problem Manually..."
+    for (i, name) in enumerate(params_to_profile)
+        idx = param_indices[i]
+        if (θ_init[idx] - lb_orig[idx] > 1e-3) && (ub_orig[idx] - θ_init[idx] > 1e-3)
+            push!(safe_indices, idx)
+            push!(safe_params, name)
+        else
+            @warn "Skipping profile for '$name' - parameter is at or very close to a bound."
+        end
+    end
+
+    if isempty(safe_indices)
+        @error "No parameters are suitable for profiling; all are at their bounds."
+        return nothing
+    end
+    println("[Profiling] Will profile $(length(safe_indices)) parameters: $(safe_params)")
+
+    # 4. Define the robust objective function
+    @info "Setting up Profiling Problem..."
     function obj(θ_est, _)
-        θ_work = eltype(θ_est) <: ForwardDiff.Dual ? ForwardDiff.value.(θ_est) : θ_est
-        if any(!isfinite, θ_work) return Inf end
+        if any(!isfinite, θ_est) return Inf end
         try
-            val = petab_problem.nllh(θ_work)
+            val = petab_problem.nllh(θ_est)
             return isfinite(val) ? val : Inf
         catch
             return Inf
         end
     end
-    θ_init = collect(θ_mle)
+    
+    # 5. Create the LikelihoodProfiler problem
     optf = OptimizationFunction(obj, Optimization.AutoForwardDiff())
-    #optprob = OptimizationProblem(optf, θ_init; lb=collect(petab_problem.lower_bounds), ub=collect(petab_problem.upper_bounds))
+    optprob = OptimizationProblem(optf, θ_init; lb=lb_orig, ub=ub_orig)
+    pl_problem = LikelihoodProfiler.PLProblem(optprob, θ_init)
+    @info "✅ Profiling Problem created successfully."
 
-    # Before creating pl_problem:
-    lb_orig = collect(petab_problem.lower_bounds)
-    ub_orig = collect(petab_problem.upper_bounds)
-
-    # Only profile parameters well away from bounds
-    safe_params = String[]
-    safe_indices = Int[]
-
-    for (i, name) in enumerate(params_to_profile)
-        idx = param_indices[i]
-        θ_val = θ_init[idx]
-        dist_to_lb = θ_val - lb_orig[idx] 
-        dist_to_ub = ub_orig[idx] - θ_val
+    # 6. Choose and run the selected profiling method
+    if profiling_method == :cico
+        println("[Profiling] Running CICOProfiler on $(length(safe_indices)) parameters...")
         
-        if dist_to_lb > 0.1 && dist_to_ub > 0.1  # Well away from bounds
-            push!(safe_params, name)
-            push!(safe_indices, idx)
-        else
-            @warn "Skipping $name - at boundary (dist: $(round(min(dist_to_lb, dist_to_ub), digits=4)))"
+        # 6. Define the profiler algorithm
+        profiler_alg = CICOProfiler(
+            optimizer=:IPNewton,
+            scan_tol=1e-2
+        )
+
+        # 7. Run the profiling in parallel using threads
+        # NO scan_bounds keyword is needed here. The profiler will use the bounds
+        # from the OptimizationProblem inside pl_problem.
+        @time profile_res = LikelihoodProfiler.profile(
+            pl_problem, 
+            profiler_alg; 
+            idxs = safe_indices,
+            parallel_type = :threads,
+            maxiters = maxiters
+        )
+
+        # 8. Plot the CICO results
+        println("[Profiling] Plotting CICO results...")
+        prof_dir = joinpath(pwd(), "likelihood_profiles")
+        mkpath(prof_dir)
+        nll_mle = pl_problem.optprob.f(pl_problem.optpars, pl_problem.optprob.p)
+
+        for (i, profile_result) in enumerate(profile_res)
+            param_name = all_names[safe_indices[i]]
+            lock(PLOT_LOCK) do
+                plt = plot()
+                plot_profile_delta_chi2!(plt, profile_result.x, profile_result.obj; pname=param_name, nll_anchor=nll_mle)
+                
+                base_name = string(param_name)
+                if startswith(base_name, "log10_")
+                    base_name = base_name[7:end]
+                end
+                if haskey(true_param_values, base_name)
+                    true_val_log10 = log10(true_param_values[base_name])
+                    vline!(plt, [true_val_log10]; label="True Value", color=:purple, linestyle=:dash)
+                end
+                
+                savefig(plt, joinpath(prof_dir, "cico_profile_$(param_name).png"))
+                println("[Profiling] Saved CICO plot for $(param_name)")
+            end
         end
-    end
-
-    # Update params_to_profile and param_indices to only include safe parameters
-    params_to_profile = safe_params
-    param_indices = safe_indices
-    println("[Profiling] Safe parameters to profile: $(params_to_profile)")
-
-    # Check if we have any parameters to profile
-    if isempty(safe_indices)
-        @error "No parameters are suitable for profiling - all are too close to bounds"
+        
+    elseif profiling_method == :manual
+        println("[Profiling] Running robust manual profiling on $(length(safe_indices)) parameters...")
+        @time robustness_results = robust_manual_profiling(pl_problem, safe_indices, safe_params, true_param_values)
+        
+    else
+        @error "Unknown profiling_method: :$profiling_method. Choose :cico or :manual."
         return nothing
     end
 
-    @info "Will profile $(length(safe_indices)) parameters: $(safe_params)"
-
-    # Create PL problem for manual profiling
-    optprob_wide = OptimizationProblem(optf, θ_init; lb=lb_orig .- 2.0, ub=ub_orig .+ 2.0)
-    pl_problem = LikelihoodProfiler.PLProblem(optprob_wide, θ_init)
-    @info "✅ Profiling Problem created successfully."
-
-    # Manual grid profiling function (replaces CICO)
-    function manual_profile_all_parameters(pl_problem, safe_indices, safe_params, true_param_values)
-        prof_dir = joinpath(pwd(), "likelihood_profiles")
-        mkpath(prof_dir)
-        
-        nll_mle = pl_problem.optprob.f(pl_problem.optpars, pl_problem.optprob.p)
-        θ_mle = pl_problem.optpars
-        
-        # Use Threads.@threads to parallelize the loop over parameters
-        # Each thread will take one parameter to profile.
-        Threads.@threads for i in 1:length(safe_indices)
-            idx = safe_indices[i]
-            param_name = safe_params[i]
-            
-            # Use thread-safe logging
-            println("[Thread $(Threads.threadid())] Manually profiling $param_name...")
-            
-            # Create grid around MLE
-            θ_center = θ_mle[idx]
-            param_range = range(θ_center - 1.5, θ_center + 1.5, length=100)
-            
-            x_vals = Float64[]
-            nll_vals = Float64[]
-            
-            for θ_val in param_range
-                # IMPORTANT: Each thread needs its own copy of the parameter vector
-                θ_test = copy(θ_mle)
-                θ_test[idx] = θ_val
-                
-                try
-                    nll = pl_problem.optprob.f(θ_test, pl_problem.optprob.p)
-                    push!(x_vals, θ_val)
-                    push!(nll_vals, isfinite(nll) ? nll : Inf)
-                catch
-                    push!(x_vals, θ_val)
-                    push!(nll_vals, Inf)
-                end
-            end
-            
-            # Plotting is generally not thread-safe, but since each thread
-            # creates and saves its own independent plot object, this is safe.
-            plt = plot()
-            plot_profile_delta_chi2!(plt, x_vals, nll_vals; pname=param_name, nll_anchor=nll_mle)
-            
-            # Match the key for true values correctly
-            base_name = string(param_name)
-            if startswith(base_name, "log10_")
-                base_name = base_name[7:end]
-            end
-
-            if haskey(true_param_values, base_name)
-                # Transform the true value to the estimation scale (log10) for plotting
-                true_val_log10 = log10(true_param_values[base_name])
-                vline!(plt, [true_val_log10]; label="True Value", color=:purple, linestyle=:dash)
-            end
-            
-            savefig(plt, joinpath(prof_dir, "manual_profile_$(param_name).png"))
-            println("[Thread $(Threads.threadid())] ✓ Completed $param_name")
-        end
-        
-        @info "Manual profiling completed for all $(length(safe_indices)) parameters"
-    end
-
-    # Run manual profiling instead of CICO
-    println("[Profiling] Running manual grid profiling on $(length(safe_indices)) parameters...")
-    @time manual_profile_all_parameters(pl_problem, safe_indices, safe_params, true_param_values)
-
     println("[Profiling] Done in $(round(time()-t_start; digits=2)) s")
-    return safe_params  # Return the list of successfully profiled parameters
+    return nothing
 end
