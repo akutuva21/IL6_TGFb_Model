@@ -1,6 +1,5 @@
-using CICOBase
 using LikelihoodProfiler
-using LikelihoodProfiler: AdaptiveStep, FixedStep
+using LikelihoodProfiler: LineSearchStep, FixedStep, OptimizationProfiler
 using Optimization
 using OptimizationOptimJL
 using ComponentArrays
@@ -203,7 +202,7 @@ function run_likelihood_profiling(
     steadystate_solver,
     θ_mle::ComponentVector,
     true_param_values::Dict;
-    profiling_method::Symbol = :cico, # NEW: Toggle between :cico and :manual
+    profiling_method::Symbol = :fixedstep,
     debug::Bool=false,
     maxiters::Int=200
 )
@@ -256,38 +255,72 @@ function run_likelihood_profiling(
     
     # 5. Create the LikelihoodProfiler problem
     optf = OptimizationFunction(obj, Optimization.AutoForwardDiff())
-    optprob = OptimizationProblem(optf, θ_init; lb=lb_orig, ub=ub_orig)
-    pl_problem = LikelihoodProfiler.PLProblem(optprob, θ_init)
+    optprob = OptimizationProblem(optf, θ_init; lb = lb_orig, ub = ub_orig)
+
+    # Explicitly define the profile_range from the problem bounds.
+    # This is the robust way to ensure the profiler respects the bounds, as shown in the library's documentation.
+    profile_range_explicit = tuple.(lb_orig, ub_orig)
+
+    pl_problem = LikelihoodProfiler.ProfileLikelihoodProblem(optprob, θ_init, profile_range_explicit)
     @info "✅ Profiling Problem created successfully."
 
     # 6. Choose and run the selected profiling method
-    if profiling_method == :cico
-        println("[Profiling] Running CICOProfiler on $(length(safe_indices)) parameters...")
+    sol_res = nothing # Initialize result variable
+    # if profiling_method == :cico
+    #     println("[Profiling] Running CICOProfiler on $(length(safe_indices)) parameters...")
         
-        # 6. Define the profiler algorithm
-        profiler_alg = CICOProfiler(
-            optimizer=:IPNewton,
-            scan_tol=1e-2
+    #     # 6. Define the profiler algorithm
+    #     profiler_alg = CICOProfiler(
+    #         optimizer=:IPNewton,
+    #         scan_tol=1e-2
+    #     )
+
+    #     # CRITICAL: CICOProfiler requires explicit scan_bounds
+    #     bounds_for_profiling = collect(zip(lb_orig, ub_orig))
+    #     sol_res = @time LikelihoodProfiler.solve(
+    #         pl_problem, 
+    #         profiler_alg; 
+    #         idxs = safe_indices,
+    #         scan_bounds = bounds_for_profiling,
+    #         parallel_type = :threads,
+    #         maxiters = maxiters
+    #     )
+    if profiling_method == :fixedstep
+        println("[Profiling] Running OptimizationProfiler with LineSearchStep on $(length(safe_indices)) parameters...")
+        
+        # Define a function for a robust initial step size (1% of parameter magnitude)
+        profile_step_func(p0, i) = abs(p0[i]) * 0.01 + 1e-8
+
+        profiler_alg = OptimizationProfiler(
+            optimizer = Optim.LBFGS(), # A robust, first-order optimizer
+            # Use the intelligent, adaptive line search stepper
+            stepper = LineSearchStep(initial_step = profile_step_func)
         )
 
-        # 7. Run the profiling in parallel using threads
-        # NO scan_bounds keyword is needed here. The profiler will use the bounds
-        # from the OptimizationProblem inside pl_problem.
-        @time profile_res = LikelihoodProfiler.profile(
-            pl_problem, 
-            profiler_alg; 
+        sol_res = @time LikelihoodProfiler.solve(
+            pl_problem,
+            profiler_alg;
             idxs = safe_indices,
             parallel_type = :threads,
             maxiters = maxiters
         )
+    elseif profiling_method == :manual
+        println("[Profiling] Running robust manual profiling on $(length(safe_indices)) parameters...")
+        @time robustness_results = robust_manual_profiling(pl_problem, safe_indices, safe_params, true_param_values)
+        
+    else
+        @error "Unknown profiling_method: :$profiling_method. Choose :cico, :fixedstep, or :manual."
+        return nothing
+    end
 
-        # 8. Plot the CICO results
-        println("[Profiling] Plotting CICO results...")
+    # 7. Plot the results if profiling was successful
+    if !isnothing(sol_res)
+        println("[Profiling] Plotting results...")
         prof_dir = joinpath(pwd(), "likelihood_profiles")
         mkpath(prof_dir)
         nll_mle = pl_problem.optprob.f(pl_problem.optpars, pl_problem.optprob.p)
 
-        for (i, profile_result) in enumerate(profile_res)
+        for (i, profile_result) in enumerate(sol_res)
             param_name = all_names[safe_indices[i]]
             lock(PLOT_LOCK) do
                 plt = plot()
@@ -302,18 +335,10 @@ function run_likelihood_profiling(
                     vline!(plt, [true_val_log10]; label="True Value", color=:purple, linestyle=:dash)
                 end
                 
-                savefig(plt, joinpath(prof_dir, "cico_profile_$(param_name).png"))
-                println("[Profiling] Saved CICO plot for $(param_name)")
+                savefig(plt, joinpath(prof_dir, "profile_$(param_name).png"))
+                println("[Profiling] Saved plot for $(param_name)")
             end
         end
-        
-    elseif profiling_method == :manual
-        println("[Profiling] Running robust manual profiling on $(length(safe_indices)) parameters...")
-        @time robustness_results = robust_manual_profiling(pl_problem, safe_indices, safe_params, true_param_values)
-        
-    else
-        @error "Unknown profiling_method: :$profiling_method. Choose :cico or :manual."
-        return nothing
     end
 
     println("[Profiling] Done in $(round(time()-t_start; digits=2)) s")

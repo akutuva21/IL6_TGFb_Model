@@ -39,9 +39,9 @@ function define_argument_parser()
             arg_type = String
             default = "best_fit.jld2"
         "--profiling-method"
-            help = "Method for profiling. Options: cico, manual"
+            help = "Method for profiling. Options: cico, fixedstep, manual"
             arg_type = String
-            default = "cico"
+            default = "fixedstep"
         "--debug"
             help = "Enable debug mode for faster, less accurate testing."
             action = :store_true

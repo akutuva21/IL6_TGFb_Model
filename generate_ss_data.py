@@ -297,8 +297,13 @@ def generate_time_course_petab(config):
     preeq_row.update(baseline_cond)
     condition_rows.append(preeq_row)
     condition_df = pd.DataFrame(condition_rows)
-    
-    filename_suffix = f"_noise{int(noise_conf['level_percent'])}" if noise_conf['add'] else "_no_noise"
+
+    # Replace dots with underscores in noise level for filesystem compatibility
+    if noise_conf['add']:
+        noise_level_str = str(noise_conf['level_percent']).replace('.', '_')
+        filename_suffix = f"_noise{noise_level_str}"
+    else:
+        filename_suffix = "_no_noise"
     measurement_path = os.path.join(output_dir, f"measurements_time_course{filename_suffix}.tsv")
     condition_path = os.path.join(output_dir, f"conditions_time_course{filename_suffix}.tsv")
     
@@ -438,7 +443,9 @@ def main():
     # Add noise suffix to filenames if noise is enabled
     noise_conf = config['time_course_settings']['noise']
     if noise_conf['add'] and noise_conf['level_percent'] > 0:
-        noise_suffix = f"_noise{int(noise_conf['level_percent'])}"
+        # Replace dots with underscores in noise level for filesystem compatibility
+        noise_level_str = str(noise_conf['level_percent']).replace('.', '_')
+        noise_suffix = f"_noise{noise_level_str}"
     else:
         noise_suffix = ""
     

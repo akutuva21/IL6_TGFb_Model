@@ -1,85 +1,43 @@
-# In create_sysimage.jl
-
+# create_sysimage.jl
 using Pkg, PackageCompiler
 
-# 1. Define the list of packages to be included in the sysimage.
-# CRITICAL: Fides and PyCall have been REMOVED as they are not compatible with sysimage creation.
+# Paths
+env_path   = abspath(joinpath(@__DIR__, "bngl_julia"))   # where Project/Manifest live
+data_path  = abspath(@__DIR__)                           # project root with precompile_workload.jl, src/, YAML
+precomp_js = joinpath(data_path, "precompile_workload.jl")
+
+# Sanity checks
+isfile(precomp_js) || error("Precompile file not found at: $precomp_js")
+isfile(joinpath(env_path, "Project.toml")) || error("Project.toml not found at: $env_path")
+
+# Activate exact environment (keeps PEtab 3.10.0 you resolved)
+Pkg.activate(env_path)
+Pkg.instantiate()
+
+# Environment for workload
+ENV["BNGL_JULIA_PROJECT_PATH"] = data_path   # where src/ and petab_problem.yml are
+ENV["GKSwstype"] = "100"                     # headless GR for Plots on clusters
+
+# Packages to bake in
 final_pkgs = [
-    # Core differential equations and scientific computing
-    "DifferentialEquations", "OrdinaryDiffEq", "Sundials", "SciMLBase",
-    "SciMLSensitivity", "DiffEqCallbacks", "ModelingToolkit", "Catalyst",
-    "Symbolics", "SymbolicUtils", "ReactionNetworkImporters", 
-    
-    # PEtab ecosystem and optimization (Fides removed)
-    "PEtab", "Optimization", "OptimizationOptimJL", "Optim", "ADTypes",
-    "LikelihoodProfiler", "CICOBase", "QuasiMonteCarlo",
-    
-    # Automatic differentiation
-    "ReverseDiff", "ForwardDiff",
-    
-    # Data handling and I/O
-    "DataFrames", "CSV", "JLD2", "XLSX", "YAML", "DataInterpolations",
-    
-    # Plotting and visualization
-    "Plots", "Colors", "RecipesBase",
-    
-    # Utilities and arrays
-    "ComponentArrays", "ArgParse",
-    
-    # Build tools
-    "PackageCompiler"
+    "DifferentialEquations","OrdinaryDiffEq","Sundials","SciMLBase",
+    "SciMLSensitivity","DiffEqCallbacks","ModelingToolkit","Catalyst",
+    "Symbolics","SymbolicUtils","ReactionNetworkImporters",
+    "PEtab","Optimization","OptimizationOptimJL","Optim","ADTypes",
+    "LikelihoodProfiler","QuasiMonteCarlo",
+    "ReverseDiff","ForwardDiff",
+    "DataFrames","CSV","JLD2","XLSX","YAML","DataInterpolations",
+    "Plots","Colors","RecipesBase",
+    "ComponentArrays","ArgParse","PackageCompiler",
 ]
 unique!(sort!(final_pkgs))
 
-# Define the standard libraries that PackageCompiler needs to see explicitly.
-std_libs = ["Dates", "LinearAlgebra", "Pkg", "Printf", "Random", "Logging"]
-
-println("📦 System image will be built with $(length(final_pkgs)) packages and $(length(std_libs)) standard libraries.")
-
-# 2. Define project paths
-project_path = abspath(@__DIR__)
-bngl_julia_project_path = joinpath(project_path, "bngl_julia")
-
-# 3. Create a temporary, clean project directory.
-tmp_project_dir = mktempdir()
-println("\nCreating a clean build environment at: ", tmp_project_dir)
-
-try
-    # 4. Copy your project's Manifest.toml to ensure consistent versions.
-    println("Copying project Manifest.toml to the build directory...")
-    cp(joinpath(bngl_julia_project_path, "Manifest.toml"), joinpath(tmp_project_dir, "Manifest.toml"))
-
-    # 5. Activate the temporary environment and add the packages.
-    Pkg.activate(tmp_project_dir)
-    println("Adding main packages to the clean environment...")
-    Pkg.add(final_pkgs)
-    println("Adding standard libraries to the clean environment...")
-    Pkg.add(std_libs) # Add the standard libraries
-
-    # Set environment variable for the workload script
-    ENV["BNGL_JULIA_PROJECT_PATH"] = project_path
-    println("🗂️  Setting BNGL_JULIA_PROJECT_PATH = $project_path")
-
-    # 6. Build the system image.
-    mkpath("SysImage")
-    sysimage_path = joinpath("SysImage", "bngl_full.so")
-    println("\n🛠 Creating FULL system image...")
-    
-    create_sysimage(
-        final_pkgs; # Pass the list of non-standard-library packages here
-        sysimage_path  = sysimage_path,
-        project        = tmp_project_dir,
-        precompile_execution_file = joinpath(project_path, "precompile_workload.jl"),
-        incremental    = false,
-        cpu_target     = "x86-64-v2"
-    )
-
-    println("\n✅ Full system image created successfully.")
-finally
-    # 7. Clean up.
-    println("Cleaning up the temporary build environment...")
-    delete!(ENV, "BNGL_JULIA_PROJECT_PATH")
-    rm(tmp_project_dir; force=true, recursive=true)
-end
-
-println("\nDone.")
+mkpath("SysImage")
+create_sysimage(
+    final_pkgs;
+    project = env_path,                    # use your exact resolved env
+    #precompile_execution_file = precomp_js,# the file in project root
+    sysimage_path = joinpath("SysImage","bngl_full.so"),
+    incremental = true,                    # more forgiving; switch if needed
+    cpu_target = "generic;sandybridge;znver2;cascadelake",
+)
