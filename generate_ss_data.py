@@ -155,6 +155,42 @@ def run_simulation_from_preeq(
     return pd.DataFrame(result, columns=result.colnames)
 
 
+def run_simulation_no_preeq(
+    model: bionetgen.bngmodel,
+    true_params: dict,
+    stimuli: dict,
+    sim_duration: float,
+    sim_steps: int
+) -> pd.DataFrame:
+    """
+    Runs a time-course simulation starting directly from model seed species at t=0
+    with condition-specific IL6_0/TGFb_0 values applied.
+    """
+    simulator = model.setup_simulator()
+    
+    # Set all kinetic parameters to their true values
+    for name, value in true_params.items():
+        simulator.model[name] = value
+    
+    # Apply stimuli at t=0 (use SBML IDs discovered earlier)
+    for species_id, value in stimuli.items():
+        simulator.model[species_id] = value
+        
+    # Apply robust integrator settings
+    simulator.integrator.stiff = True
+    simulator.integrator.absolute_tolerance = 1e-8
+    simulator.integrator.relative_tolerance = 1e-6
+    simulator.integrator.maximum_num_steps = 50000
+    
+    # Simulate directly from seed species with condition stimuli at t=0
+    result = simulator.simulate(start=0, end=sim_duration, steps=sim_steps)
+    
+    if result is None:
+        raise RuntimeError("Simulation failed to produce results.")
+
+    return pd.DataFrame(result, columns=result.colnames)
+
+
 def discover_species_map(model: bionetgen.bngmodel, params_to_trace: list) -> dict:
     """Uses a tracer method to find the mapping from BNGL parameters to simulator species IDs."""
     logging.info("--- Discovering species mapping with tracer method ---")
@@ -204,7 +240,7 @@ def add_noise(data_series: pd.Series, noise_level: float, rng: np.random.Generat
 
 def generate_time_course_petab(config):
     """
-    Generates time-course data with consistent pre-equilibration,
+    Generates time-course data starting from t=0 with condition-specific stimuli,
     handles zero values with a Limit of Detection (LOD), adds noise,
     and saves it in PEtab-standard TSV format.
     """
@@ -223,26 +259,44 @@ def generate_time_course_petab(config):
     constant_stimuli_names = set(tc_settings.get('constant_stimuli', []))
     condition_params = variable_stimuli.union(constant_stimuli_names)
     true_params = get_true_parameters(model, condition_params)
+    
+    # Discover species mapping for stimulus parameters
     temp_model_for_tracing = bionetgen.bngmodel(model_path)
     param_to_sbml_id = discover_species_map(temp_model_for_tracing, list(condition_params))
     
-    # 3. Calculate pre-equilibration steady-state
-    stimuli_to_zero = {param: 0.0 for param in variable_stimuli}
-    baseline_condition = tc_settings['conditions']['TREG']
-    constant_stimuli = {param: baseline_condition[param] for param in constant_stimuli_names if param in baseline_condition}
-    preeq_ss = calculate_preeq_steadystate(model, true_params, stimuli_to_zero, constant_stimuli, param_to_sbml_id)
-    logging.info(f"  Pre-equilibration steady-state calculated.")
+    # 3. Check if pre-equilibration is enabled
+    use_preeq = tc_settings.get('preequilibration', True)  # Default to True for backward compatibility
     
-    # 4. Run simulations and generate "perfect" data
-    time_course_results = {}
-    for condition_name, condition_values in tc_settings['conditions'].items():
-        logging.info(f"  Simulating condition: {condition_name}")
-        stimuli_with_ids = {param_to_sbml_id[p]: v for p, v in condition_values.items()}
-        result_df = run_simulation_from_preeq(
-            model, preeq_ss, true_params, stimuli_with_ids, 
-            tc_settings['simulation']['duration'], tc_settings['simulation']['steps']
-        )
-        time_course_results[condition_name] = result_df
+    if use_preeq:
+        # OLD PATH: Calculate pre-equilibration steady-state
+        stimuli_to_zero = {param: 0.0 for param in variable_stimuli}
+        baseline_condition = tc_settings['conditions']['TREG']
+        constant_stimuli = {param: baseline_condition[param] for param in constant_stimuli_names if param in baseline_condition}
+        preeq_ss = calculate_preeq_steadystate(model, true_params, stimuli_to_zero, constant_stimuli, param_to_sbml_id)
+        logging.info(f"  Pre-equilibration steady-state calculated.")
+        
+        # Run simulations from pre-equilibrated state
+        time_course_results = {}
+        for condition_name, condition_values in tc_settings['conditions'].items():
+            logging.info(f"  Simulating condition: {condition_name}")
+            stimuli_with_ids = {param_to_sbml_id[p]: v for p, v in condition_values.items()}
+            result_df = run_simulation_from_preeq(
+                model, preeq_ss, true_params, stimuli_with_ids, 
+                tc_settings['simulation']['duration'], tc_settings['simulation']['steps']
+            )
+            time_course_results[condition_name] = result_df
+    else:
+        # NEW PATH: Simulate directly from t=0 with condition stimuli
+        logging.info(f"  Pre-equilibration disabled. Simulating directly from t=0.")
+        time_course_results = {}
+        for condition_name, condition_values in tc_settings['conditions'].items():
+            logging.info(f"  Simulating condition: {condition_name}")
+            stimuli_with_ids = {param_to_sbml_id[p]: v for p, v in condition_values.items()}
+            result_df = run_simulation_no_preeq(
+                model, true_params, stimuli_with_ids,
+                tc_settings['simulation']['duration'], tc_settings['simulation']['steps']
+            )
+            time_course_results[condition_name] = result_df
         
     # 5. Convert to long format DataFrame (still noise-free)
     measurement_rows = []
@@ -252,27 +306,27 @@ def generate_time_course_petab(config):
             time_val = row['time']
             for obs_name in all_observables:
                 if obs_name in row:
-                    measurement_rows.append({
+                    measurement_row = {
                         'observableId': obs_name,
                         'simulationConditionId': condition_name,
                         'time': time_val,
                         'measurement': row[obs_name],
-                        'preequilibrationConditionId': 'preeq_ss'
-                    })
-    
+                    }
+                    # Only add preequilibrationConditionId if using pre-equilibration
+                    if use_preeq:
+                        measurement_row['preequilibrationConditionId'] = 'preeq_ss'
+                    measurement_rows.append(measurement_row)
+
     measurement_df = pd.DataFrame(measurement_rows)
 
     # 6. Apply Limit of Detection (LOD) and Noise
     noise_conf = tc_settings['noise']
     if noise_conf['add']:
-        # --- REPLACE THE apply_lod FUNCTION ---
+        # Apply floor value to non-positive measurements
         def apply_floor(row):
-            # If measurement is zero, replace it with a tiny value before adding noise
-            # This prevents issues with log-normal noise on zero.
-            if row['measurement'] <= 1e-12: # Use a small threshold
+            if row['measurement'] <= 1e-12:
                 return 1e-8
             return row['measurement']
-            
         measurement_df['measurement'] = measurement_df.apply(apply_floor, axis=1)
         logging.info("  ...Floor value applied to non-positive measurements.")
         
@@ -292,10 +346,13 @@ def generate_time_course_petab(config):
         condition_row.update(condition_values)
         condition_rows.append(condition_row)
     
-    baseline_cond = tc_settings['conditions'].get('TREG', {})
-    preeq_row = {'conditionId': 'preeq_ss'}
-    preeq_row.update(baseline_cond)
-    condition_rows.append(preeq_row)
+    # Only add preeq_ss condition if using pre-equilibration
+    if use_preeq:
+        baseline_cond = tc_settings['conditions'].get('TREG', {})
+        preeq_row = {'conditionId': 'preeq_ss'}
+        preeq_row.update(baseline_cond)
+        condition_rows.append(preeq_row)
+        
     condition_df = pd.DataFrame(condition_rows)
 
     # Replace dots with underscores in noise level for filesystem compatibility

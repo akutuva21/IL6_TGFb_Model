@@ -1,145 +1,145 @@
-observableId	simulationConditionId	time	measurement	preequilibrationConditionId
-Free_TGFb_obs	TREG	0	1.0059112	preeq_ss
-IL6R_Active	TREG	0	9.7922135e-09	preeq_ss
-Free_IL6_obs	TREG	0	1.0149177e-08	preeq_ss
-pSMAD3_obs	TREG	0	84.896417	preeq_ss
-STAT3d_active_obs	TREG	0	9.6154226e-09	preeq_ss
-S3S4_complex_obs	TREG	0	48.698638	preeq_ss
-S3STAT3d_complex_obs	TREG	0	1.0023594e-08	preeq_ss
-PKA_active	TREG	0	47.499263	preeq_ss
-Free_TGFb_obs	TREG	5	0.99946419	preeq_ss
-IL6R_Active	TREG	5	9.8288895e-09	preeq_ss
-Free_IL6_obs	TREG	5	1.0175383e-08	preeq_ss
-pSMAD3_obs	TREG	5	84.620517	preeq_ss
-STAT3d_active_obs	TREG	5	1.0011211e-08	preeq_ss
-S3S4_complex_obs	TREG	5	51.123007	preeq_ss
-S3STAT3d_complex_obs	TREG	5	1.0091913e-08	preeq_ss
-PKA_active	TREG	5	46.986216	preeq_ss
-Free_TGFb_obs	TREG	10	1.0072001	preeq_ss
-IL6R_Active	TREG	10	9.8081081e-09	preeq_ss
-Free_IL6_obs	TREG	10	1.017519e-08	preeq_ss
-pSMAD3_obs	TREG	10	83.231348	preeq_ss
-STAT3d_active_obs	TREG	10	9.9611075e-09	preeq_ss
-S3S4_complex_obs	TREG	10	49.307432	preeq_ss
-S3STAT3d_complex_obs	TREG	10	1.0245448e-08	preeq_ss
-PKA_active	TREG	10	47.653121	preeq_ss
-Free_TGFb_obs	TREG	15	0.99127265	preeq_ss
-IL6R_Active	TREG	15	9.9278423e-09	preeq_ss
-Free_IL6_obs	TREG	15	1.0104999e-08	preeq_ss
-pSMAD3_obs	TREG	15	83.925594	preeq_ss
-STAT3d_active_obs	TREG	15	1.0080864e-08	preeq_ss
-S3S4_complex_obs	TREG	15	50.415951	preeq_ss
-S3STAT3d_complex_obs	TREG	15	1.0435504e-08	preeq_ss
-PKA_active	TREG	15	47.413686	preeq_ss
-Free_TGFb_obs	TREG	20	0.98961056	preeq_ss
-IL6R_Active	TREG	20	9.8366116e-09	preeq_ss
-Free_IL6_obs	TREG	20	1.0121921e-08	preeq_ss
-pSMAD3_obs	TREG	20	85.216891	preeq_ss
-STAT3d_active_obs	TREG	20	9.9752439e-09	preeq_ss
-S3S4_complex_obs	TREG	20	49.150676	preeq_ss
-S3STAT3d_complex_obs	TREG	20	9.8345054e-09	preeq_ss
-PKA_active	TREG	20	48.426586	preeq_ss
-Free_TGFb_obs	TREG	25	1.0147717	preeq_ss
-IL6R_Active	TREG	25	1.0107191e-08	preeq_ss
-Free_IL6_obs	TREG	25	9.8658201e-09	preeq_ss
-pSMAD3_obs	TREG	25	83.702198	preeq_ss
-STAT3d_active_obs	TREG	25	1.0021358e-08	preeq_ss
-S3S4_complex_obs	TREG	25	50.202528	preeq_ss
-S3STAT3d_complex_obs	TREG	25	1.0173761e-08	preeq_ss
-PKA_active	TREG	25	48.014828	preeq_ss
-Free_TGFb_obs	TREG	30	1.0134668	preeq_ss
-IL6R_Active	TREG	30	1.0011521e-08	preeq_ss
-Free_IL6_obs	TREG	30	1.0055975e-08	preeq_ss
-pSMAD3_obs	TREG	30	84.37296	preeq_ss
-STAT3d_active_obs	TREG	30	9.7108608e-09	preeq_ss
-S3S4_complex_obs	TREG	30	49.664941	preeq_ss
-S3STAT3d_complex_obs	TREG	30	9.9043952e-09	preeq_ss
-PKA_active	TREG	30	47.193781	preeq_ss
-Free_TGFb_obs	TREG	35	0.99431397	preeq_ss
-IL6R_Active	TREG	35	1.0301412e-08	preeq_ss
-Free_IL6_obs	TREG	35	9.8263764e-09	preeq_ss
-pSMAD3_obs	TREG	35	84.943481	preeq_ss
-STAT3d_active_obs	TREG	35	9.6671264e-09	preeq_ss
-S3S4_complex_obs	TREG	35	49.649833	preeq_ss
-S3STAT3d_complex_obs	TREG	35	1.0030594e-08	preeq_ss
-PKA_active	TREG	35	48.364288	preeq_ss
-Free_TGFb_obs	TREG	40	1.0141219	preeq_ss
-IL6R_Active	TREG	40	1.0157887e-08	preeq_ss
-Free_IL6_obs	TREG	40	9.9285191e-09	preeq_ss
-pSMAD3_obs	TREG	40	82.547704	preeq_ss
-STAT3d_active_obs	TREG	40	1.0171024e-08	preeq_ss
-S3S4_complex_obs	TREG	40	49.792599	preeq_ss
-S3STAT3d_complex_obs	TREG	40	9.7461658e-09	preeq_ss
-PKA_active	TREG	40	46.729466	preeq_ss
-Free_TGFb_obs	TH17	0	0.98158451	preeq_ss
-IL6R_Active	TH17	0	1.0097899e-08	preeq_ss
-Free_IL6_obs	TH17	0	100.26518	preeq_ss
-pSMAD3_obs	TH17	0	84.472902	preeq_ss
-STAT3d_active_obs	TH17	0	9.9129396e-09	preeq_ss
-S3S4_complex_obs	TH17	0	50.142178	preeq_ss
-S3STAT3d_complex_obs	TH17	0	1.0123867e-08	preeq_ss
-PKA_active	TH17	0	47.505814	preeq_ss
-Free_TGFb_obs	TH17	5	1.0089747	preeq_ss
-IL6R_Active	TH17	5	76.662948	preeq_ss
-Free_IL6_obs	TH17	5	7.3844673	preeq_ss
-pSMAD3_obs	TH17	5	88.278405	preeq_ss
-STAT3d_active_obs	TH17	5	36.418276	preeq_ss
-S3S4_complex_obs	TH17	5	50.401763	preeq_ss
-S3STAT3d_complex_obs	TH17	5	35.671631	preeq_ss
-PKA_active	TH17	5	47.775766	preeq_ss
-Free_TGFb_obs	TH17	10	1.0094585	preeq_ss
-IL6R_Active	TH17	10	84.687406	preeq_ss
-Free_IL6_obs	TH17	10	7.236292	preeq_ss
-pSMAD3_obs	TH17	10	92.215538	preeq_ss
-STAT3d_active_obs	TH17	10	37.150196	preeq_ss
-S3S4_complex_obs	TH17	10	49.871576	preeq_ss
-S3STAT3d_complex_obs	TH17	10	35.578441	preeq_ss
-PKA_active	TH17	10	46.421372	preeq_ss
-Free_TGFb_obs	TH17	15	0.9737007	preeq_ss
-IL6R_Active	TH17	15	82.719969	preeq_ss
-Free_IL6_obs	TH17	15	7.1752739	preeq_ss
-pSMAD3_obs	TH17	15	92.418192	preeq_ss
-STAT3d_active_obs	TH17	15	37.380904	preeq_ss
-S3S4_complex_obs	TH17	15	51.274015	preeq_ss
-S3STAT3d_complex_obs	TH17	15	36.864587	preeq_ss
-PKA_active	TH17	15	48.498544	preeq_ss
-Free_TGFb_obs	TH17	20	0.98130649	preeq_ss
-IL6R_Active	TH17	20	84.072818	preeq_ss
-Free_IL6_obs	TH17	20	6.982574	preeq_ss
-pSMAD3_obs	TH17	20	94.321484	preeq_ss
-STAT3d_active_obs	TH17	20	38.508129	preeq_ss
-S3S4_complex_obs	TH17	20	48.26516	preeq_ss
-S3STAT3d_complex_obs	TH17	20	37.697042	preeq_ss
-PKA_active	TH17	20	48.017552	preeq_ss
-Free_TGFb_obs	TH17	25	0.98799092	preeq_ss
-IL6R_Active	TH17	25	82.014943	preeq_ss
-Free_IL6_obs	TH17	25	7.1266546	preeq_ss
-pSMAD3_obs	TH17	25	94.401915	preeq_ss
-STAT3d_active_obs	TH17	25	38.239296	preeq_ss
-S3S4_complex_obs	TH17	25	49.984219	preeq_ss
-S3STAT3d_complex_obs	TH17	25	38.802337	preeq_ss
-PKA_active	TH17	25	47.56205	preeq_ss
-Free_TGFb_obs	TH17	30	0.97954425	preeq_ss
-IL6R_Active	TH17	30	84.724678	preeq_ss
-Free_IL6_obs	TH17	30	7.147751	preeq_ss
-pSMAD3_obs	TH17	30	98.286457	preeq_ss
-STAT3d_active_obs	TH17	30	38.891554	preeq_ss
-S3S4_complex_obs	TH17	30	50.320432	preeq_ss
-S3STAT3d_complex_obs	TH17	30	38.887782	preeq_ss
-PKA_active	TH17	30	46.667652	preeq_ss
-Free_TGFb_obs	TH17	35	0.98709034	preeq_ss
-IL6R_Active	TH17	35	82.871586	preeq_ss
-Free_IL6_obs	TH17	35	7.0611135	preeq_ss
-pSMAD3_obs	TH17	35	93.19613	preeq_ss
-STAT3d_active_obs	TH17	35	38.913623	preeq_ss
-S3S4_complex_obs	TH17	35	49.740965	preeq_ss
-S3STAT3d_complex_obs	TH17	35	36.838363	preeq_ss
-PKA_active	TH17	35	46.829523	preeq_ss
-Free_TGFb_obs	TH17	40	1.0060881	preeq_ss
-IL6R_Active	TH17	40	85.848386	preeq_ss
-Free_IL6_obs	TH17	40	7.4062838	preeq_ss
-pSMAD3_obs	TH17	40	101.6497	preeq_ss
-STAT3d_active_obs	TH17	40	38.908047	preeq_ss
-S3S4_complex_obs	TH17	40	48.983323	preeq_ss
-S3STAT3d_complex_obs	TH17	40	36.506783	preeq_ss
-PKA_active	TH17	40	48.046773	preeq_ss
+observableId	simulationConditionId	time	measurement
+Free_TGFb_obs	TREG	0	1.0059112
+IL6R_Active	TREG	0	9.7922135e-09
+Free_IL6_obs	TREG	0	1.0149177e-08
+pSMAD3_obs	TREG	0	1.0187837e-08
+STAT3d_active_obs	TREG	0	9.6154226e-09
+S3S4_complex_obs	TREG	0	9.7410036e-09
+S3STAT3d_complex_obs	TREG	0	1.0023594e-08
+PKA_active	TREG	0	9.9349706e-09
+Free_TGFb_obs	TREG	5	0.99946419
+IL6R_Active	TREG	5	9.8288895e-09
+Free_IL6_obs	TREG	5	1.0175383e-08
+pSMAD3_obs	TREG	5	39.893265
+STAT3d_active_obs	TREG	5	1.0011211e-08
+S3S4_complex_obs	TREG	5	39.634837
+S3STAT3d_complex_obs	TREG	5	1.0091913e-08
+PKA_active	TREG	5	37.329164
+Free_TGFb_obs	TREG	10	1.0072001
+IL6R_Active	TREG	10	9.8081081e-09
+Free_IL6_obs	TREG	10	1.017519e-08
+pSMAD3_obs	TREG	10	62.107095
+STAT3d_active_obs	TREG	10	9.9611075e-09
+S3S4_complex_obs	TREG	10	49.295874
+S3STAT3d_complex_obs	TREG	10	1.0245448e-08
+PKA_active	TREG	10	47.646695
+Free_TGFb_obs	TREG	15	0.99127265
+IL6R_Active	TREG	15	9.9278423e-09
+Free_IL6_obs	TREG	15	1.0104999e-08
+pSMAD3_obs	TREG	15	73.863032
+STAT3d_active_obs	TREG	15	1.0080864e-08
+S3S4_complex_obs	TREG	15	50.413106
+S3STAT3d_complex_obs	TREG	15	1.0435504e-08
+PKA_active	TREG	15	47.412246
+Free_TGFb_obs	TREG	20	0.98961056
+IL6R_Active	TREG	20	9.8366116e-09
+Free_IL6_obs	TREG	20	1.0121921e-08
+pSMAD3_obs	TREG	20	80.390209
+STAT3d_active_obs	TREG	20	9.9752439e-09
+S3S4_complex_obs	TREG	20	49.14961
+S3STAT3d_complex_obs	TREG	20	9.8345054e-09
+PKA_active	TREG	20	48.426026
+Free_TGFb_obs	TREG	25	1.0147717
+IL6R_Active	TREG	25	1.0107191e-08
+Free_IL6_obs	TREG	25	9.8658201e-09
+pSMAD3_obs	TREG	25	81.462727
+STAT3d_active_obs	TREG	25	1.0021358e-08
+S3S4_complex_obs	TREG	25	50.202056
+S3STAT3d_complex_obs	TREG	25	1.0173761e-08
+PKA_active	TREG	25	48.014588
+Free_TGFb_obs	TREG	30	1.0134668
+IL6R_Active	TREG	30	1.0011521e-08
+Free_IL6_obs	TREG	30	1.0055975e-08
+pSMAD3_obs	TREG	30	83.306614
+STAT3d_active_obs	TREG	30	9.7108608e-09
+S3S4_complex_obs	TREG	30	49.664729
+S3STAT3d_complex_obs	TREG	30	9.9043952e-09
+PKA_active	TREG	30	47.193674
+Free_TGFb_obs	TREG	35	0.99431397
+IL6R_Active	TREG	35	1.0301412e-08
+Free_IL6_obs	TREG	35	9.8263764e-09
+pSMAD3_obs	TREG	35	84.436362
+STAT3d_active_obs	TREG	35	9.6671264e-09
+S3S4_complex_obs	TREG	35	49.649735
+S3STAT3d_complex_obs	TREG	35	1.0030594e-08
+PKA_active	TREG	35	48.364237
+Free_TGFb_obs	TREG	40	1.0141219
+IL6R_Active	TREG	40	1.0157887e-08
+Free_IL6_obs	TREG	40	9.9285191e-09
+pSMAD3_obs	TREG	40	82.314912
+STAT3d_active_obs	TREG	40	1.0171024e-08
+S3S4_complex_obs	TREG	40	49.792553
+S3STAT3d_complex_obs	TREG	40	9.7461658e-09
+PKA_active	TREG	40	46.729443
+Free_TGFb_obs	TH17	0	0.98158451
+IL6R_Active	TH17	0	1.0097899e-08
+Free_IL6_obs	TH17	0	100.26518
+pSMAD3_obs	TH17	0	1.0137014e-08
+STAT3d_active_obs	TH17	0	9.9129396e-09
+S3S4_complex_obs	TH17	0	1.0029749e-08
+S3STAT3d_complex_obs	TH17	0	1.0123867e-08
+PKA_active	TH17	0	9.9363408e-09
+Free_TGFb_obs	TH17	5	1.0089747
+IL6R_Active	TH17	5	76.662953
+Free_IL6_obs	TH17	5	7.3844668
+pSMAD3_obs	TH17	5	39.011702
+STAT3d_active_obs	TH17	5	32.627565
+S3S4_complex_obs	TH17	5	25.800225
+S3STAT3d_complex_obs	TH17	5	13.465692
+PKA_active	TH17	5	25.291203
+Free_TGFb_obs	TH17	10	1.0094585
+IL6R_Active	TH17	10	84.687433
+Free_IL6_obs	TH17	10	7.2362907
+pSMAD3_obs	TH17	10	63.012042
+STAT3d_active_obs	TH17	10	30.824285
+S3S4_complex_obs	TH17	10	41.945948
+S3STAT3d_complex_obs	TH17	10	20.117027
+PKA_active	TH17	10	40.100462
+Free_TGFb_obs	TH17	15	0.9737007
+IL6R_Active	TH17	15	82.719976
+Free_IL6_obs	TH17	15	7.1752736
+pSMAD3_obs	TH17	15	76.120284
+STAT3d_active_obs	TH17	15	30.325576
+S3S4_complex_obs	TH17	15	50.671879
+S3STAT3d_complex_obs	TH17	15	26.82148
+PKA_active	TH17	15	48.113574
+Free_TGFb_obs	TH17	20	0.98130649
+IL6R_Active	TH17	20	84.072819
+Free_IL6_obs	TH17	20	6.9825739
+pSMAD3_obs	TH17	20	85.153703
+STAT3d_active_obs	TH17	20	31.685863
+S3S4_complex_obs	TH17	20	48.251454
+S3STAT3d_complex_obs	TH17	20	30.793658
+PKA_active	TH17	20	48.009563
+Free_TGFb_obs	TH17	25	0.98799092
+IL6R_Active	TH17	25	82.014943
+Free_IL6_obs	TH17	25	7.1266546
+pSMAD3_obs	TH17	25	88.978249
+STAT3d_active_obs	TH17	25	32.052421
+S3S4_complex_obs	TH17	25	49.985973
+S3STAT3d_complex_obs	TH17	25	32.537247
+PKA_active	TH17	25	47.562765
+Free_TGFb_obs	TH17	30	0.97954425
+IL6R_Active	TH17	30	84.724678
+Free_IL6_obs	TH17	30	7.147751
+pSMAD3_obs	TH17	30	94.587892
+STAT3d_active_obs	TH17	30	33.142686
+S3S4_complex_obs	TH17	30	50.325729
+S3STAT3d_complex_obs	TH17	30	33.209675
+PKA_active	TH17	30	46.670135
+Free_TGFb_obs	TH17	35	0.98709034
+IL6R_Active	TH17	35	82.871586
+Free_IL6_obs	TH17	35	7.0611135
+pSMAD3_obs	TH17	35	90.645458
+STAT3d_active_obs	TH17	35	33.646075
+S3S4_complex_obs	TH17	35	49.74734
+S3STAT3d_complex_obs	TH17	35	31.937657
+PKA_active	TH17	35	46.832593
+Free_TGFb_obs	TH17	40	1.0060881
+IL6R_Active	TH17	40	85.848385
+Free_IL6_obs	TH17	40	7.4062838
+pSMAD3_obs	TH17	40	99.440857
+STAT3d_active_obs	TH17	40	34.072627
+S3S4_complex_obs	TH17	40	48.989951
+S3STAT3d_complex_obs	TH17	40	32.062323
+PKA_active	TH17	40	48.05011

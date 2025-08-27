@@ -64,10 +64,14 @@ function main()
         
         setup_results = setup_petab_problem(parsed_args["yaml"])
         odesolver = ODESolver(KenCarp47(autodiff=false), abstol=1e-8, reltol=1e-8)
-        ss_solver = SteadyStateSolver(:Simulate, abstol=1e-8, reltol=1e-8)
+        # Remove ss_solver since pre-equilibration is disabled
         
-        petab_problem = PEtabODEProblem(setup_results.petab_model, odesolver=odesolver, ss_solver=ss_solver,
-                                        gradient_method=:Adjoint, sensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP()))
+        petab_problem = PEtabODEProblem(
+                        setup_results.petab_model, 
+                        odesolver=odesolver,
+                        gradient_method=:Adjoint, 
+                        sensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP()),
+                        split_over_conditions=true)
         
         run_single_optimization(parsed_args, petab_problem)
 
@@ -122,7 +126,10 @@ function main()
         # --- Set up the PEtab problem once for all plotting ---
         setup_results = setup_petab_problem(parsed_args["yaml"])
         odesolver = ODESolver(KenCarp47(autodiff=false), abstol=1e-8, reltol=1e-8)
-        petab_problem = PEtabODEProblem(setup_results.petab_model, odesolver=odesolver)
+        petab_problem = PEtabODEProblem(
+                            setup_results.petab_model, 
+                            odesolver=odesolver,
+                            split_over_conditions=true)
 
         # --- Generate Diagnostic Plots ---
         @info "--- Generating diagnostic plots ---"
@@ -145,7 +152,7 @@ function main()
         
         setup_results = setup_petab_problem(parsed_args["yaml"])
         profiling_odesol = ODESolver(KenCarp47(autodiff=false), abstol=1e-8, reltol=1e-8)
-        profiling_ss_solver = SteadyStateSolver(:Simulate, abstol=1e-8, reltol=1e-8)
+        # Remove profiling_ss_solver since pre-equilibration is disabled
 
         # Pass the method as a Symbol
         prof_method = Symbol(parsed_args["profiling-method"])
@@ -153,7 +160,7 @@ function main()
         run_likelihood_profiling(
             setup_results.petab_model, 
             profiling_odesol, 
-            profiling_ss_solver, 
+            nothing,  # Pass nothing for steadystate_solver
             best_mle, 
             setup_results.true_values;
             profiling_method = prof_method # Pass the selected method

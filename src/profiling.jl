@@ -49,17 +49,16 @@ function LikelihoodProfiler.interpolate_endpoint(profile_values::LikelihoodProfi
     end
 end
 
-function create_petab_problem_for_profiling(petab_model::PEtabModel, odesolver, steadystate_solver)
+function create_petab_problem_for_profiling(petab_model::PEtabModel, odesolver, steadystate_solver=nothing)
     @info "Creating PEtabODEProblem for profiling with PositiveDomain callback..."
     
-    # 1. Define the callback you want to add
+    # Define the callback you want to add
     positive_domain_cb = PositiveDomain()
     
-    # 2. Combine it with any existing callbacks in the model
+    # Combine it with any existing callbacks in the model
     combined_callbacks = CallbackSet(petab_model.callbacks, positive_domain_cb)
 
-    # 3. Manually create a *new* PEtabModel that is a copy of the original,
-    #    but with our new, combined callback set. This is the key step.
+    # Create a new PEtabModel with the combined callback set
     petab_model_with_callback = PEtabModel(
         petab_model.name,
         petab_model.h,
@@ -73,17 +72,24 @@ function create_petab_problem_for_profiling(petab_model::PEtabModel, odesolver, 
         petab_model.parametermap,
         petab_model.speciemap,
         petab_model.petab_tables,
-        combined_callbacks, # <<< Here we insert the new callbacks
+        combined_callbacks,
         petab_model.defined_in_julia
     )
 
-    # 4. Create the final PEtabODEProblem from this new, modified PEtabModel.
-    petab_problem = PEtabODEProblem(
-        petab_model_with_callback,
-        odesolver=odesolver,
-        ss_solver=steadystate_solver,
-        verbose=false
+    # Create the final PEtabODEProblem
+    problem_kwargs = Dict(
+        :odesolver => odesolver,
+        :gradient_method => :ForwardDiff,
+        :split_over_conditions => true,
+        :verbose => false
     )
+    
+    # Only add ss_solver if provided
+    if !isnothing(steadystate_solver)
+        problem_kwargs[:ss_solver] = steadystate_solver
+    end
+    
+    petab_problem = PEtabODEProblem(petab_model_with_callback; problem_kwargs...)
     
     @info "✅ PEtabODEProblem for profiling created successfully."
     return petab_problem
