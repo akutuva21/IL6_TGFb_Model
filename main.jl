@@ -151,7 +151,7 @@ function main()
         best_mle = fit_data["best_mle"]
         
         setup_results = setup_petab_problem(parsed_args["yaml"])
-        profiling_odesol = ODESolver(KenCarp47(autodiff=false), abstol=1e-8, reltol=1e-8)
+        profiling_odesol = ODESolver(Rodas5P(), abstol=1e-6, reltol=1e-6)
         # Remove profiling_ss_solver since pre-equilibration is disabled
 
         # Pass the method as a Symbol
