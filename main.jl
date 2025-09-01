@@ -63,14 +63,12 @@ function main()
         @info "--- Running in WORKER mode for Task ID: $(parsed_args["task-id"]) ---"
         
         setup_results = setup_petab_problem(parsed_args["yaml"])
-        odesolver = ODESolver(KenCarp47(autodiff=false), abstol=1e-8, reltol=1e-8)
+        odesolver = ODESolver(Rodas5P(), abstol=1e-8, reltol=1e-8)
         # Remove ss_solver since pre-equilibration is disabled
         
         petab_problem = PEtabODEProblem(
                         setup_results.petab_model, 
                         odesolver=odesolver,
-                        gradient_method=:Adjoint, 
-                        sensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP()),
                         split_over_conditions=true)
         
         run_single_optimization(parsed_args, petab_problem)
@@ -125,7 +123,7 @@ function main()
 
         # --- Set up the PEtab problem once for all plotting ---
         setup_results = setup_petab_problem(parsed_args["yaml"])
-        odesolver = ODESolver(KenCarp47(autodiff=false), abstol=1e-8, reltol=1e-8)
+        odesolver = ODESolver(Rodas5P(), abstol=1e-8, reltol=1e-8)
         petab_problem = PEtabODEProblem(
                             setup_results.petab_model, 
                             odesolver=odesolver,
@@ -151,7 +149,7 @@ function main()
         best_mle = fit_data["best_mle"]
         
         setup_results = setup_petab_problem(parsed_args["yaml"])
-        profiling_odesol = ODESolver(Rodas5P(), abstol=1e-6, reltol=1e-6)
+        profiling_odesol = ODESolver(Rodas5P(), abstol=1e-8, reltol=1e-8)
         # Remove profiling_ss_solver since pre-equilibration is disabled
 
         # Pass the method as a Symbol

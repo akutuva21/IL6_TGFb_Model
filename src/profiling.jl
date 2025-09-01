@@ -851,11 +851,14 @@ function robust_manual_profiling(pl_problem, safe_indices, safe_params, true_par
             base_name = base_name[7:end]
         end
         θ_true = haskey(true_param_values, base_name) ? log10(true_param_values[base_name]) : θ_center
-        
+
+        zoom_range = 0.02
+        num_pts = 1000
+
         # Grid covering both MLE and true value with margin
-        θ_min = min(θ_center, θ_true) - 2.0
-        θ_max = max(θ_center, θ_true) + 2.0
-        param_range = range(θ_min, θ_max, length=200)
+        θ_min = min(θ_center, θ_true) - zoom_range
+        θ_max = max(θ_center, θ_true) + zoom_range
+        param_range = range(θ_min, θ_max, length=num_pts)
         
         x_vals = Float64[]
         nll_vals = Float64[]

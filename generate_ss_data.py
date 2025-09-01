@@ -494,8 +494,9 @@ def main():
     measurements_df, condition_df, model = generate_time_course_petab(config)
     
     # Create PEtab files
-    output_dir = "petab_files"
-    os.makedirs(output_dir, exist_ok=True)
+    # Allow overriding the PEtab output folder via config (defaults to 'petab_files')
+    petab_output_dir = config.get('petab_output_dir', 'petab_files')
+    os.makedirs(petab_output_dir, exist_ok=True)
     
     # Add noise suffix to filenames if noise is enabled
     noise_conf = config['time_course_settings']['noise']
@@ -506,8 +507,8 @@ def main():
     else:
         noise_suffix = ""
     
-    observables_path = os.path.join(output_dir, f"observables{noise_suffix}.tsv")
-    parameters_path = os.path.join(output_dir, f"parameters{noise_suffix}.tsv")
+    observables_path = os.path.join(petab_output_dir, f"observables{noise_suffix}.tsv")
+    parameters_path = os.path.join(petab_output_dir, f"parameters{noise_suffix}.tsv")
     
     create_observables_petab(
         config,

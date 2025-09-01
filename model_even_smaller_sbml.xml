@@ -35,22 +35,22 @@
       <!-- Independent variables -->
       <parameter id="TGFb_0" value="1"/>
       <parameter id="IL6_0" value="0"/>
-      <parameter id="kf_il6_bind" value="0.1"/>
-      <parameter id="kr_il6_bind" value="0.1"/>
+      <parameter id="kf_il6_bind" value="0.05"/>
+      <parameter id="kr_il6_bind" value="0.15"/>
       <parameter id="k_act_il6r" value="0.5"/>
       <parameter id="k_inact_il6r" value="0.05"/>
-      <parameter id="k_phos_smad3" value="0.1"/>
+      <parameter id="k_phos_smad3" value="0.2"/>
       <parameter id="k_dephos_smad3" value="0.05"/>
-      <parameter id="kf_stat3_bind" value="1"/>
-      <parameter id="kr_stat3_bind" value="0.1"/>
-      <parameter id="k_stat3_dimer" value="0.1"/>
-      <parameter id="k_deact_stat3" value="0.05"/>
+      <parameter id="kf_stat3_bind" value="0.8"/>
+      <parameter id="kr_stat3_bind" value="0.3"/>
+      <parameter id="k_stat3_dimer" value="0.3"/>
+      <parameter id="k_deact_stat3" value="0.7"/>
       <parameter id="kf_s3s4" value="1"/>
-      <parameter id="kr_s3s4" value="0.1"/>
-      <parameter id="kf_s3stat3d" value="1"/>
-      <parameter id="kr_s3stat3d" value="0.1"/>
-      <parameter id="kf_pka_bind" value="1"/>
-      <parameter id="kr_pka_bind" value="0.1"/>
+      <parameter id="kr_s3s4" value="0.5"/>
+      <parameter id="kf_s3stat3d" value="0.3"/>
+      <parameter id="kr_s3stat3d" value="0.9"/>
+      <parameter id="kf_pka_bind" value="0.9"/>
+      <parameter id="kr_pka_bind" value="0.7"/>
       <parameter id="IL6R_0" value="100"/>
       <parameter id="SMAD3_0" value="100"/>
       <parameter id="SMAD4_0" value="50"/>
