@@ -228,7 +228,7 @@ def add_noise(data_series: pd.Series, noise_level: float, rng: np.random.Generat
 
     sigma = float(np.sqrt(np.log(1.0 + noise_level**2)))
     # Draw one factor per element
-    eps = np.exp(rng.normal(loc=-0.5 * sigma**2, scale=sigma, size=len(data_series)))
+    eps = np.exp(rng.normal(loc=0, scale=sigma, size=len(data_series)))
     noisy_series = data_series.to_numpy(dtype=float) * eps
     # Log-normal factor is > 0, so no need to clip; keep clip for robustness if desired
     # noisy_series = np.clip(noisy_series, a_min=0.0, a_max=None)
@@ -459,17 +459,17 @@ def create_parameters_petab(config, model, output_path):
         parameters_data.append({
             'parameterId': 'sigma_log_shared', 'parameterName': 'sigma_log_shared',
             'parameterScale': 'log10', # The optimizer still sees this on a log scale
-            'lowerBound': 1e-2,       # Linear bound
-            'upperBound': 0.25,        # Linear bound
+            'lowerBound': 1e-5,       # Linear bound
+            'upperBound': 10,        # Linear bound
             'nominalValue': sigma_nominal, # Linear nominal value
-            'estimate': 0
+            'estimate': 1
         })
     else:
         # Add a fixed noise parameter if data is noise-free
         parameters_data.append({
             'parameterId': 'sigma_log_shared', 'parameterName': 'sigma_log_shared',
-            'parameterScale': 'log10', 'lowerBound': 1e-8, 'upperBound': 1e-4,
-            'nominalValue': 1e-8, 'estimate': 0
+            'parameterScale': 'log10', 'lowerBound': 1e-10, 'upperBound': 1.0,
+            'nominalValue': 1e-8, 'estimate': 1
         })
 
     pd.DataFrame(parameters_data).to_csv(output_path, sep='\t', index=False, float_format='%.16g')

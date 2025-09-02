@@ -170,6 +170,85 @@ function plot_profile_delta_chi2!(
     return plt
 end
 
+"""
+    profile_parameter_custom_range(
+        param_name::AbstractString,
+        pl_problem,
+        θ_mle::ComponentVector,
+        true_values::Dict;
+        num_points::Int=60,
+        pad_fraction::Float64=0.25
+    )
+
+Compute a profile over a custom range that spans between the MLE and the true
+value (on log10-scale for kinetic parameters) with padding, then plot Δχ²
+and mark both MLE (solid green) and True (dashed purple). Saves to
+`likelihood_profiles_custom`.
+"""
+function profile_parameter_custom_range(
+    param_name::AbstractString,
+    pl_problem,
+    θ_mle::ComponentVector,
+    true_values::Dict;
+    num_points::Int=60,
+    pad_fraction::Float64=0.25
+)
+    # Determine index of parameter and related names
+    all_names = string.(keys(θ_mle))
+    idx = findfirst(==(param_name), all_names)
+    if idx === nothing
+        @warn "Parameter $param_name not found in θ_mle; skipping custom-range profile."
+        return
+    end
+
+    # Map to base name (remove log10_ prefix)
+    base_name = startswith(param_name, "log10_") ? param_name[7:end] : param_name
+    if !haskey(true_values, base_name)
+        @warn "No true value for '$base_name'; skipping custom-range profile for $param_name."
+        return
+    end
+
+    # Values on log10-scale
+    mle_val = θ_mle[idx]
+    true_val_log10 = log10(true_values[base_name])
+
+    # Define range covering both with padding
+    lo = min(mle_val, true_val_log10)
+    hi = max(mle_val, true_val_log10)
+    pad = max((hi - lo) * pad_fraction, 1e-3)
+    xspan = range(lo - pad, hi + pad, length=max(num_points, 10))
+
+    # Evaluate objective across range
+    nll_anchor = pl_problem.optprob.f(pl_problem.optpars, pl_problem.optprob.p)
+    x_vals = Vector{Float64}(undef, length(xspan))
+    nll_vals = Vector{Float64}(undef, length(xspan))
+
+    for (i, x) in enumerate(xspan)
+        θ_test = copy(pl_problem.optpars)
+        θ_test[idx] = x
+        x_vals[i] = x
+        val = try
+            pl_problem.optprob.f(θ_test, pl_problem.optprob.p)
+        catch
+            Inf
+        end
+        nll_vals[i] = isfinite(val) ? val : Inf
+    end
+
+    # Plot thread-safely
+    lock(PLOT_LOCK) do
+        plt = plot()
+        plot_profile_delta_chi2!(plt, x_vals, nll_vals; pname=param_name, nll_anchor=nll_anchor, ymax=50.0)
+        vline!(plt, [mle_val]; label="MLE", color=:green, lw=2)
+        vline!(plt, [true_val_log10]; label="True Value", color=:purple, linestyle=:dash, lw=2)
+
+        save_dir = joinpath(pwd(), "likelihood_profiles_custom")
+        mkpath(save_dir)
+        savefig(plt, joinpath(save_dir, "custom_profile_$(param_name).png"))
+        @info "Saved custom-range profile for $param_name"
+    end
+end
+
 function test_objective_sensitivity(petab_problem, θ_mle, param_idx, param_name)
     """Test how sensitive the objective function is to parameter perturbations."""
     θ_center = θ_mle[param_idx]
@@ -842,27 +921,30 @@ function robust_manual_profiling(pl_problem, safe_indices, safe_params, true_par
         param_name = safe_params[i]
         @info "Robustness profiling $param_name..."
         
-        # Adaptive grid around MLE + true value
+        # 1. Get MLE and True Value on log10 scale
         θ_center = θ_mle[idx]
-        
-        # Get true value, handling log10_ prefixes correctly
         base_name = string(param_name)
         if startswith(base_name, "log10_")
             base_name = base_name[7:end]
         end
         θ_true = haskey(true_param_values, base_name) ? log10(true_param_values[base_name]) : θ_center
 
-        zoom_range = 0.02
+        # 2. Make the sampling range ADAPTIVE
+        padding_fraction = 0.25 # Use 25% padding
         num_pts = 1000
 
-        # Grid covering both MLE and true value with margin
-        θ_min = min(θ_center, θ_true) - zoom_range
-        θ_max = max(θ_center, θ_true) + zoom_range
+        # Calculate the range based on the distance between the two points
+        distance = abs(θ_center - θ_true)
+        padding = max(distance * padding_fraction, 0.001) # Ensure padding is not zero
+
+        θ_min = min(θ_center, θ_true) - padding
+        θ_max = max(θ_center, θ_true) + padding
         param_range = range(θ_min, θ_max, length=num_pts)
         
         x_vals = Float64[]
         nll_vals = Float64[]
         
+        # This part remains the same
         for θ_val in param_range
             θ_test = copy(θ_mle)
             θ_test[idx] = θ_val
@@ -877,7 +959,7 @@ function robust_manual_profiling(pl_problem, safe_indices, safe_params, true_par
             end
         end
         
-        # Calculate robustness metrics
+        # This part remains the same
         delta_chi2 = 2.0 .* (nll_vals .- nll_mle)
         ci_95_indices = findall(delta_chi2 .<= 3.84)
         
@@ -886,16 +968,16 @@ function robust_manual_profiling(pl_problem, safe_indices, safe_params, true_par
             "mle_value" => θ_center,
             "true_value" => θ_true,
             "ci_width" => length(ci_95_indices) > 0 ? maximum(x_vals[ci_95_indices]) - minimum(x_vals[ci_95_indices]) : Inf,
-            "contains_true" => θ_true in x_vals[ci_95_indices],
+            "contains_true" => !isempty(ci_95_indices) && (minimum(x_vals[ci_95_indices]) <= θ_true <= maximum(x_vals[ci_95_indices])),
             "profile_success" => any(isfinite.(nll_vals))
         )
         
         robustness_results[param_name] = robustness_info
         
-        # Plot results with thread-safe plotting
+        # This part remains the same
         lock(PLOT_LOCK) do
             plt = plot()
-            plot_profile_delta_chi2!(plt, x_vals, nll_vals; pname=param_name, nll_anchor=nll_mle)
+            plot_profile_delta_chi2!(plt, x_vals, nll_vals; pname=param_name, nll_anchor=nll_mle, autox=false)
             vline!(plt, [θ_true]; label="True Value", color=:purple, linestyle=:dash, lw=2)
             vline!(plt, [θ_center]; label="MLE", color=:green, linestyle=:solid, lw=2)
             
@@ -1263,6 +1345,16 @@ function run_likelihood_profiling(
         println("Review individual parameter diagnostics above for identifiability status.")
         println("Flat profiles may indicate either poor identifiability OR very precise estimates.")
         println("Consider complementary analysis: parameter correlations, Fisher Information, or bootstrap CI.")
+    end
+
+    # Generate custom-range profiles comparing MLE vs True Value for each parameter
+    println("\n--- Generating Custom-Range Profiles (MLE vs True) ---")
+    for pname in safe_params
+        try
+            profile_parameter_custom_range(pname, pl_problem, θ_mle, true_param_values)
+        catch e
+            @warn "Custom-range profile failed for $pname: $e"
+        end
     end
 
     println("[Profiling] Done in $(round(time()-t_start; digits=2)) s")

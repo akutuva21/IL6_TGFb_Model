@@ -22,4 +22,4 @@ SMAD3_0	SMAD3_0	log10	1	10000	100	0
 SMAD4_0	SMAD4_0	log10	0.5	5000	50	0
 STAT3m_0	STAT3m_0	log10	1	10000	100	0
 PKA_0	PKA_0	log10	0.5	5000	50	0
-sigma_log_shared	sigma_log_shared	log10	0.01	0.25	0.04996879224663275	0
+sigma_log_shared	sigma_log_shared	log10	1e-05	10	0.04996879224663275	1

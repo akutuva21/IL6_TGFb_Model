@@ -6,30 +6,30 @@ begin parameters
     IL6_0                   0.0
 
     # IL-6 Pathway
-    kf_il6_bind             0.05
-    kr_il6_bind             0.15
+    kf_il6_bind             0.1
+    kr_il6_bind             0.1
     k_act_il6r              0.5
     k_inact_il6r            0.05
 
     # SMAD3 dynamics
-    k_phos_smad3            0.2
+    k_phos_smad3            0.1
     k_dephos_smad3          0.05
 
     # STAT3 dynamics
-    kf_stat3_bind           0.8
-    kr_stat3_bind           0.3
-    k_stat3_dimer           0.3
-    k_deact_stat3           0.7
+    kf_stat3_bind           1.0
+    kr_stat3_bind           0.1
+    k_stat3_dimer           0.1
+    k_deact_stat3           0.05
 
     # Complex formation
     kf_s3s4                 1.0
-    kr_s3s4                 0.5
-    kf_s3stat3d             0.3
-    kr_s3stat3d             0.9
+    kr_s3s4                 0.1
+    kf_s3stat3d             1.0
+    kr_s3stat3d             0.1
 
     # PKA activation parameters
-    kf_pka_bind             0.9
-    kr_pka_bind             0.7
+    kf_pka_bind             1.0
+    kr_pka_bind             0.1
 
     # Initial amounts of cellular components
     IL6R_0                  100.0

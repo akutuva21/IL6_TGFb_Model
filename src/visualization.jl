@@ -299,7 +299,6 @@ function run_visualization(
             if !isnothing(sol_key)
                 solution = ode_solutions[sol_key]
                 
-                # --- THE FIX: Use the correct path to the 'h' function ---
                 simulated_values = [
                     petab_prob.model_info.model.h(sol_u, sol_t, solution.prob.p, [], [], [], obs_id, nothing) 
                     for (sol_u, sol_t) in zip(solution.u, solution.t)
@@ -634,7 +633,7 @@ Additionally, this function supports a `reference_values` feature not available
 in the native plot.
 """
 function plot_parameter_distribution(multistart_result::PEtabMultistartResult, petab_prob::PEtabODEProblem; reference_values=nothing)
-    println("\n--- Generating Parameter Distribution Plot (Custom Julia) ---")
+    println("\n--- Generating Parameter Distribution Plot  ---")
     plot_dir = joinpath(pwd(), "final_results_plots")
     if !isdir(plot_dir); mkpath(plot_dir); end
     save_path = joinpath(plot_dir, "parameter_distribution_plot.png")
@@ -689,15 +688,9 @@ function plot_parameter_distribution(multistart_result::PEtabMultistartResult, p
     bounds_x = vcat(lower_bounds, upper_bounds)
     scatter!(plt, bounds_x, bounds_y, marker=:+, color=:black, markersize=4, label="Bounds")
 
-    # --- START OF MODIFICATION ---
     # This section is rewritten to correctly plot the true values as a connected line.
     if !isnothing(reference_values)
         ref_x_values_log10 = Float64[]
-        
-        println("INFO: Matching and transforming reference (true) values...")
-        println("DIAGNOSTIC: Available true parameter names: $(collect(keys(reference_values)))")
-        println("DIAGNOSTIC: Available true parameter types: $(typeof.(collect(keys(reference_values))))")
-        println("DIAGNOSTIC: Estimated parameter symbols: $param_names_symbols")
         
         # Try multiple matching strategies for robustness
         matched_count = 0
