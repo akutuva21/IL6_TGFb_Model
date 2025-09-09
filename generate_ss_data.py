@@ -53,7 +53,11 @@ def get_true_parameters(model: bionetgen.bngmodel, exclude_params: set) -> dict:
         if param_name not in exclude_params:
             # Access the parameter object from the model using its name
             param_obj = model.parameters[param_name]
-            true_params[param_name] = float(param_obj.value)
+            try:
+                true_params[param_name] = float(param_obj.value)
+            except ValueError:
+                logging.debug(f"  Skipping parameter '{param_name}' with expression value '{param_obj.value}'.")
+                continue
     logging.info(f"  Found {len(true_params)} kinetic parameters.")
     return true_params
 
@@ -234,6 +238,27 @@ def add_noise(data_series: pd.Series, noise_level: float, rng: np.random.Generat
     # noisy_series = np.clip(noisy_series, a_min=0.0, a_max=None)
     return pd.Series(noisy_series, index=data_series.index)
 
+def add_combined_noise(data_series: pd.Series, sigma_add: float, sigma_mult: float, rng: np.random.Generator) -> pd.Series:
+    """
+    Adds combined additive and multiplicative Gaussian noise on linear scale.
+    noise ~ N(0, (sigma_add + sigma_mult * |true|)^2)
+
+    Also truncates results to a small positive floor to avoid negative values.
+    """
+    if (sigma_add is None or sigma_add <= 0) and (sigma_mult is None or sigma_mult <= 0):
+        return data_series.copy()
+
+    true_values = data_series.to_numpy(dtype=float)
+    s_add = float(max(0.0, sigma_add if sigma_add is not None else 0.0))
+    s_mult = float(max(0.0, sigma_mult if sigma_mult is not None else 0.0))
+    std_devs = s_add + s_mult * np.abs(true_values)
+    noise = rng.normal(loc=0.0, scale=std_devs, size=len(true_values))
+    noisy = true_values + noise
+    # Apply small positive floor
+    floor_value = 1e-8
+    noisy = np.maximum(noisy, floor_value)
+    return pd.Series(noisy, index=data_series.index)
+
 # --------------------------------------------------------------------------
 #                   TIME-COURSE WORKFLOW WITH PEtab TSV OUTPUT
 # --------------------------------------------------------------------------
@@ -264,6 +289,24 @@ def generate_time_course_petab(config):
     temp_model_for_tracing = bionetgen.bngmodel(model_path)
     param_to_sbml_id = discover_species_map(temp_model_for_tracing, list(condition_params))
     
+    # 2.5 Simulation configuration: support either uniform duration/steps or explicit time_points + replicates
+    sim_conf = tc_settings.get('simulation', {})
+    time_points_mode = 'time_points' in sim_conf and isinstance(sim_conf.get('time_points'), (list, tuple)) and len(sim_conf.get('time_points')) > 0
+    if time_points_mode:
+        time_points_to_sample = list(sim_conf['time_points'])
+        n_replicates = int(sim_conf.get('replicates', 1))
+        # Simulate densely up to max time to ensure we can sample requested points reliably
+        t_end = float(max(time_points_to_sample))
+        # Heuristic for dense steps: at least 100 steps or 5 per time unit, whichever is larger
+        sim_duration = t_end
+        sim_steps = int(max(100, 5 * t_end))
+        logging.info(f"Using explicit time points mode with {len(time_points_to_sample)} points, {n_replicates} replicates each.")
+    else:
+        # Default/uniform sampling mode for backward compatibility
+        sim_duration = float(sim_conf.get('duration', 60.0))
+        sim_steps = int(sim_conf.get('steps', 10))
+        logging.info(f"Using uniform sampling: duration={sim_duration}, steps={sim_steps}.")
+    
     # 3. Check if pre-equilibration is enabled
     use_preeq = tc_settings.get('preequilibration', True)  # Default to True for backward compatibility
     
@@ -282,7 +325,7 @@ def generate_time_course_petab(config):
             stimuli_with_ids = {param_to_sbml_id[p]: v for p, v in condition_values.items()}
             result_df = run_simulation_from_preeq(
                 model, preeq_ss, true_params, stimuli_with_ids, 
-                tc_settings['simulation']['duration'], tc_settings['simulation']['steps']
+                sim_duration, sim_steps
             )
             time_course_results[condition_name] = result_df
     else:
@@ -294,50 +337,110 @@ def generate_time_course_petab(config):
             stimuli_with_ids = {param_to_sbml_id[p]: v for p, v in condition_values.items()}
             result_df = run_simulation_no_preeq(
                 model, true_params, stimuli_with_ids,
-                tc_settings['simulation']['duration'], tc_settings['simulation']['steps']
+                sim_duration, sim_steps
             )
             time_course_results[condition_name] = result_df
-        
-    # 5. Convert to long format DataFrame (still noise-free)
-    measurement_rows = []
+
+    # 4/5. Build measurement table
     all_observables = [obs_name for obs_name in model.observables]
-    for condition_name, result_df in time_course_results.items():
-        for _, row in result_df.iterrows():
-            time_val = row['time']
-            for obs_name in all_observables:
-                if obs_name in row:
-                    measurement_row = {
-                        'observableId': obs_name,
-                        'simulationConditionId': condition_name,
-                        'time': time_val,
-                        'measurement': row[obs_name],
-                    }
-                    # Only add preequilibrationConditionId if using pre-equilibration
-                    if use_preeq:
-                        measurement_row['preequilibrationConditionId'] = 'preeq_ss'
-                    measurement_rows.append(measurement_row)
-
-    measurement_df = pd.DataFrame(measurement_rows)
-
-    # 6. Apply Limit of Detection (LOD) and Noise
     noise_conf = tc_settings['noise']
-    if noise_conf['add']:
-        # Apply floor value to non-positive measurements
-        def apply_floor(row):
-            if row['measurement'] <= 1e-12:
-                return 1e-8
-            return row['measurement']
-        measurement_df['measurement'] = measurement_df.apply(apply_floor, axis=1)
-        logging.info("  ...Floor value applied to non-positive measurements.")
-        
-        logging.info(f"  Adding {noise_conf['level_percent']}% lognormal noise...")
+    # Determine noise model
+    noise_add = bool(noise_conf.get('add', False))
+    combined_mode = noise_add and (
+        str(noise_conf.get('model', '')).lower().startswith('combined') or
+        ('sigma_add' in noise_conf and 'sigma_mult' in noise_conf)
+    )
+
+    if time_points_mode:
+        # Filter simulated trajectories to the requested time points, then create replicates with noise
+        logging.info("Filtering simulation output to specified time points and generating replicates...")
+        time_tolerance = 1e-6
         seed = tc_settings.get('random_seed', 42)
         rng = np.random.default_rng(seed)
-        noise_fraction = noise_conf['level_percent'] / 100.0
-        
-        # Apply noise to the entire measurement column at once
-        measurement_df['measurement'] = add_noise(measurement_df['measurement'], noise_fraction, rng)
-        logging.info("  ...Noise added successfully.")
+        noise_fraction = noise_conf['level_percent'] / 100.0 if (noise_add and not combined_mode) else 0.0
+        sigma_add = float(noise_conf.get('sigma_add', 0.0)) if combined_mode else 0.0
+        sigma_mult = float(noise_conf.get('sigma_mult', 0.0)) if combined_mode else 0.0
+
+        measurement_rows = []
+        for condition_name, result_df in time_course_results.items():
+            # Keep only rows whose time matches any requested time point (within tolerance)
+            mask = result_df['time'].apply(lambda t: any(abs(t - tp) < time_tolerance for tp in time_points_to_sample))
+            filtered_df = result_df.loc[mask].copy()
+            # Snap times to the exact requested values for clean output
+            filtered_df.loc[:, 'time'] = filtered_df['time'].apply(lambda t: min(time_points_to_sample, key=lambda tp: abs(t - tp)))
+
+            for _, row in filtered_df.iterrows():
+                time_val = float(row['time'])
+                for obs_name in all_observables:
+                    if obs_name in row:
+                        true_val = float(row[obs_name])
+                        # Create N replicates for each observable/time/condition
+                        for _ in range(n_replicates):
+                            meas_val = true_val
+                            # Apply LOD floor first if noise is enabled
+                            if noise_add and meas_val <= 1e-12:
+                                meas_val = 1e-8
+                            # Add multiplicative log-normal noise per replicate if requested
+                            if noise_add:
+                                if combined_mode:
+                                    meas_val = add_combined_noise(pd.Series([meas_val]), sigma_add, sigma_mult, rng).iloc[0]
+                                elif noise_fraction > 0:
+                                    meas_val = add_noise(pd.Series([meas_val]), noise_fraction, rng).iloc[0]
+
+                            measurement_row = {
+                                'observableId': obs_name,
+                                'simulationConditionId': condition_name,
+                                'time': time_val,
+                                'measurement': meas_val,
+                            }
+                            if use_preeq:
+                                measurement_row['preequilibrationConditionId'] = 'preeq_ss'
+                            measurement_rows.append(measurement_row)
+
+        measurement_df = pd.DataFrame(measurement_rows)
+        logging.info(f"  Generated a total of {len(measurement_df)} measurement points including replicates.")
+    else:
+        # Uniform sampling path (backward compatible): build long table then apply noise once
+        measurement_rows = []
+        for condition_name, result_df in time_course_results.items():
+            for _, row in result_df.iterrows():
+                time_val = row['time']
+                for obs_name in all_observables:
+                    if obs_name in row:
+                        measurement_row = {
+                            'observableId': obs_name,
+                            'simulationConditionId': condition_name,
+                            'time': time_val,
+                            'measurement': row[obs_name],
+                        }
+                        if use_preeq:
+                            measurement_row['preequilibrationConditionId'] = 'preeq_ss'
+                        measurement_rows.append(measurement_row)
+
+        measurement_df = pd.DataFrame(measurement_rows)
+
+        # Apply LOD and noise in bulk as before
+        if noise_add:
+            def apply_floor(row):
+                if row['measurement'] <= 1e-12:
+                    return 1e-8
+                return row['measurement']
+            measurement_df['measurement'] = measurement_df.apply(apply_floor, axis=1)
+            logging.info("  ...Floor value applied to non-positive measurements.")
+
+            seed = tc_settings.get('random_seed', 42)
+            rng = np.random.default_rng(seed)
+            if combined_mode:
+                sigma_add = float(noise_conf.get('sigma_add', 0.0))
+                sigma_mult = float(noise_conf.get('sigma_mult', 0.0))
+                logging.info(f"  Adding combined normal noise: sigma_add={sigma_add}, sigma_mult={sigma_mult}...")
+                measurement_df['measurement'] = add_combined_noise(measurement_df['measurement'], sigma_add, sigma_mult, rng)
+                logging.info("  ...Combined noise added successfully.")
+            else:
+                logging.info(f"  Adding {noise_conf['level_percent']}% lognormal noise...")
+                noise_fraction = noise_conf['level_percent'] / 100.0
+                measurement_df['measurement'] = add_noise(measurement_df['measurement'], noise_fraction, rng)
+                logging.info("  ...Noise added successfully.")
 
     # 7. Create and save PEtab files
     condition_rows = []
@@ -355,10 +458,16 @@ def generate_time_course_petab(config):
         
     condition_df = pd.DataFrame(condition_rows)
 
-    # Replace dots with underscores in noise level for filesystem compatibility
-    if noise_conf['add']:
-        noise_level_str = str(noise_conf['level_percent']).replace('.', '_')
-        filename_suffix = f"_noise{noise_level_str}"
+    # Filename suffix reflects noise model
+    if noise_add:
+        if combined_mode:
+            filename_suffix = "_noise_combined"
+        elif 'level_percent' in noise_conf:
+            # Replace dots with underscores in noise level for filesystem compatibility
+            noise_level_str = str(noise_conf['level_percent']).replace('.', '_')
+            filename_suffix = f"_noise{noise_level_str}"
+        else:
+            filename_suffix = "_noise"
     else:
         filename_suffix = "_no_noise"
     measurement_path = os.path.join(output_dir, f"measurements_time_course{filename_suffix}.tsv")
@@ -379,18 +488,29 @@ def generate_time_course_petab(config):
 
 def create_observables_petab(config, measurements_df, observables_mapping, output_path):
     """Creates a PEtab observables file with a shared noise parameter."""
-    logging.info("Creating observables PEtab file (log-normal with shared sigma)...")
+    logging.info("Creating observables PEtab file (supports log-normal or combined normal noise)...")
 
     noise_conf = config['time_course_settings']['noise']
-    is_noisy = noise_conf['add'] and noise_conf['level_percent'] > 0
+    noise_add = bool(noise_conf.get('add', False))
+    combined_mode = noise_add and (
+        str(noise_conf.get('model', '')).lower().startswith('combined') or
+        ('sigma_add' in noise_conf and 'sigma_mult' in noise_conf)
+    )
+    is_noisy = noise_add and ((not combined_mode and noise_conf.get('level_percent', 0) > 0) or combined_mode)
 
     observable_ids = measurements_df['observableId'].unique()
     observables_data = []
 
     for obs_id in observable_ids:
-        # Use one shared sigma for all observables for simplicity and robustness
-        noise_formula = "sigma_log_shared" if is_noisy else "1e-8"
-        noise_dist = "logNormal"
+        # Noise model selection
+        if combined_mode:
+            # Combined additive + multiplicative on linear scale, normal distribution
+            noise_formula = f"sigma_add + sigma_mult * {obs_id}"
+            noise_dist = "normal"
+        else:
+            # Legacy log-normal with shared sigma
+            noise_formula = "sigma_log_shared" if is_noisy else "1e-8"
+            noise_dist = "logNormal"
 
         observables_data.append({
             'observableId': obs_id,
@@ -419,7 +539,11 @@ def create_parameters_petab(config, model, output_path):
         # Get the parameter OBJECT using the name as a key
         param_obj = model.parameters[param_name]
         # Access the .value attribute from the OBJECT
-        nominal_value = float(param_obj.value)
+        try:
+            nominal_value = float(param_obj.value)
+        except ValueError:
+            logging.debug(f"  Skipping expression '{param_name}' during parameters.tsv creation.")
+            continue
         
         # Default bounds for kinetic rates
         lower_bound = nominal_value / 100.0
@@ -448,29 +572,46 @@ def create_parameters_petab(config, model, output_path):
             'estimate': estimate
         })
 
-    # Add the shared noise parameter
+    # Add noise parameter(s)
     noise_conf = config['time_course_settings']['noise']
-    is_noisy = noise_conf.get('add', False) and noise_conf.get('level_percent', 0) > 0
-    
-    if is_noisy:
-        cv = noise_conf['level_percent'] / 100.0
-        # Nominal value for sigma on linear scale, derived from CV
-        sigma_nominal = float(np.sqrt(np.log(1.0 + cv**2)))
+    noise_add = bool(noise_conf.get('add', False))
+    combined_mode = noise_add and (
+        str(noise_conf.get('model', '')).lower().startswith('combined') or
+        ('sigma_add' in noise_conf and 'sigma_mult' in noise_conf)
+    )
+
+    if combined_mode:
+        # Add sigma_add and sigma_mult parameters (estimated on log10 scale)
+        sigma_add_nom = float(noise_conf.get('sigma_add', 0.1))
+        sigma_mult_nom = float(noise_conf.get('sigma_mult', 0.1))
         parameters_data.append({
-            'parameterId': 'sigma_log_shared', 'parameterName': 'sigma_log_shared',
-            'parameterScale': 'log10', # The optimizer still sees this on a log scale
-            'lowerBound': 1e-5,       # Linear bound
-            'upperBound': 10,        # Linear bound
-            'nominalValue': sigma_nominal, # Linear nominal value
-            'estimate': 1
+            'parameterId': 'sigma_add', 'parameterName': 'sigma_add',
+            'parameterScale': 'log10', 'lowerBound': 1e-8, 'upperBound': 10.0,
+            'nominalValue': sigma_add_nom, 'estimate': 1
+        })
+        parameters_data.append({
+            'parameterId': 'sigma_mult', 'parameterName': 'sigma_mult',
+            'parameterScale': 'log10', 'lowerBound': 1e-4, 'upperBound': 1.0,
+            'nominalValue': sigma_mult_nom, 'estimate': 1
         })
     else:
-        # Add a fixed noise parameter if data is noise-free
-        parameters_data.append({
-            'parameterId': 'sigma_log_shared', 'parameterName': 'sigma_log_shared',
-            'parameterScale': 'log10', 'lowerBound': 1e-10, 'upperBound': 1.0,
-            'nominalValue': 1e-8, 'estimate': 1
-        })
+        # Single shared log-normal sigma parameter
+        is_noisy = noise_add and noise_conf.get('level_percent', 0) > 0
+        if is_noisy:
+            cv = noise_conf['level_percent'] / 100.0
+            sigma_nominal = float(np.sqrt(np.log(1.0 + cv**2)))
+            parameters_data.append({
+                'parameterId': 'sigma_log_shared', 'parameterName': 'sigma_log_shared',
+                'parameterScale': 'log10',
+                'lowerBound': 1e-5, 'upperBound': 10,
+                'nominalValue': sigma_nominal, 'estimate': 1
+            })
+        else:
+            parameters_data.append({
+                'parameterId': 'sigma_log_shared', 'parameterName': 'sigma_log_shared',
+                'parameterScale': 'log10', 'lowerBound': 1e-10, 'upperBound': 1.0,
+                'nominalValue': 1e-8, 'estimate': 1
+            })
 
     pd.DataFrame(parameters_data).to_csv(output_path, sep='\t', index=False, float_format='%.16g')
     logging.info(f"✅ Parameters file saved: {output_path}")
@@ -500,7 +641,14 @@ def main():
     
     # Add noise suffix to filenames if noise is enabled
     noise_conf = config['time_course_settings']['noise']
-    if noise_conf['add'] and noise_conf['level_percent'] > 0:
+    noise_add = bool(noise_conf.get('add', False))
+    combined_mode = noise_add and (
+        str(noise_conf.get('model', '')).lower().startswith('combined') or
+        ('sigma_add' in noise_conf and 'sigma_mult' in noise_conf)
+    )
+    if combined_mode:
+        noise_suffix = "_noise_combined"
+    elif noise_add and noise_conf.get('level_percent', 0) > 0:
         # Replace dots with underscores in noise level for filesystem compatibility
         noise_level_str = str(noise_conf['level_percent']).replace('.', '_')
         noise_suffix = f"_noise{noise_level_str}"

@@ -8,11 +8,11 @@ k_inact_il6r	k_inact_il6r	log10	0.0005	5	0.05	1
 k_phos_smad3	k_phos_smad3	log10	0.001	10	0.1	1
 k_dephos_smad3	k_dephos_smad3	log10	0.0005	5	0.05	1
 kf_stat3_bind	kf_stat3_bind	log10	0.01	100	1	1
-kr_stat3_bind	kr_stat3_bind	log10	0.001	10	0.1	1
+Kd_stat3_bind	Kd_stat3_bind	log10	0.001	10	0.1	1
 k_stat3_dimer	k_stat3_dimer	log10	0.001	10	0.1	1
 k_deact_stat3	k_deact_stat3	log10	0.0005	5	0.05	1
 kf_s3s4	kf_s3s4	log10	0.01	100	1	1
-kr_s3s4	kr_s3s4	log10	0.001	10	0.1	1
+Kd_s3s4	Kd_s3s4	log10	0.001	10	0.1	1
 kf_s3stat3d	kf_s3stat3d	log10	0.01	100	1	1
 kr_s3stat3d	kr_s3stat3d	log10	0.001	10	0.1	1
 kf_pka_bind	kf_pka_bind	log10	0.01	100	1	1
