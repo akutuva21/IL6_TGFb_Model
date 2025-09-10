@@ -50,7 +50,7 @@ time_course_settings:
     replicates: 3
 
   noise:
-    add: true
+    add: false
     level_percent: 1
     # To use combined additive + multiplicative noise on linear scale instead of log-normal,
     # uncomment the following and set a model flag (the generator auto-detects if sigma_add/mult exist):

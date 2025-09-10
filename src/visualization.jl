@@ -273,8 +273,13 @@ function run_visualization(
         )
 
         relevant_conditions = unique(measurements_df.simulation_condition_id[measurements_df.observable_id .== obs_id])
-
-        for condition_id in relevant_conditions
+        
+        # Define a color palette for conditions - ensures points and lines match
+        condition_colors = [:blue, :red, :green, :orange, :purple, :brown, :pink, :gray, :olive, :cyan]
+        
+        for (idx, condition_id) in enumerate(relevant_conditions)
+            # Get consistent color for this condition
+            condition_color = condition_colors[mod1(idx, length(condition_colors))]
             
             # Plot measurement data
             data_for_plot = measurements_df.measurement[
@@ -285,7 +290,13 @@ function run_visualization(
                 (measurements_df.observable_id .== obs_id) .& 
                 (measurements_df.simulation_condition_id .== condition_id)
             ]
-            scatter!(plt, time_points, data_for_plot, label="Data ($condition_id)")
+            scatter!(plt, time_points, data_for_plot, 
+                    color=condition_color, 
+                    markersize=6,
+                    markerstrokewidth=1,
+                    markerstrokecolor=condition_color,
+                    alpha=0.8,
+                    label="Data ($condition_id)")
 
             # Plot simulation results
             sol_key = nothing
@@ -304,7 +315,11 @@ function run_visualization(
                     for (sol_u, sol_t) in zip(solution.u, solution.t)
                 ]
                 
-                plot!(plt, solution.t, simulated_values, label="Model ($condition_id)", linewidth=2)
+                plot!(plt, solution.t, simulated_values, 
+                     color=condition_color,
+                     linewidth=2.5,
+                     alpha=0.9,
+                     label="Model ($condition_id)")
             else
                 @warn "Could not find a simulation solution for condition $condition_id"
             end

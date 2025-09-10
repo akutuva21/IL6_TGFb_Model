@@ -24,11 +24,11 @@
       <species id="S9" compartment="cell" initialAmount="0" name="SMAD3(phos~P,pka_site,smad4_site,stat3_site)"/>
       <species id="S10" compartment="cell" initialAmount="0" name="IL6(r!1).IL6R(activity~A,l_bind!1,stat3_site)"/>
       <species id="S11" compartment="cell" initialAmount="0" name="SMAD3(phos~P,pka_site,smad4_site!1,stat3_site).SMAD4(s3_site!1)"/>
-      <species id="S12" compartment="cell" initialAmount="0" name="IL6(r!1).IL6R(activity~A,l_bind!1,stat3_site!2).STAT3m(il6r_site!2)"/>
-      <species id="S13" compartment="cell" initialAmount="0" name="PKA(activity~A,s3s4_site!1).SMAD3(phos~P,pka_site!1,smad4_site!2,stat3_site).SMAD4(s3_site!2)"/>
-      <species id="S14" compartment="cell" initialAmount="0" name="IL6R(activity~I,l_bind,stat3_site!1).STAT3m(il6r_site!1)"/>
-      <species id="S15" compartment="cell" initialAmount="0" name="STAT3d_active(s3_site)"/>
-      <species id="S16" compartment="cell" initialAmount="0" name="IL6(r!1).IL6R(activity~I,l_bind!1,stat3_site!2).STAT3m(il6r_site!2)"/>
+      <species id="S12" compartment="cell" initialAmount="0" name="IL6R_internal(bound_il6)"/>
+      <species id="S13" compartment="cell" initialAmount="0" name="IL6(r!1).IL6R(activity~A,l_bind!1,stat3_site!2).STAT3m(il6r_site!2)"/>
+      <species id="S14" compartment="cell" initialAmount="0" name="PKA(activity~A,s3s4_site!1).SMAD3(phos~P,pka_site!1,smad4_site!2,stat3_site).SMAD4(s3_site!2)"/>
+      <species id="S15" compartment="cell" initialAmount="0" name="pSTAT3m()"/>
+      <species id="S16" compartment="cell" initialAmount="0" name="STAT3d_active(s3_site)"/>
       <species id="S17" compartment="cell" initialAmount="0" name="SMAD3(phos~P,pka_site,smad4_site,stat3_site!1).STAT3d_active(s3_site!1)"/>
     </listOfSpecies>
     <listOfParameters>
@@ -38,19 +38,22 @@
       <parameter id="kf_il6_bind" value="0.1"/>
       <parameter id="kr_il6_bind" value="0.1"/>
       <parameter id="k_act_il6r" value="0.5"/>
-      <parameter id="k_inact_il6r" value="0.05"/>
+      <parameter id="k_internalize" value="0.03"/>
+      <parameter id="k_recycle" value="0.02"/>
       <parameter id="k_phos_smad3" value="0.1"/>
       <parameter id="k_dephos_smad3" value="0.05"/>
       <parameter id="kf_stat3_bind" value="1"/>
       <parameter id="Kd_stat3_bind" value="0.1"/>
-      <parameter id="k_stat3_dimer" value="0.1"/>
-      <parameter id="k_deact_stat3" value="0.05"/>
+      <parameter id="k_phos_stat3" value="0.08"/>
+      <parameter id="kf_dimer" value="0.1"/>
+      <parameter id="Kd_dimer" value="0.5"/>
+      <parameter id="k_dephos_stat3d" value="0.05"/>
       <parameter id="kf_s3s4" value="1"/>
-      <parameter id="Kd_s3s4" value="0.1"/>
+      <parameter id="kr_s3s4" value="0.1"/>
       <parameter id="kf_s3stat3d" value="1"/>
       <parameter id="kr_s3stat3d" value="0.1"/>
       <parameter id="kf_pka_bind" value="1"/>
-      <parameter id="Kd_pka_bind" value="0.1"/>
+      <parameter id="kr_pka_bind" value="0.1"/>
       <parameter id="IL6R_0" value="100"/>
       <parameter id="SMAD3_0" value="100"/>
       <parameter id="SMAD4_0" value="50"/>
@@ -59,12 +62,12 @@
       <!-- Dependent variables -->
       <parameter id="_rateLaw1" constant="true"/>
       <parameter id="_rateLaw2" constant="true"/>
-      <parameter id="_rateLaw3" constant="true"/>
       <!-- Observables -->
       <parameter id="Free_TGFb_obs" constant="false"/>
       <parameter id="IL6R_Active" constant="false"/>
       <parameter id="Free_IL6_obs" constant="false"/>
       <parameter id="pSMAD3_obs" constant="false"/>
+      <parameter id="pSTAT3_obs" constant="false"/>
       <parameter id="STAT3d_active_obs" constant="false"/>
       <parameter id="S3S4_complex_obs" constant="false"/>
       <parameter id="S3STAT3d_complex_obs" constant="false"/>
@@ -121,17 +124,8 @@
         <math xmlns="http://www.w3.org/1998/Math/MathML">
           <apply>
             <times/>
-            <ci> kf_s3s4 </ci>
-            <ci> Kd_s3s4 </ci>
-          </apply>
-        </math>
-      </initialAssignment>
-      <initialAssignment symbol="_rateLaw3">
-        <math xmlns="http://www.w3.org/1998/Math/MathML">
-          <apply>
-            <times/>
-            <ci> kf_pka_bind </ci>
-            <ci> Kd_pka_bind </ci>
+            <ci> kf_dimer </ci>
+            <ci> Kd_dimer </ci>
           </apply>
         </math>
       </initialAssignment>
@@ -152,7 +146,7 @@
             <apply>
               <plus/>
               <ci> S10 </ci>
-              <ci> S12 </ci>
+              <ci> S13 </ci>
             </apply>
           </math>
       </assignmentRule>
@@ -171,8 +165,17 @@
               <plus/>
               <ci> S9 </ci>
               <ci> S11 </ci>
-              <ci> S13 </ci>
+              <ci> S14 </ci>
               <ci> S17 </ci>
+            </apply>
+          </math>
+      </assignmentRule>
+      <assignmentRule variable="pSTAT3_obs">
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <plus/>
+              <cn> 0 </cn>
+              <ci> S15 </ci>
             </apply>
           </math>
       </assignmentRule>
@@ -180,7 +183,7 @@
           <math xmlns="http://www.w3.org/1998/Math/MathML">
             <apply>
               <plus/>
-              <ci> S15 </ci>
+              <ci> S16 </ci>
               <ci> S17 </ci>
             </apply>
           </math>
@@ -190,7 +193,7 @@
             <apply>
               <plus/>
               <ci> S11 </ci>
-              <ci> S13 </ci>
+              <ci> S14 </ci>
             </apply>
           </math>
       </assignmentRule>
@@ -208,7 +211,7 @@
             <apply>
               <plus/>
               <cn> 0 </cn>
-              <ci> S13 </ci>
+              <ci> S14 </ci>
             </apply>
           </math>
       </assignmentRule>
@@ -329,14 +332,13 @@
           <speciesReference species="S10"/>
         </listOfReactants>
         <listOfProducts>
-          <speciesReference species="S2"/>
-          <speciesReference species="S3"/>
+          <speciesReference species="S12"/>
         </listOfProducts>
         <kineticLaw>
           <math xmlns="http://www.w3.org/1998/Math/MathML">
             <apply>
               <times/>
-              <ci> k_inact_il6r </ci>
+              <ci> k_internalize </ci>
               <ci> S10 </ci>
             </apply>
           </math>
@@ -348,7 +350,7 @@
           <speciesReference species="S10"/>
         </listOfReactants>
         <listOfProducts>
-          <speciesReference species="S12"/>
+          <speciesReference species="S13"/>
         </listOfProducts>
         <kineticLaw>
           <math xmlns="http://www.w3.org/1998/Math/MathML">
@@ -373,7 +375,7 @@
           <math xmlns="http://www.w3.org/1998/Math/MathML">
             <apply>
               <times/>
-              <ci> _rateLaw2 </ci>
+              <ci> kr_s3s4 </ci>
               <ci> S11 </ci>
             </apply>
           </math>
@@ -385,7 +387,7 @@
           <speciesReference species="S11"/>
         </listOfReactants>
         <listOfProducts>
-          <speciesReference species="S13"/>
+          <speciesReference species="S14"/>
         </listOfProducts>
         <kineticLaw>
           <math xmlns="http://www.w3.org/1998/Math/MathML">
@@ -400,18 +402,18 @@
       </reaction>
       <reaction id="R11" reversible="false">
         <listOfReactants>
-          <speciesReference species="S12"/>
+          <speciesReference species="S13"/>
         </listOfReactants>
         <listOfProducts>
-          <speciesReference species="S2"/>
-          <speciesReference species="S14"/>
+          <speciesReference species="S6"/>
+          <speciesReference species="S12"/>
         </listOfProducts>
         <kineticLaw>
           <math xmlns="http://www.w3.org/1998/Math/MathML">
             <apply>
               <times/>
-              <ci> k_inact_il6r </ci>
-              <ci> S12 </ci>
+              <ci> k_internalize </ci>
+              <ci> S13 </ci>
             </apply>
           </math>
         </kineticLaw>
@@ -419,6 +421,24 @@
       <reaction id="R12" reversible="false">
         <listOfReactants>
           <speciesReference species="S12"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S2"/>
+          <speciesReference species="S3"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> k_recycle </ci>
+              <ci> S12 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R13" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S13"/>
         </listOfReactants>
         <listOfProducts>
           <speciesReference species="S6"/>
@@ -429,27 +449,7 @@
             <apply>
               <times/>
               <ci> _rateLaw1 </ci>
-              <ci> S12 </ci>
-            </apply>
-          </math>
-        </kineticLaw>
-      </reaction>
-      <reaction id="R13" reversible="false">
-        <listOfReactants>
-          <speciesReference species="S6"/>
-          <speciesReference species="S12"/>
-        </listOfReactants>
-        <listOfProducts>
-          <speciesReference species="S10"/>
-          <speciesReference species="S15"/>
-        </listOfProducts>
-        <kineticLaw>
-          <math xmlns="http://www.w3.org/1998/Math/MathML">
-            <apply>
-              <times/>
-              <ci> k_stat3_dimer </ci>
-              <ci> S6 </ci>
-              <ci> S12 </ci>
+              <ci> S13 </ci>
             </apply>
           </math>
         </kineticLaw>
@@ -459,14 +459,14 @@
           <speciesReference species="S13"/>
         </listOfReactants>
         <listOfProducts>
-          <speciesReference species="S7"/>
-          <speciesReference species="S11"/>
+          <speciesReference species="S10"/>
+          <speciesReference species="S15"/>
         </listOfProducts>
         <kineticLaw>
           <math xmlns="http://www.w3.org/1998/Math/MathML">
             <apply>
               <times/>
-              <ci> _rateLaw3 </ci>
+              <ci> k_phos_stat3 </ci>
               <ci> S13 </ci>
             </apply>
           </math>
@@ -474,18 +474,17 @@
       </reaction>
       <reaction id="R15" reversible="false">
         <listOfReactants>
-          <speciesReference species="S2"/>
           <speciesReference species="S14"/>
         </listOfReactants>
         <listOfProducts>
-          <speciesReference species="S16"/>
+          <speciesReference species="S7"/>
+          <speciesReference species="S11"/>
         </listOfProducts>
         <kineticLaw>
           <math xmlns="http://www.w3.org/1998/Math/MathML">
             <apply>
               <times/>
-              <ci> kf_il6_bind </ci>
-              <ci> S2 </ci>
+              <ci> kr_pka_bind </ci>
               <ci> S14 </ci>
             </apply>
           </math>
@@ -494,6 +493,44 @@
       <reaction id="R16" reversible="false">
         <listOfReactants>
           <speciesReference species="S15"/>
+          <speciesReference species="S15"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S16"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <cn> 0.5 </cn>
+              <ci> kf_dimer </ci>
+              <ci> S15 </ci>
+              <ci> S15 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R17" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S16"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S15"/>
+          <speciesReference species="S15"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> _rateLaw2 </ci>
+              <ci> S16 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R18" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S16"/>
         </listOfReactants>
         <listOfProducts>
           <speciesReference species="S6"/>
@@ -503,16 +540,16 @@
           <math xmlns="http://www.w3.org/1998/Math/MathML">
             <apply>
               <times/>
-              <ci> k_deact_stat3 </ci>
-              <ci> S15 </ci>
+              <ci> k_dephos_stat3d </ci>
+              <ci> S16 </ci>
             </apply>
           </math>
         </kineticLaw>
       </reaction>
-      <reaction id="R17" reversible="false">
+      <reaction id="R19" reversible="false">
         <listOfReactants>
           <speciesReference species="S9"/>
-          <speciesReference species="S15"/>
+          <speciesReference species="S16"/>
         </listOfReactants>
         <listOfProducts>
           <speciesReference species="S17"/>
@@ -523,41 +560,6 @@
               <times/>
               <ci> kf_s3stat3d </ci>
               <ci> S9 </ci>
-              <ci> S15 </ci>
-            </apply>
-          </math>
-        </kineticLaw>
-      </reaction>
-      <reaction id="R18" reversible="false">
-        <listOfReactants>
-          <speciesReference species="S16"/>
-        </listOfReactants>
-        <listOfProducts>
-          <speciesReference species="S2"/>
-          <speciesReference species="S14"/>
-        </listOfProducts>
-        <kineticLaw>
-          <math xmlns="http://www.w3.org/1998/Math/MathML">
-            <apply>
-              <times/>
-              <ci> kr_il6_bind </ci>
-              <ci> S16 </ci>
-            </apply>
-          </math>
-        </kineticLaw>
-      </reaction>
-      <reaction id="R19" reversible="false">
-        <listOfReactants>
-          <speciesReference species="S16"/>
-        </listOfReactants>
-        <listOfProducts>
-          <speciesReference species="S12"/>
-        </listOfProducts>
-        <kineticLaw>
-          <math xmlns="http://www.w3.org/1998/Math/MathML">
-            <apply>
-              <times/>
-              <ci> k_act_il6r </ci>
               <ci> S16 </ci>
             </apply>
           </math>
@@ -569,7 +571,7 @@
         </listOfReactants>
         <listOfProducts>
           <speciesReference species="S9"/>
-          <speciesReference species="S15"/>
+          <speciesReference species="S16"/>
         </listOfProducts>
         <kineticLaw>
           <math xmlns="http://www.w3.org/1998/Math/MathML">
