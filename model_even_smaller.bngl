@@ -26,13 +26,13 @@ begin parameters
 
     # Complex formation
     kf_s3s4                 1.0
-    kr_s3s4                 0.1
+    Kd_s3s4                 0.1
     kf_s3stat3d             1.0
-    kr_s3stat3d             0.1
+    Kd_s3stat3d             0.1
 
     # PKA activation parameters
     kf_pka_bind             1.0
-    kr_pka_bind             0.1
+    Kd_pka_bind             0.1
 
     # Initial amounts of cellular components
     IL6R_0                  100.0
@@ -98,11 +98,11 @@ begin reaction rules
     R4_Dephos_STAT3d: STAT3d_active(s3_site) -> STAT3m(il6r_site) + STAT3m(il6r_site) k_dephos_stat3d
 
     # 5. & 6. Complex Formation
-    R5_Bind_S3S4: SMAD3(phos~P,smad4_site,stat3_site,pka_site) + SMAD4(s3_site) <-> SMAD3(phos~P,smad4_site!1,stat3_site,pka_site).SMAD4(s3_site!1) kf_s3s4,kr_s3s4
-    R6_Bind_S3STAT3d: SMAD3(phos~P,smad4_site,stat3_site,pka_site) + STAT3d_active(s3_site) <-> SMAD3(phos~P,smad4_site,stat3_site!1,pka_site).STAT3d_active(s3_site!1) kf_s3stat3d,kr_s3stat3d
+    R5_Bind_S3S4: SMAD3(phos~P,smad4_site,stat3_site,pka_site) + SMAD4(s3_site) <-> SMAD3(phos~P,smad4_site!1,stat3_site,pka_site).SMAD4(s3_site!1) kf_s3s4,kf_s3s4*Kd_s3s4
+    R6_Bind_S3STAT3d: SMAD3(phos~P,smad4_site,stat3_site,pka_site) + STAT3d_active(s3_site) <-> SMAD3(phos~P,smad4_site,stat3_site!1,pka_site).STAT3d_active(s3_site!1) kf_s3stat3d,kf_s3stat3d*Kd_s3stat3d
 
     # 7. PKA Activation
-    R7_Bind_PKA: SMAD3(phos~P,smad4_site!1,stat3_site,pka_site).SMAD4(s3_site!1) + PKA(activity~I,s3s4_site) <-> SMAD3(phos~P,smad4_site!1,stat3_site,pka_site!2).SMAD4(s3_site!1).PKA(activity~A,s3s4_site!2) kf_pka_bind,kr_pka_bind
+    R7_Bind_PKA: SMAD3(phos~P,smad4_site!1,stat3_site,pka_site).SMAD4(s3_site!1) + PKA(activity~I,s3s4_site) <-> SMAD3(phos~P,smad4_site!1,stat3_site,pka_site!2).SMAD4(s3_site!1).PKA(activity~A,s3s4_site!2) kf_pka_bind,kf_pka_bind*Kd_pka_bind
 
 end reaction rules
 

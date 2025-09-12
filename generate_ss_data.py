@@ -553,8 +553,8 @@ def create_parameters_petab(config, model, output_path):
             estimate = 0
             parameter_scale = 'lin'
             # For fixed params, bounds are just the nominal value
-            lower_bound = nominal_value
-            upper_bound = nominal_value
+            lower_bound = max(0.001, nominal_value / 1000.0)  # Much wider bounds
+            upper_bound = nominal_value * 1000.0
         elif param_name.endswith("_0"):
             estimate = 0
             parameter_scale = 'log10'

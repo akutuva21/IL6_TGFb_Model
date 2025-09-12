@@ -49,11 +49,11 @@
       <parameter id="Kd_dimer" value="0.5"/>
       <parameter id="k_dephos_stat3d" value="0.05"/>
       <parameter id="kf_s3s4" value="1"/>
-      <parameter id="kr_s3s4" value="0.1"/>
+      <parameter id="Kd_s3s4" value="0.1"/>
       <parameter id="kf_s3stat3d" value="1"/>
-      <parameter id="kr_s3stat3d" value="0.1"/>
+      <parameter id="Kd_s3stat3d" value="0.1"/>
       <parameter id="kf_pka_bind" value="1"/>
-      <parameter id="kr_pka_bind" value="0.1"/>
+      <parameter id="Kd_pka_bind" value="0.1"/>
       <parameter id="IL6R_0" value="100"/>
       <parameter id="SMAD3_0" value="100"/>
       <parameter id="SMAD4_0" value="50"/>
@@ -62,6 +62,9 @@
       <!-- Dependent variables -->
       <parameter id="_rateLaw1" constant="true"/>
       <parameter id="_rateLaw2" constant="true"/>
+      <parameter id="_rateLaw3" constant="true"/>
+      <parameter id="_rateLaw4" constant="true"/>
+      <parameter id="_rateLaw5" constant="true"/>
       <!-- Observables -->
       <parameter id="Free_TGFb_obs" constant="false"/>
       <parameter id="IL6R_Active" constant="false"/>
@@ -126,6 +129,33 @@
             <times/>
             <ci> kf_dimer </ci>
             <ci> Kd_dimer </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="_rateLaw3">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> kf_s3s4 </ci>
+            <ci> Kd_s3s4 </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="_rateLaw4">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> kf_s3stat3d </ci>
+            <ci> Kd_s3stat3d </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="_rateLaw5">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> kf_pka_bind </ci>
+            <ci> Kd_pka_bind </ci>
           </apply>
         </math>
       </initialAssignment>
@@ -375,7 +405,7 @@
           <math xmlns="http://www.w3.org/1998/Math/MathML">
             <apply>
               <times/>
-              <ci> kr_s3s4 </ci>
+              <ci> _rateLaw3 </ci>
               <ci> S11 </ci>
             </apply>
           </math>
@@ -484,7 +514,7 @@
           <math xmlns="http://www.w3.org/1998/Math/MathML">
             <apply>
               <times/>
-              <ci> kr_pka_bind </ci>
+              <ci> _rateLaw5 </ci>
               <ci> S14 </ci>
             </apply>
           </math>
@@ -577,7 +607,7 @@
           <math xmlns="http://www.w3.org/1998/Math/MathML">
             <apply>
               <times/>
-              <ci> kr_s3stat3d </ci>
+              <ci> _rateLaw4 </ci>
               <ci> S17 </ci>
             </apply>
           </math>

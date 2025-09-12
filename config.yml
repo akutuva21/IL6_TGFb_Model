@@ -50,13 +50,13 @@ time_course_settings:
     replicates: 3
 
   noise:
-    add: false
+    add: true
     level_percent: 1
     # To use combined additive + multiplicative noise on linear scale instead of log-normal,
     # uncomment the following and set a model flag (the generator auto-detects if sigma_add/mult exist):
-    model: combined
-    sigma_add: 0.05   # additive SD
-    sigma_mult: 0.10  # multiplicative SD (fractional)
+    # model: combined
+    # sigma_add: 0.05   # additive SD
+    # sigma_mult: 0.10  # multiplicative SD (fractional)
 
 # UNIFIED MAPPING for all run modes
 observables_mapping:

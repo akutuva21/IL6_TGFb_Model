@@ -1,10 +1,14 @@
 # main.jl
 
+# Headless plotting: avoid GKS display errors on headless environments
+ENV["GKSwstype"] = "100"
+
 # --- 1. INCLUDES and USING STATEMENTS ---
 include("src/model_param_est_robustness.jl")
 include("src/visualization.jl")
 include("src/optimization.jl")
 include("src/profiling.jl")
+include("src/identifiability.jl")
 
 using ArgParse, JLD2, Logging, PEtab, SciMLSensitivity, ReverseDiff, DiffEqCallbacks, OrdinaryDiffEq, Sundials, LinearAlgebra, CSV, DataFrames, ComponentArrays
 
@@ -33,6 +37,9 @@ function define_argument_parser()
             action = :store_true
         "--profile"
             help = "Run likelihood profiling on a best-fit parameter set."
+            action = :store_true
+        "--ident"
+            help = "Run identifiability diagnostics (FIM, eigen, coordinate metric) after collation."
             action = :store_true
         "--load-fit"
             help = "Path to a .jld2 file containing best-fit parameters for profiling."
@@ -141,6 +148,111 @@ function main()
             petab_problem,
             odesolver
         )
+
+        # --- Optional: Identifiability diagnostics ---
+        if parsed_args["ident"]
+            @info "--- Running identifiability diagnostics at best fit ---"
+            
+            # Force best_params to be a plain Vector of values
+            param_values = if best_params isa ComponentVector
+                collect(best_params)  # Extract just the values
+            else
+                collect(best_params)  # Ensure it's a Vector
+            end
+            
+            # Systematically get the correct parameter names that PEtab expects
+            # Method 1: Try to extract from the parameter table with scaling info
+            function get_scaled_parameter_names(petab_problem)
+                try
+                    # Access the parameter table from the PEtab model
+                    param_table = petab_problem.model_info.model.petab_tables[:parameters]
+                    
+                    # Get parameter IDs and their scales
+                    param_ids = String.(param_table.parameterId)
+                    
+                    # Check if parameterScale column exists (PEtab 1.0 format)
+                    if :parameterScale in names(param_table)
+                        scales = String.(param_table.parameterScale)
+                        scaled_names = Symbol[]
+                        
+                        for (id, scale) in zip(param_ids, scales)
+                            if scale == "log10"
+                                push!(scaled_names, Symbol("log10_$id"))
+                            elseif scale == "log"
+                                push!(scaled_names, Symbol("log_$id"))
+                            else  # "lin" or other
+                                push!(scaled_names, Symbol(id))
+                            end
+                        end
+                        return scaled_names
+                    else
+                        # PEtab 2.0+ format or scale info not available
+                        # Fall back to trying both scaled and unscaled names
+                        return nothing
+                    end
+                catch
+                    return nothing
+                end
+            end
+            
+            # Method 2: Use trial-and-error with a test call to discover the expected names
+            function discover_parameter_names(petab_problem, param_values)
+                # First try with base names
+                base_names = petab_problem.xnames
+                θ_test = ComponentArray(NamedTuple{Tuple(base_names)}(param_values))
+                
+                try
+                    petab_problem.nllh(θ_test; prior=false)
+                    return base_names  # Success with base names
+                catch e
+                    if e isa PEtab.PEtabInputError && occursin("must appear in the order of", string(e))
+                        # Extract the expected names from the error message
+                        error_msg = string(e)
+                        # Find the part with the expected parameter list
+                        start_idx = findfirst('[', error_msg)
+                        end_idx = findlast(']', error_msg)
+                        if start_idx !== nothing && end_idx !== nothing
+                            names_str = error_msg[start_idx+1:end_idx-1]
+                            # Parse the symbol names
+                            expected_names = Symbol[]
+                            for name_match in eachmatch(r":(\w+)", names_str)
+                                push!(expected_names, Symbol(name_match.captures[1]))
+                            end
+                            return expected_names
+                        end
+                    end
+                    rethrow(e)
+                end
+            end
+            
+            # Try systematic approach first, then fallback to discovery
+            scaled_names = get_scaled_parameter_names(petab_problem)
+            if scaled_names === nothing
+                @info "Using parameter name discovery method..."
+                scaled_names = discover_parameter_names(petab_problem, param_values)
+            else
+                @info "Using systematic parameter scaling method..."
+            end
+            
+            @assert length(scaled_names) == length(param_values)
+            
+            # Construct ComponentArray with the correct names
+            θ_full = ComponentArray(NamedTuple{Tuple(scaled_names)}(param_values))
+            
+            @info "Using parameter names: $(collect(keys(θ_full)))"
+            
+            # Sanity checks
+            try
+                _ = petab_problem.nllh(θ_full; prior=false)
+                _ = petab_problem.simulated_values(θ_full)
+                @info "Sanity checks passed"
+            catch e
+                @error "Sanity check failed before identifiability: $e"
+                rethrow()
+            end
+            
+            run_identifiability(petab_problem, θ_full; eps=1e-4)
+        end
 
     elseif parsed_args["profile"]
         @info "--- Running in PROFILING mode ---"
