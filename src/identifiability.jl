@@ -198,12 +198,15 @@ function compute_S_FIM(
         first_param = collect(keys(θ_full))[1]
         θ_minimal = ComponentArray(copy(θ_full))
         
+        # Ensure we have baseline y0 for comparison
+        y0_baseline = simvec(θ_minimal)
+        
         # Try a very small change first
         original_val = θ_minimal[first_param]
         θ_minimal[first_param] += 0.001  # 0.1% change
         
         y_minimal = simvec(θ_minimal)
-        minimal_diff = norm(y_minimal - y0, Inf)
+        minimal_diff = norm(y_minimal - y0_baseline, Inf)
         @info "Minimal change test ($first_param: $original_val → $(θ_minimal[first_param])): ||Δy||_∞ = $minimal_diff"
         
         if minimal_diff == 0.0
@@ -213,6 +216,9 @@ function compute_S_FIM(
             @info "✅ Parameter changes do affect simulation"
         end
     end
+    
+    # Compute baseline simulation for main sensitivity analysis
+    y0 = simvec(θ_full)
     n = length(y0)
     ps = isnothing(perturb_syms) ? collect(keys(θ_full)) : perturb_syms
     
