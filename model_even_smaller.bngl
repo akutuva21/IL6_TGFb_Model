@@ -8,7 +8,7 @@ begin parameters
     # IL-6 Pathway
     kf_il6_bind             0.1
     kr_il6_bind             0.1
-    k_act_il6r              0.5
+    k_act_il6r              1.5          # OPTIMIZED: 3x increase for stronger IL6R activation
     k_internalize           0.03
     k_recycle               0.02
 
@@ -17,10 +17,10 @@ begin parameters
     k_dephos_smad3          0.05
 
     # STAT3 dynamics
-    kf_stat3_bind           1.0
+    kf_stat3_bind           0.2          # OPTIMIZED: 5x decrease for selective STAT3 binding
     Kd_stat3_bind           0.1
-    k_phos_stat3            0.08
-    kf_dimer                0.1
+    k_phos_stat3            0.25         # OPTIMIZED: 3.1x increase for faster STAT3 phosphorylation
+    kf_dimer                0.8          # OPTIMIZED: 8x increase for enhanced STAT3 dimerization
     Kd_dimer                0.5
     k_dephos_stat3d         0.05
 
@@ -35,10 +35,10 @@ begin parameters
     Kd_pka_bind             0.1
 
     # Initial amounts of cellular components
-    IL6R_0                  100.0
+    IL6R_0                  150.0        # OPTIMIZED: 1.5x increase for more IL6 receptors
     SMAD3_0                 100.0
     SMAD4_0                 50.0
-    STAT3m_0                100.0
+    STAT3m_0                150.0        # OPTIMIZED: 1.5x increase for more STAT3 available
     PKA_0                   50.0
 
 end parameters

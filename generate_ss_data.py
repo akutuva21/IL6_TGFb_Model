@@ -343,6 +343,12 @@ def generate_time_course_petab(config):
 
     # 4/5. Build measurement table
     all_observables = [obs_name for obs_name in model.observables]
+    # Optional: allow selecting a subset of observables to include
+    obs_include = tc_settings.get('observables_to_include')
+    if isinstance(obs_include, (list, tuple)) and len(obs_include) > 0:
+        include_set = set(obs_include)
+        all_observables = [o for o in all_observables if o in include_set]
+        logging.info(f"Including a subset of observables ({len(all_observables)}): {sorted(all_observables)}")
     noise_conf = tc_settings['noise']
     # Determine noise model
     noise_add = bool(noise_conf.get('add', False))
@@ -499,6 +505,10 @@ def create_observables_petab(config, measurements_df, observables_mapping, outpu
     is_noisy = noise_add and ((not combined_mode and noise_conf.get('level_percent', 0) > 0) or combined_mode)
 
     observable_ids = measurements_df['observableId'].unique()
+    # Respect optional observables_to_include (already applied to measurements, but keep consistent here)
+    obs_include = config.get('time_course_settings', {}).get('observables_to_include')
+    if isinstance(obs_include, (list, tuple)) and len(obs_include) > 0:
+        observable_ids = [oid for oid in observable_ids if oid in set(obs_include)]
     observables_data = []
 
     for obs_id in observable_ids:
@@ -534,6 +544,16 @@ def create_parameters_petab(config, model, output_path):
 
     parameters_data = []
     stimulus_params = set(config['time_course_settings']['variable_stimuli']) | set(config['time_course_settings']['constant_stimuli'])
+    # Compute per-stimulus max across defined conditions to derive sane bounds (esp. when nominal is 0)
+    conds = config.get('time_course_settings', {}).get('conditions', {})
+    stim_max_values = {p: 0.0 for p in stimulus_params}
+    for _cname, cvals in conds.items():
+        for p in stimulus_params:
+            if p in cvals:
+                try:
+                    stim_max_values[p] = max(float(cvals[p]), stim_max_values[p])
+                except Exception:
+                    pass
 
     for param_name in model.parameters:
         # Get the parameter OBJECT using the name as a key
@@ -552,11 +572,12 @@ def create_parameters_petab(config, model, output_path):
         if param_name in stimulus_params:
             estimate = 0
             parameter_scale = 'lin'
-            # For fixed params, bounds are just the nominal value
-            lower_bound = max(0.001, nominal_value / 1000.0)  # Much wider bounds
-            upper_bound = nominal_value * 1000.0
+            # For fixed stimulus parameters, set bounds to cover condition values safely
+            max_val = max(stim_max_values.get(param_name, 0.0), nominal_value)
+            lower_bound = 0.0
+            upper_bound = max(10.0 * max_val, 1.0)  # at least 1.0
         elif param_name.endswith("_0"):
-            estimate = 0
+            estimate = 1
             parameter_scale = 'log10'
         else:
             estimate = 1

@@ -15,10 +15,10 @@
     <listOfSpecies>
       <species id="S1" compartment="cell" initialAmount="1" name="TGFb(r)"/>
       <species id="S2" compartment="cell" initialAmount="0" name="IL6(r)"/>
-      <species id="S3" compartment="cell" initialAmount="100" name="IL6R(activity~I,l_bind,stat3_site)"/>
+      <species id="S3" compartment="cell" initialAmount="150" name="IL6R(activity~I,l_bind,stat3_site)"/>
       <species id="S4" compartment="cell" initialAmount="100" name="SMAD3(phos~U,pka_site,smad4_site,stat3_site)"/>
       <species id="S5" compartment="cell" initialAmount="50" name="SMAD4(s3_site)"/>
-      <species id="S6" compartment="cell" initialAmount="100" name="STAT3m(il6r_site)"/>
+      <species id="S6" compartment="cell" initialAmount="150" name="STAT3m(il6r_site)"/>
       <species id="S7" compartment="cell" initialAmount="50" name="PKA(activity~I,s3s4_site)"/>
       <species id="S8" compartment="cell" initialAmount="0" name="IL6(r!1).IL6R(activity~I,l_bind!1,stat3_site)"/>
       <species id="S9" compartment="cell" initialAmount="0" name="SMAD3(phos~P,pka_site,smad4_site,stat3_site)"/>
@@ -37,15 +37,15 @@
       <parameter id="IL6_0" value="0"/>
       <parameter id="kf_il6_bind" value="0.1"/>
       <parameter id="kr_il6_bind" value="0.1"/>
-      <parameter id="k_act_il6r" value="0.5"/>
+      <parameter id="k_act_il6r" value="1.5"/>
       <parameter id="k_internalize" value="0.03"/>
       <parameter id="k_recycle" value="0.02"/>
       <parameter id="k_phos_smad3" value="0.1"/>
       <parameter id="k_dephos_smad3" value="0.05"/>
-      <parameter id="kf_stat3_bind" value="1"/>
+      <parameter id="kf_stat3_bind" value="0.2"/>
       <parameter id="Kd_stat3_bind" value="0.1"/>
-      <parameter id="k_phos_stat3" value="0.08"/>
-      <parameter id="kf_dimer" value="0.1"/>
+      <parameter id="k_phos_stat3" value="0.25"/>
+      <parameter id="kf_dimer" value="0.8"/>
       <parameter id="Kd_dimer" value="0.5"/>
       <parameter id="k_dephos_stat3d" value="0.05"/>
       <parameter id="kf_s3s4" value="1"/>
@@ -54,10 +54,10 @@
       <parameter id="Kd_s3stat3d" value="0.1"/>
       <parameter id="kf_pka_bind" value="1"/>
       <parameter id="Kd_pka_bind" value="0.1"/>
-      <parameter id="IL6R_0" value="100"/>
+      <parameter id="IL6R_0" value="150"/>
       <parameter id="SMAD3_0" value="100"/>
       <parameter id="SMAD4_0" value="50"/>
-      <parameter id="STAT3m_0" value="100"/>
+      <parameter id="STAT3m_0" value="150"/>
       <parameter id="PKA_0" value="50"/>
       <!-- Dependent variables -->
       <parameter id="_rateLaw1" constant="true"/>

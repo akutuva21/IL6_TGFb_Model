@@ -154,7 +154,7 @@ function compute_S_FIM(
         @warn "Parameters in θ_full but not in xnames: $extra_in_theta"
     end
     
-    simvec = p -> petab_problem.simulated_values(p)
+    simvec = p -> petab_problem.simulated_values(p)[:]  # Apply [:] workaround for SBML bug
     
     # Test multiple simulation approaches
     @info "=== Testing different simulation methods ==="

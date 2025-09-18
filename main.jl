@@ -244,7 +244,7 @@ function main()
             # Sanity checks
             try
                 _ = petab_problem.nllh(θ_full; prior=false)
-                _ = petab_problem.simulated_values(θ_full)
+                _ = petab_problem.simulated_values(θ_full)[:]  # Apply [:] workaround for SBML bug
                 @info "Sanity checks passed"
             catch e
                 @error "Sanity check failed before identifiability: $e"

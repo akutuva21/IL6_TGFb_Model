@@ -60,7 +60,7 @@ println("✅ Parameter maps prepared with correct naming.")
 println("Using PEtab's simulation capabilities...")
 
 # Calculate simulated values for all conditions using PEtab
-simulated_vals = petab_problem.simulated_values(p_est)
+simulated_vals = petab_problem.simulated_values(p_est)[:]  # Apply [:] workaround for SBML bug
 
 # Get the measurement data table
 measurements_df = petab_problem.model_info.model.petab_tables[:measurements]
