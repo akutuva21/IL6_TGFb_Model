@@ -1,7 +1,8 @@
 observableId	observableName	observableFormula	noiseFormula	noiseDistribution
+Free_IL6_obs	Free_IL6_obs	Free_IL6_obs	sigma_add + sigma_mult * Free_IL6_obs	normal
 Free_TGFb_obs	Free_TGFb_obs	Free_TGFb_obs	sigma_add + sigma_mult * Free_TGFb_obs	normal
 IL6R_Active	IL6R_Active	IL6R_Active	sigma_add + sigma_mult * IL6R_Active	normal
-Free_IL6_obs	Free_IL6_obs	Free_IL6_obs	sigma_add + sigma_mult * Free_IL6_obs	normal
+TGFbR_Active	TGFbR_Active	TGFbR_Active	sigma_add + sigma_mult * TGFbR_Active	normal
 pSMAD3_obs	pSMAD3_obs	pSMAD3_obs	sigma_add + sigma_mult * pSMAD3_obs	normal
 pSTAT3_obs	pSTAT3_obs	pSTAT3_obs	sigma_add + sigma_mult * pSTAT3_obs	normal
 STAT3d_active_obs	STAT3d_active_obs	STAT3d_active_obs	sigma_add + sigma_mult * STAT3d_active_obs	normal

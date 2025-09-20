@@ -10,7 +10,7 @@ include("src/optimization.jl")
 include("src/profiling.jl")
 include("src/identifiability.jl")
 
-using ArgParse, JLD2, Logging, PEtab, SciMLSensitivity, ReverseDiff, DiffEqCallbacks, OrdinaryDiffEq, Sundials, LinearAlgebra, CSV, DataFrames, ComponentArrays
+using ArgParse, JLD2, Logging, PEtab, SciMLSensitivity, ReverseDiff, DiffEqCallbacks, OrdinaryDiffEq, Sundials, LinearAlgebra, CSV, DataFrames, ComponentArrays, Printf
 
 # --- 2. ARGUMENT PARSER DEFINITION ---
 function define_argument_parser()
@@ -69,9 +69,8 @@ function main()
         # --- WORKER MODE ---
         @info "--- Running in WORKER mode for Task ID: $(parsed_args["task-id"]) ---"
         
-        setup_results = setup_petab_problem(parsed_args["yaml"])
+        setup_results = setup_petab_problem(parsed_args["yaml"]) 
         odesolver = ODESolver(Rodas5P(), abstol=1e-8, reltol=1e-8)
-        # Remove ss_solver since pre-equilibration is disabled
         
         petab_problem = PEtabODEProblem(
                         setup_results.petab_model, 
@@ -84,9 +83,17 @@ function main()
         # --- COLLATION & VISUALIZATION MODE ---
         @info "--- Running in COLLATION & VISUALIZATION mode ---"
         
+        # --- MODIFICATION: Set up the PEtab problem once at the beginning ---
+        setup_results = setup_petab_problem(parsed_args["yaml"])
+        odesolver = ODESolver(Rodas5P(), abstol=1e-8, reltol=1e-8)
+        petab_problem = PEtabODEProblem(
+                            setup_results.petab_model, 
+                            odesolver=odesolver,
+                            split_over_conditions=true)
+
+        # --- Collation Loop ---
         n_starts = parsed_args["n-starts"]
         results_dir = "results"
-        
         best_cost = Inf
         best_params = nothing
         all_runs = PEtab.PEtabOptimisationResult[]
@@ -128,13 +135,87 @@ function main()
         JLD2.save("best_fit.jld2", Dict("best_mle" => best_params, "best_cost" => best_cost, "multistart_result" => multistart_res))
         @info "   - Best parameters and full multistart results saved to best_fit.jld2"
 
-        # --- Set up the PEtab problem once for all plotting ---
-        setup_results = setup_petab_problem(parsed_args["yaml"])
-        odesolver = ODESolver(Rodas5P(), abstol=1e-8, reltol=1e-8)
-        petab_problem = PEtabODEProblem(
-                            setup_results.petab_model, 
-                            odesolver=odesolver,
-                            split_over_conditions=true)
+        # --- START: CORRECTED PI's QUESTION SECTION ---
+        @info "--- Compare NLLH of Best-Fit vs. True Parameters ---"
+        
+        true_values_linear = setup_results.true_values
+        estimated_param_ids = petab_problem.xnames # This is a Vector{Symbol} of the correctly scaled names
+        xindices = petab_problem.model_info.xindices
+        
+        @info "All estimated parameter IDs: $(estimated_param_ids)"
+        @info "Available true values: $(keys(true_values_linear))"
+        
+        true_params_on_scale_vector = Float64[]
+        
+        for param_id_sym in estimated_param_ids
+            base_name = replace(string(param_id_sym), r"^(log10_|log2_|log_)" => "")
+            @info "Processing parameter: $param_id_sym -> base_name: $base_name"
+            
+            if haskey(true_values_linear, base_name)
+                linear_val = true_values_linear[base_name]
+                scale = xindices.xscale[param_id_sym]
+                
+                if scale == :log10
+                    scaled_val = log10(linear_val)
+                    push!(true_params_on_scale_vector, scaled_val)
+                    @info "  Added log10($linear_val) = $scaled_val"
+                elseif scale == :log
+                    scaled_val = log(linear_val)
+                    push!(true_params_on_scale_vector, scaled_val)
+                    @info "  Added log($linear_val) = $scaled_val"
+                elseif scale == :log2
+                    scaled_val = log2(linear_val)
+                    push!(true_params_on_scale_vector, scaled_val)
+                    @info "  Added log2($linear_val) = $scaled_val"
+                else # :lin
+                    push!(true_params_on_scale_vector, linear_val)
+                    @info "  Added linear value: $linear_val"
+                end
+            else
+                @warn "Could not find true value for estimated parameter: $base_name. Skipping."
+            end
+        end
+        
+        if length(true_params_on_scale_vector) == length(estimated_param_ids)
+            # Create the parameter names with log10_ prefixes that PEtab expects
+            petab_expected_names = Symbol[]
+            for param_id_sym in estimated_param_ids
+                scale = xindices.xscale[param_id_sym]
+                if scale == :log10
+                    push!(petab_expected_names, Symbol("log10_", string(param_id_sym)))
+                elseif scale == :log
+                    push!(petab_expected_names, Symbol("log_", string(param_id_sym)))
+                else # :lin - no prefix needed
+                    push!(petab_expected_names, param_id_sym)
+                end
+            end
+            
+            @info "PEtab expected parameter names: $(petab_expected_names)"
+            
+            true_params_component_array = ComponentArray(NamedTuple{Tuple(petab_expected_names)}(true_params_on_scale_vector))
+            @info "ComponentArray keys: $(collect(keys(true_params_component_array)))"
+            
+            nllh_true = petab_problem.nllh(true_params_component_array)
+            
+            println("\n" * "="^50)
+            @printf("NLLH for Best Fit Parameters: %.6f\n", best_cost)
+            @printf("NLLH for 'True' Parameters:   %.6f\n", nllh_true)
+            println("="^50 * "\n")
+
+            if best_cost < nllh_true
+                @info "✅ As expected, the best-fit parameters provide a better fit to the noisy data."
+                @printf("   The fit is better by %.4f units.\n", nllh_true - best_cost)
+                @info "   This confirms the optimizer is working correctly and finding a solution that accounts for the specific noise in this dataset (overfitting)."
+            elseif best_cost > nllh_true
+                @warn "This is unexpected. The optimizer did not find a solution as good as the true parameters."
+                @warn "   This could indicate an optimization issue (e.g., getting stuck in a local minimum)."
+            else
+                @info "The NLLH values are nearly identical, suggesting the true parameters are very close to the optimal fit."
+            end
+        else
+            @error "Could not construct the full 'true' parameter vector due to missing values. Comparison skipped."
+        end
+        # --- END: CORRECTED SECTION ---
 
         # --- Generate Diagnostic Plots ---
         @info "--- Generating diagnostic plots ---"
@@ -149,110 +230,50 @@ function main()
             odesolver
         )
 
-        # --- Optional: Identifiability diagnostics ---
+        # --- START: CORRECTED IDENTIFIABILITY SECTION ---
         if parsed_args["ident"]
             @info "--- Running identifiability diagnostics at best fit ---"
             
-            # Force best_params to be a plain Vector of values
-            param_values = if best_params isa ComponentVector
-                collect(best_params)  # Extract just the values
-            else
-                collect(best_params)  # Ensure it's a Vector
-            end
+            param_values = collect(best_params)
             
-            # Systematically get the correct parameter names that PEtab expects
-            # Method 1: Try to extract from the parameter table with scaling info
-            function get_scaled_parameter_names(petab_problem)
-                try
-                    # Access the parameter table from the PEtab model
-                    param_table = petab_problem.model_info.model.petab_tables[:parameters]
-                    
-                    # Get parameter IDs and their scales
-                    param_ids = String.(param_table.parameterId)
-                    
-                    # Check if parameterScale column exists (PEtab 1.0 format)
-                    if :parameterScale in names(param_table)
-                        scales = String.(param_table.parameterScale)
-                        scaled_names = Symbol[]
-                        
-                        for (id, scale) in zip(param_ids, scales)
-                            if scale == "log10"
-                                push!(scaled_names, Symbol("log10_$id"))
-                            elseif scale == "log"
-                                push!(scaled_names, Symbol("log_$id"))
-                            else  # "lin" or other
-                                push!(scaled_names, Symbol(id))
-                            end
-                        end
-                        return scaled_names
-                    else
-                        # PEtab 2.0+ format or scale info not available
-                        # Fall back to trying both scaled and unscaled names
-                        return nothing
-                    end
-                catch
-                    return nothing
+            # Use the same parameter naming approach as the NLLH comparison
+            estimated_param_ids = petab_problem.xnames
+            xindices = petab_problem.model_info.xindices
+            
+            # Create the parameter names with log10_ prefixes that PEtab expects
+            petab_expected_names = Symbol[]
+            for param_id_sym in estimated_param_ids
+                scale = xindices.xscale[param_id_sym]
+                if scale == :log10
+                    push!(petab_expected_names, Symbol("log10_", string(param_id_sym)))
+                elseif scale == :log
+                    push!(petab_expected_names, Symbol("log_", string(param_id_sym)))
+                elseif scale == :log2
+                    push!(petab_expected_names, Symbol("log2_", string(param_id_sym)))
+                else # :lin - no prefix needed
+                    push!(petab_expected_names, param_id_sym)
                 end
             end
             
-            # Method 2: Use trial-and-error with a test call to discover the expected names
-            function discover_parameter_names(petab_problem, param_values)
-                # First try with base names
-                base_names = petab_problem.xnames
-                θ_test = ComponentArray(NamedTuple{Tuple(base_names)}(param_values))
-                
-                try
-                    petab_problem.nllh(θ_test; prior=false)
-                    return base_names  # Success with base names
-                catch e
-                    if e isa PEtab.PEtabInputError && occursin("must appear in the order of", string(e))
-                        # Extract the expected names from the error message
-                        error_msg = string(e)
-                        # Find the part with the expected parameter list
-                        start_idx = findfirst('[', error_msg)
-                        end_idx = findlast(']', error_msg)
-                        if start_idx !== nothing && end_idx !== nothing
-                            names_str = error_msg[start_idx+1:end_idx-1]
-                            # Parse the symbol names
-                            expected_names = Symbol[]
-                            for name_match in eachmatch(r":(\w+)", names_str)
-                                push!(expected_names, Symbol(name_match.captures[1]))
-                            end
-                            return expected_names
-                        end
-                    end
-                    rethrow(e)
-                end
-            end
+            @assert length(petab_expected_names) == length(param_values) "Parameter name count ($(length(petab_expected_names))) does not match parameter vector length ($(length(param_values)))"
             
-            # Try systematic approach first, then fallback to discovery
-            scaled_names = get_scaled_parameter_names(petab_problem)
-            if scaled_names === nothing
-                @info "Using parameter name discovery method..."
-                scaled_names = discover_parameter_names(petab_problem, param_values)
-            else
-                @info "Using systematic parameter scaling method..."
-            end
+            # Construct the ComponentArray with the correct log10_ prefixed names
+            θ_full = ComponentArray(NamedTuple{Tuple(petab_expected_names)}(param_values))
             
-            @assert length(scaled_names) == length(param_values)
+            @info "Using parameter names for FIM: $(collect(keys(θ_full)))"
             
-            # Construct ComponentArray with the correct names
-            θ_full = ComponentArray(NamedTuple{Tuple(scaled_names)}(param_values))
-            
-            @info "Using parameter names: $(collect(keys(θ_full)))"
-            
-            # Sanity checks
+            # Sanity check before running the main function
             try
-                _ = petab_problem.nllh(θ_full; prior=false)
-                _ = petab_problem.simulated_values(θ_full)[:]  # Apply [:] workaround for SBML bug
-                @info "Sanity checks passed"
+                _ = petab_problem.nllh(θ_full)
+                @info "Sanity check for identifiability passed."
             catch e
-                @error "Sanity check failed before identifiability: $e"
-                rethrow()
+                @error "Sanity check failed before running identifiability analysis. This indicates a persistent parameter name mismatch."
+                rethrow(e)
             end
-            
+
             run_identifiability(petab_problem, θ_full; eps=1e-4)
         end
+        # --- END: CORRECTED IDENTIFIABILITY SECTION ---
 
     elseif parsed_args["profile"]
         @info "--- Running in PROFILING mode ---"
@@ -262,18 +283,16 @@ function main()
         
         setup_results = setup_petab_problem(parsed_args["yaml"])
         profiling_odesol = ODESolver(Rodas5P(), abstol=1e-8, reltol=1e-8)
-        # Remove profiling_ss_solver since pre-equilibration is disabled
-
-        # Pass the method as a Symbol
+        
         prof_method = Symbol(parsed_args["profiling-method"])
 
         run_likelihood_profiling(
             setup_results.petab_model, 
             profiling_odesol, 
-            nothing,  # Pass nothing for steadystate_solver
+            nothing,
             best_mle, 
             setup_results.true_values;
-            profiling_method = prof_method # Pass the selected method
+            profiling_method = prof_method
         )
     else
         @error "No mode selected. Please specify --task-id or --collate."

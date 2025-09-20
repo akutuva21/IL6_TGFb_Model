@@ -355,7 +355,7 @@ function calculate_profiled_nllh_advanced(
             ub_sub,
             p_init_sub,
             Optim.Fminbox(Optim.LBFGS()),
-            Optim.Options(g_tol=1e-4, f_reltol=1e-3, iterations=150, show_trace=false)
+            Optim.Options(g_tol=1e-3, f_reltol=5e-2, iterations=500, show_trace=false)
         )
     catch e
         return (Inf, nothing)

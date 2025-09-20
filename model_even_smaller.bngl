@@ -6,39 +6,49 @@ begin parameters
     IL6_0                   0.0
 
     # IL-6 Pathway
-    kf_il6_bind             0.1
-    kr_il6_bind             0.1
-    k_act_il6r              1.5          # OPTIMIZED: 3x increase for stronger IL6R activation
-    k_internalize           0.03
-    k_recycle               0.02
+    kf_il6_bind             0.3          # Increased from 0.1 for stronger IL6 binding
+    kr_il6_bind             0.05         # Reduced from 0.1 for more stable IL6-receptor complex
+    k_act_il6r              3.0          # Increased from 1.5 for much stronger IL6R activation
+    k_deact_il6r            0.01         # Reduced from 0.02 for longer IL6R active state
+
+    # TGFb Pathway (similar to IL-6)
+    kf_tgfb_bind            0.05         # Further reduced from 0.08 to minimize baseline TGFb activity
+    kr_tgfb_bind            0.2          # Increased from 0.15 for even less stable TGFb binding
+    k_act_tgfbr             0.8          # Reduced from 1.2 to weaken baseline TGFb response
+    k_deact_tgfbr           0.02         # Reduced from 0.08 for much slower TGFb deactivation/consumption
 
     # SMAD3 dynamics
-    k_phos_smad3            0.1
-    k_dephos_smad3          0.05
+    k_phos_smad3            0.03         # Reduced from 0.05 to slow baseline SMAD3 phosphorylation
+    k_dephos_smad3          0.02         # Reduced from 0.03 to help maintain differences
 
     # STAT3 dynamics
-    kf_stat3_bind           0.2          # OPTIMIZED: 5x decrease for selective STAT3 binding
-    Kd_stat3_bind           0.1
-    k_phos_stat3            0.25         # OPTIMIZED: 3.1x increase for faster STAT3 phosphorylation
-    kf_dimer                0.8          # OPTIMIZED: 8x increase for enhanced STAT3 dimerization
-    Kd_dimer                0.5
-    k_dephos_stat3d         0.05
+    kf_stat3_bind           0.12         # Increased from 0.05 for stronger STAT3 response to IL6
+    Kd_stat3_bind           0.08         # Reduced from 0.2 for tighter STAT3 binding to IL6R
+    k_phos_stat3            0.15         # Increased from 0.08 for faster STAT3 phosphorylation
+    kf_dimer                0.5          # Increased from 0.3 for better STAT3 dimerization
+    Kd_dimer                0.6          # Reduced from 0.8 for stronger dimer formation
+    k_dephos_stat3d         0.06         # Reduced from 0.08 to maintain STAT3 activity longer
+
+    # SMAD3-TGFbR binding parameters
+    kf_smad3_bind           0.08         # SMAD3 forward binding rate (slower than STAT3)
+    Kd_smad3_bind           0.12         # SMAD3 dissociation constant
 
     # Complex formation
-    kf_s3s4                 1.0
-    Kd_s3s4                 0.1
-    kf_s3stat3d             1.0
-    Kd_s3stat3d             0.1
+    kf_s3s4                 0.6          # Reduced from 1.0 to slow SMAD3-SMAD4 complex formation
+    Kd_s3s4                 0.2          # Increased from 0.1 for weaker SMAD3-SMAD4 binding
+    kf_s3stat3d             2.0          # Increased from 1.0 for stronger SMAD3-STAT3 crosstalk
+    Kd_s3stat3d             0.05         # Reduced from 0.1 for much stronger SMAD3-STAT3 binding
 
     # PKA activation parameters
     kf_pka_bind             1.0
     Kd_pka_bind             0.1
 
     # Initial amounts of cellular components
-    IL6R_0                  150.0        # OPTIMIZED: 1.5x increase for more IL6 receptors
-    SMAD3_0                 100.0
-    SMAD4_0                 50.0
-    STAT3m_0                150.0        # OPTIMIZED: 1.5x increase for more STAT3 available
+    IL6R_0                  250.0        # Further increased from 200 for even stronger IL6 response
+    TGFbR_0                 40.0         # Further reduced from 60 to minimize baseline TGFb activity
+    SMAD3_0                 60.0         # Further reduced from 80 to limit baseline SMAD3 pool
+    SMAD4_0                 30.0         # Further reduced from 40 to limit SMAD3-SMAD4 complexes
+    STAT3m_0                220.0        # Further increased from 180 for stronger STAT3-SMAD3 crosstalk
     PKA_0                   50.0
 
 end parameters
@@ -47,11 +57,10 @@ begin molecule types
     TGFb(r)
     IL6(r)
     IL6R(l_bind,activity~I~A,stat3_site) 
-    IL6R_internal(bound_il6)
-    SMAD3(phos~U~P,smad4_site,stat3_site,pka_site)
+    TGFbR(l_bind,activity~I~A,smad3_site)
+    SMAD3(phos~U~P,smad4_site,stat3_site,pka_site,tgfbr_site)
     SMAD4(s3_site)
-    STAT3m(il6r_site)
-    pSTAT3m()
+    STAT3m(il6r_site,phos~U~P)
     STAT3d_active(s3_site)
     PKA(activity~I~A,s3s4_site)
 end molecule types
@@ -60,21 +69,23 @@ begin seed species
     TGFb(r)                                         TGFb_0
     IL6(r)                                          IL6_0
     IL6R(l_bind,activity~I,stat3_site)            IL6R_0
-    SMAD3(phos~U,smad4_site,stat3_site,pka_site)    SMAD3_0
+    TGFbR(l_bind,activity~I,smad3_site)           TGFbR_0
+    SMAD3(phos~U,smad4_site,stat3_site,pka_site,tgfbr_site)    SMAD3_0
     SMAD4(s3_site)                                  SMAD4_0
-    STAT3m(il6r_site)                               STAT3m_0
+    STAT3m(il6r_site,phos~U)                       STAT3m_0
     PKA(activity~I,s3s4_site)                      PKA_0
 end seed species
 
 begin observables
+    Molecules Free_IL6_obs IL6(r)
     Molecules Free_TGFb_obs TGFb(r)
     Molecules IL6R_Active IL6(r!+).IL6R(l_bind!+,activity~A)
-    Molecules Free_IL6_obs IL6(r)
+    Molecules TGFbR_Active TGFb(r!+).TGFbR(l_bind!+,activity~A)
     Molecules pSMAD3_obs SMAD3(phos~P)
-    Molecules pSTAT3_obs pSTAT3m()
+    Molecules pSTAT3_obs STAT3m(phos~P)
     Molecules STAT3d_active_obs STAT3d_active()
-    Molecules S3S4_complex_obs SMAD3(smad4_site!1).SMAD4(s3_site!1)
-    Molecules S3STAT3d_complex_obs SMAD3(stat3_site!1).STAT3d_active(s3_site!1)
+    Molecules S3S4_complex_obs SMAD3(smad4_site!1,tgfbr_site).SMAD4(s3_site!1)
+    Molecules S3STAT3d_complex_obs SMAD3(stat3_site!1,tgfbr_site).STAT3d_active(s3_site!1)
     Molecules PKA_active PKA(activity~A)
 end observables
 
@@ -82,27 +93,32 @@ begin reaction rules
     # 0. IL-6 Signaling Pathway
     R0a_IL6_Bind_Receptor: IL6(r) + IL6R(l_bind,activity~I) <-> IL6(r!1).IL6R(l_bind!1,activity~I) kf_il6_bind,kr_il6_bind
     R0b_Activate_IL6R: IL6(r!+).IL6R(l_bind!+,activity~I) -> IL6(r!+).IL6R(l_bind!+,activity~A) k_act_il6r
-    R0c_Internalize_IL6R: IL6(r!1).IL6R(l_bind!1,activity~A) -> IL6R_internal(bound_il6) k_internalize
-    R0d_Recycle_IL6R: IL6R_internal(bound_il6) -> IL6(r) + IL6R(l_bind,activity~I,stat3_site) k_recycle
+    R0c_Deactivate_IL6R: IL6(r!1).IL6R(l_bind!1,activity~A) -> IL6(r) + IL6R(l_bind,activity~I,stat3_site) k_deact_il6r
+
+    # 0b. TGFb Signaling Pathway (similar to IL-6)
+    R0e_TGFb_Bind_Receptor: TGFb(r) + TGFbR(l_bind,activity~I) <-> TGFb(r!1).TGFbR(l_bind!1,activity~I) kf_tgfb_bind,kr_tgfb_bind
+    R0f_Activate_TGFbR: TGFb(r!+).TGFbR(l_bind!+,activity~I) -> TGFb(r!+).TGFbR(l_bind!+,activity~A) k_act_tgfbr
+    R0g_Deactivate_TGFbR: TGFb(r!1).TGFbR(l_bind!1,activity~A) -> TGFb(r) + TGFbR(l_bind,activity~I,smad3_site) k_deact_tgfbr
 
     # 1. & 2. SMAD3 Dynamics
-    R1_Phos_SMAD3: SMAD3(phos~U,smad4_site,stat3_site,pka_site) + TGFb(r) -> SMAD3(phos~P,smad4_site,stat3_site,pka_site) + TGFb(r) k_phos_smad3
-    R2_Dephos_SMAD3: SMAD3(phos~P,smad4_site,stat3_site,pka_site) -> SMAD3(phos~U,smad4_site,stat3_site,pka_site) k_dephos_smad3
+    R1a_Bind_SMAD3_TGFbR: SMAD3(phos~U,smad4_site,stat3_site,pka_site,tgfbr_site) + TGFb(r!+).TGFbR(l_bind!+,activity~A,smad3_site) <-> SMAD3(phos~U,smad4_site,stat3_site,pka_site,tgfbr_site!1).TGFb(r!+).TGFbR(l_bind!+,activity~A,smad3_site!1) kf_smad3_bind,kf_smad3_bind*Kd_smad3_bind
+    R1b_Phos_SMAD3: SMAD3(phos~U,smad4_site,stat3_site,pka_site,tgfbr_site!1).TGFb(r!+).TGFbR(l_bind!+,activity~A,smad3_site!1) -> SMAD3(phos~P,smad4_site,stat3_site,pka_site,tgfbr_site) + TGFb(r!+).TGFbR(l_bind!+,activity~A,smad3_site) k_phos_smad3
+    R2_Dephos_SMAD3: SMAD3(phos~P,smad4_site,stat3_site,pka_site,tgfbr_site) -> SMAD3(phos~U,smad4_site,stat3_site,pka_site,tgfbr_site) k_dephos_smad3
 
     # 3. STAT3 Pathway
-    R3a_Bind_STAT3: STAT3m(il6r_site) + IL6(r!+).IL6R(l_bind!+,activity~A,stat3_site) <-> STAT3m(il6r_site!1).IL6(r!+).IL6R(l_bind!+,activity~A,stat3_site!1) kf_stat3_bind,kf_stat3_bind*Kd_stat3_bind
-    R3b_Phos_STAT3: STAT3m(il6r_site!1).IL6(r!+).IL6R(l_bind!+,activity~A,stat3_site!1) -> pSTAT3m() + IL6(r!+).IL6R(l_bind!+,activity~A,stat3_site) k_phos_stat3
-    R3c_Dimerize_pSTAT3: pSTAT3m() + pSTAT3m() <-> STAT3d_active(s3_site) kf_dimer,kf_dimer*Kd_dimer
+    R3a_Bind_STAT3: STAT3m(il6r_site,phos~U) + IL6(r!+).IL6R(l_bind!+,activity~A,stat3_site) <-> STAT3m(il6r_site!1,phos~U).IL6(r!+).IL6R(l_bind!+,activity~A,stat3_site!1) kf_stat3_bind,kf_stat3_bind*Kd_stat3_bind
+    R3b_Phos_STAT3: STAT3m(il6r_site!1,phos~U).IL6(r!+).IL6R(l_bind!+,activity~A,stat3_site!1) -> STAT3m(il6r_site,phos~P) + IL6(r!+).IL6R(l_bind!+,activity~A,stat3_site) k_phos_stat3
+    R3c_Dimerize_pSTAT3: STAT3m(il6r_site,phos~P) + STAT3m(il6r_site,phos~P) <-> STAT3d_active(s3_site) kf_dimer,kf_dimer*Kd_dimer
 
     # 4. STAT3 Dephosphorylation
-    R4_Dephos_STAT3d: STAT3d_active(s3_site) -> STAT3m(il6r_site) + STAT3m(il6r_site) k_dephos_stat3d
+    R4_Dephos_STAT3d: STAT3d_active(s3_site) -> STAT3m(il6r_site,phos~U) + STAT3m(il6r_site,phos~U) k_dephos_stat3d
 
     # 5. & 6. Complex Formation
-    R5_Bind_S3S4: SMAD3(phos~P,smad4_site,stat3_site,pka_site) + SMAD4(s3_site) <-> SMAD3(phos~P,smad4_site!1,stat3_site,pka_site).SMAD4(s3_site!1) kf_s3s4,kf_s3s4*Kd_s3s4
-    R6_Bind_S3STAT3d: SMAD3(phos~P,smad4_site,stat3_site,pka_site) + STAT3d_active(s3_site) <-> SMAD3(phos~P,smad4_site,stat3_site!1,pka_site).STAT3d_active(s3_site!1) kf_s3stat3d,kf_s3stat3d*Kd_s3stat3d
+    R5_Bind_S3S4: SMAD3(phos~P,smad4_site,stat3_site,pka_site,tgfbr_site) + SMAD4(s3_site) <-> SMAD3(phos~P,smad4_site!1,stat3_site,pka_site,tgfbr_site).SMAD4(s3_site!1) kf_s3s4,kf_s3s4*Kd_s3s4
+    R6_Bind_S3STAT3d: SMAD3(phos~P,smad4_site,stat3_site,pka_site,tgfbr_site) + STAT3d_active(s3_site) <-> SMAD3(phos~P,smad4_site,stat3_site!1,pka_site,tgfbr_site).STAT3d_active(s3_site!1) kf_s3stat3d,kf_s3stat3d*Kd_s3stat3d
 
     # 7. PKA Activation
-    R7_Bind_PKA: SMAD3(phos~P,smad4_site!1,stat3_site,pka_site).SMAD4(s3_site!1) + PKA(activity~I,s3s4_site) <-> SMAD3(phos~P,smad4_site!1,stat3_site,pka_site!2).SMAD4(s3_site!1).PKA(activity~A,s3s4_site!2) kf_pka_bind,kf_pka_bind*Kd_pka_bind
+    R7_Bind_PKA: SMAD3(phos~P,smad4_site!1,stat3_site,pka_site,tgfbr_site).SMAD4(s3_site!1) + PKA(activity~I,s3s4_site) <-> SMAD3(phos~P,smad4_site!1,stat3_site,pka_site!2,tgfbr_site).SMAD4(s3_site!1).PKA(activity~A,s3s4_site!2) kf_pka_bind,kf_pka_bind*Kd_pka_bind
 
 end reaction rules
 

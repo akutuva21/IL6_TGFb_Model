@@ -41,21 +41,15 @@ time_course_settings:
   simulation:
     duration: 60.0
     steps: 20
-    # Optional: switch to explicit time points mode by providing time_points.
-    # When present, duration/steps ar    # model: combined
-    # sigma_add: 0.05   # additive SD
-    # sigma_mult: 0.10  # multiplicative SD (fractional)e ignored and the generator will:
-    #  - simulate densely up to max(time_points)
-    #  - filter to these exact time points (with tolerance)
-    #  - create N replicates per point if 'replicates' is set
+
     time_points: [0.0, 5.0, 10.0, 15.0, 30.0, 45.0]
     replicates: 3
 
   noise:
     add: true
     model: combined
-    sigma_add: 0.01   # additive SD on linear scale
-    sigma_mult: 0.01  # multiplicative SD (fractional) on linear scale
+    sigma_add: 0.05   # additive SD on linear scale
+    sigma_mult: 0.10  # multiplicative SD (fractional) on linear scale
     # level_percent is ignored when model: combined
 
 
