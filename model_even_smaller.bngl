@@ -5,9 +5,18 @@ begin parameters
     TGFb_0                  1.0
     IL6_0                   0.0
 
-    # Simplified effective activation parameters
-    k_il6_activation        1.0          # Effective rate of IL6R activation by IL-6
-    k_tgfb_activation       0.1          # Effective rate of TGFbR activation by TGF-b
+    # Reversible ligand binding parameters (FIXED: PI's suggestion)
+    # IL-6 Pathway
+    kf_il6_bind             0.3          # IL-6 forward binding rate
+    kr_il6_bind             0.05         # IL-6 reverse binding rate  
+    k_act_il6r              3.0          # IL6R activation rate
+    k_deact_il6r            0.01         # IL6R deactivation rate
+
+    # TGFb Pathway  
+    kf_tgfb_bind            0.05         # TGFb forward binding rate
+    kr_tgfb_bind            0.2          # TGFb reverse binding rate
+    k_act_tgfbr             0.8          # TGFbR activation rate
+    k_deact_tgfbr           0.02         # TGFbR deactivation rate
 
     # SMAD3 dynamics
     k_phos_smad3            0.015        # Further reduced from 0.03 to minimize baseline SMAD3 phosphorylation
@@ -45,8 +54,8 @@ end parameters
 begin molecule types
     TGFb(r)
     IL6(r)
-    IL6R(activity~I~A,stat3_site) 
-    TGFbR(activity~I~A,smad3_site)
+    IL6R(l_bind,activity~I~A,stat3_site) 
+    TGFbR(l_bind,activity~I~A,smad3_site)
     SMAD3(phos~U~P,smad4_site,stat3_site,pka_site,tgfbr_site)
     SMAD4(s3_site)
     STAT3m(il6r_site,phos~U~P)
@@ -55,14 +64,14 @@ begin molecule types
 end molecule types
 
 begin seed species
-    TGFb(r)                                                     TGFb_0
-    IL6(r)                                                      IL6_0
-    IL6R(activity~I,stat3_site)                                 IL6R_0
-    TGFbR(activity~I,smad3_site)                                TGFbR_0
-    SMAD3(phos~U,smad4_site,stat3_site,pka_site,tgfbr_site)     SMAD3_0
-    SMAD4(s3_site)                                              SMAD4_0
-    STAT3m(il6r_site,phos~U)                                    STAT3m_0
-    PKA(s3s4_site,phos~U)                                       PKA_0
+    TGFb(r)                                                            TGFb_0
+    IL6(r)                                                             IL6_0
+    IL6R(l_bind,activity~I,stat3_site)                                 IL6R_0
+    TGFbR(l_bind,activity~I,smad3_site)                                TGFbR_0
+    SMAD3(phos~U,smad4_site,stat3_site,pka_site,tgfbr_site)            SMAD3_0
+    SMAD4(s3_site)                                                     SMAD4_0
+    STAT3m(il6r_site,phos~U)                                           STAT3m_0
+    PKA(s3s4_site,phos~U)                                              PKA_0
 end seed species
 
 begin observables
@@ -79,12 +88,16 @@ begin observables
 end observables
 
 begin reaction rules
-    # Simplified upstream activation (replacing complex binding/activation chains)
-    # IL-6 binds and activates the receptor in a single, effective step
-    Activate_IL6R: IL6(r) + IL6R(activity~I) -> IL6(r) + IL6R(activity~A) k_il6_activation
+    # Biologically correct reversible ligand binding (FIXED: PI's suggestion)
+    # 0. IL-6 Signaling Pathway
+    R0a_IL6_Bind_Receptor: IL6(r) + IL6R(l_bind,activity~I) <-> IL6(r!1).IL6R(l_bind!1,activity~I) kf_il6_bind,kr_il6_bind
+    R0b_Activate_IL6R: IL6(r!+).IL6R(l_bind!+,activity~I) -> IL6(r!+).IL6R(l_bind!+,activity~A) k_act_il6r
+    R0c_Deactivate_IL6R: IL6(r!1).IL6R(l_bind!1,activity~A) -> IL6(r) + IL6R(l_bind,activity~I,stat3_site) k_deact_il6r
 
-    # TGF-b binds and activates its receptor in a single, effective step
-    Activate_TGFbR: TGFb(r) + TGFbR(activity~I) -> TGFb(r) + TGFbR(activity~A) k_tgfb_activation
+    # 0b. TGFb Signaling Pathway (similar to IL-6)
+    R0e_TGFb_Bind_Receptor: TGFb(r) + TGFbR(l_bind,activity~I) <-> TGFb(r!1).TGFbR(l_bind!1,activity~I) kf_tgfb_bind,kr_tgfb_bind
+    R0f_Activate_TGFbR: TGFb(r!+).TGFbR(l_bind!+,activity~I) -> TGFb(r!+).TGFbR(l_bind!+,activity~A) k_act_tgfbr
+    R0g_Deactivate_TGFbR: TGFb(r!1).TGFbR(l_bind!1,activity~A) -> TGFb(r) + TGFbR(l_bind,activity~I,smad3_site) k_deact_tgfbr
 
     # 1. & 2. SMAD3 Dynamics
     R1a_Bind_SMAD3_TGFbR: SMAD3(phos~U,smad4_site,stat3_site,pka_site,tgfbr_site) + TGFbR(activity~A,smad3_site) -> SMAD3(phos~U,smad4_site,stat3_site,pka_site,tgfbr_site!1).TGFbR(activity~A,smad3_site!1) kf_smad3_bind

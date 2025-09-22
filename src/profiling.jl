@@ -30,7 +30,13 @@ function run_likelihood_profiling(
     # Build CICOBase-compatible bounds
     # If staying on CICOBase 0.5.4 (strict interior), use a tiny δ margin
     δ = 1e-6
-    cico_bounds = [(lb_vector[i], ub_vector[i]) for i in eachindex(lb_vector)]
+    # cico_bounds = [(lb_vector[i], ub_vector[i]) for i in eachindex(lb_vector)]
+
+    # before building cico_bounds
+    expand = 1.0  # in log10 units if parameters are log-scaled
+    lb_prof = lb_vector .- expand
+    ub_prof = ub_vector .+ expand
+    cico_bounds = [(lb_prof[i], ub_prof[i]) for i in eachindex(lb_prof)]
 
     # Baseline loss and absolute threshold (FIXED: correct threshold for NLLH)
     obj0 = petab_problem.nllh(θ_mle_vector)
@@ -73,9 +79,9 @@ function run_likelihood_profiling(
                 loss_crit    = losscrit,
                 theta_bounds = cico_bounds,
                 scan_bounds  = scan_bounds_tuple,  # FIXED: use adaptive bounds
-                scan_tol     = 1e-3,
+                scan_tol     = 1e-4,
                 local_alg    = :LN_NELDERMEAD,
-                silent       = false,
+                silent       = true                # FIXED: suppress verbose logging
             )
             println("  ✓ done")
         catch e

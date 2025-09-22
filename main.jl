@@ -293,6 +293,7 @@ function main()
             best_mle, 
             setup_results.true_values
         )
+
     else
         @error "No mode selected. Please specify --task-id or --collate."
     end
