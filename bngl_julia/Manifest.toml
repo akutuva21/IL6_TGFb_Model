@@ -2,7 +2,7 @@
 
 julia_version = "1.10.10"
 manifest_format = "2.0"
-project_hash = "b452c4817e426ce3f04889ecb4a66547d4fbcb4f"
+project_hash = "1c54eda0fd7373cf823d2cb8856e1d4bb5338ae6"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "60665b326b75db6517939d0e1875850bc4a54368"
@@ -276,6 +276,12 @@ git-tree-sha1 = "389ad5c84de1ae7cf0e28e381131c98ea87d54fc"
 uuid = "fa961155-64e5-5f13-b03f-caf6b980ea82"
 version = "0.5.0"
 
+[[deps.CICOBase]]
+deps = ["Calculus", "ForwardDiff", "LinearAlgebra", "NLopt", "NLopt_jll", "PlotUtils", "ProgressMeter", "RecipesBase"]
+git-tree-sha1 = "e262374de34c533bd1d46c4d5cd74b2b99bbb772"
+uuid = "33444335-3134-4342-4659-594331344435"
+version = "0.5.4"
+
 [[deps.CPUSummary]]
 deps = ["CpuId", "IfElse", "PrecompileTools", "Preferences", "Static"]
 git-tree-sha1 = "f3a21d7fc84ba618a779d1ed2fcca2e682865bab"
@@ -293,6 +299,12 @@ deps = ["Artifacts", "Bzip2_jll", "CompilerSupportLibraries_jll", "Fontconfig_jl
 git-tree-sha1 = "fde3bf89aead2e723284a8ff9cdf5b551ed700e8"
 uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
 version = "1.18.5+0"
+
+[[deps.Calculus]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "9cb23bbb1127eefb022b022481466c0f1127d430"
+uuid = "49dc2e85-a5d0-5ad3-a950-438e2897f1b9"
+version = "0.5.2"
 
 [[deps.Cassette]]
 git-tree-sha1 = "f8764df8d9d2aec2812f009a1ac39e46c33354b8"
@@ -1545,12 +1557,10 @@ deps = ["CommonSolve", "DataFrames", "DataInterpolations", "Distributed", "Distr
 git-tree-sha1 = "a5056fd33a727166e3b4a25ba977e0475e2a263b"
 uuid = "93acb638-a083-5915-8dce-d129bc6a3f59"
 version = "1.1.0"
+weakdeps = ["CICOBase"]
 
     [deps.LikelihoodProfiler.extensions]
     CICOBaseExt = "CICOBase"
-
-    [deps.LikelihoodProfiler.weakdeps]
-    CICOBase = "33444335-3134-4342-4659-594331344435"
 
 [[deps.LineSearch]]
 deps = ["ADTypes", "CommonSolve", "ConcreteStructs", "FastClosures", "LinearAlgebra", "MaybeInplace", "SciMLBase", "SciMLJacobianOperators", "StaticArraysCore"]
@@ -1769,6 +1779,24 @@ deps = ["ADTypes", "DifferentiationInterface", "Distributed", "FiniteDiff", "For
 git-tree-sha1 = "25a6638571a902ecfb1ae2a18fc1575f86b1d4df"
 uuid = "d41bc354-129a-5804-8e4c-c37616107c6c"
 version = "7.10.0"
+
+[[deps.NLopt]]
+deps = ["CEnum", "NLopt_jll"]
+git-tree-sha1 = "624785b15005a0e0f4e462b27ee745dbe5941863"
+uuid = "76087f3c-5699-56af-9a33-bf431cd00edd"
+version = "1.2.1"
+
+    [deps.NLopt.extensions]
+    NLoptMathOptInterfaceExt = ["MathOptInterface"]
+
+    [deps.NLopt.weakdeps]
+    MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
+
+[[deps.NLopt_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "3d1eefa627faeabc59ab9edbf00d17f70123ad69"
+uuid = "079eb43e-fd8e-5478-9966-2cf3e3edb778"
+version = "2.8.0+0"
 
 [[deps.NLsolve]]
 deps = ["Distances", "LineSearches", "LinearAlgebra", "NLSolversBase", "Printf", "Reexport"]

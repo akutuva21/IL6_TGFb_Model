@@ -271,7 +271,7 @@ function main()
                 rethrow(e)
             end
 
-            run_identifiability(petab_problem, θ_full; eps=1e-4)
+            run_identifiability(petab_problem, θ_full)
         end
         # --- END: CORRECTED IDENTIFIABILITY SECTION ---
 
@@ -291,8 +291,7 @@ function main()
             profiling_odesol, 
             nothing,
             best_mle, 
-            setup_results.true_values;
-            profiling_method = prof_method
+            setup_results.true_values
         )
     else
         @error "No mode selected. Please specify --task-id or --collate."
