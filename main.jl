@@ -83,7 +83,6 @@ function main()
         # --- COLLATION & VISUALIZATION MODE ---
         @info "--- Running in COLLATION & VISUALIZATION mode ---"
         
-        # --- MODIFICATION: Set up the PEtab problem once at the beginning ---
         setup_results = setup_petab_problem(parsed_args["yaml"])
         odesolver = ODESolver(Rodas5P(), abstol=1e-8, reltol=1e-8)
         petab_problem = PEtabODEProblem(
@@ -135,7 +134,6 @@ function main()
         JLD2.save("best_fit.jld2", Dict("best_mle" => best_params, "best_cost" => best_cost, "multistart_result" => multistart_res))
         @info "   - Best parameters and full multistart results saved to best_fit.jld2"
 
-        # --- START: CORRECTED PI's QUESTION SECTION ---
         @info "--- Compare NLLH of Best-Fit vs. True Parameters ---"
         
         true_values_linear = setup_results.true_values
@@ -215,7 +213,6 @@ function main()
         else
             @error "Could not construct the full 'true' parameter vector due to missing values. Comparison skipped."
         end
-        # --- END: CORRECTED SECTION ---
 
         # --- Generate Diagnostic Plots ---
         @info "--- Generating diagnostic plots ---"
@@ -230,7 +227,6 @@ function main()
             odesolver
         )
 
-        # --- START: CORRECTED IDENTIFIABILITY SECTION ---
         if parsed_args["ident"]
             @info "--- Running identifiability diagnostics at best fit ---"
             
@@ -273,7 +269,6 @@ function main()
 
             run_identifiability(petab_problem, θ_full)
         end
-        # --- END: CORRECTED IDENTIFIABILITY SECTION ---
 
     elseif parsed_args["profile"]
         @info "--- Running in PROFILING mode ---"

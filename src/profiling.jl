@@ -27,39 +27,29 @@ function run_likelihood_profiling(
     # Sanity checks
     @assert length(θ_mle_vector) == length(lb_vector) == length(ub_vector) "bounds/θ mismatch"
 
-    # Build CICOBase-compatible bounds
-    # If staying on CICOBase 0.5.4 (strict interior), use a tiny δ margin
-    δ = 1e-6
-    # cico_bounds = [(lb_vector[i], ub_vector[i]) for i in eachindex(lb_vector)]
-
-    # before building cico_bounds
-    expand = 1.0  # in log10 units if parameters are log-scaled
+    # Build CICOBase-compatible bounds with expansion for profiling
+    expand = 2.0  # in log10 units if parameters are log-scaled
     lb_prof = lb_vector .- expand
     ub_prof = ub_vector .+ expand
     cico_bounds = [(lb_prof[i], ub_prof[i]) for i in eachindex(lb_prof)]
 
-    # Baseline loss and absolute threshold (FIXED: correct threshold for NLLH)
+    # Baseline loss and absolute threshold for 95% confidence interval
     obj0 = petab_problem.nllh(θ_mle_vector)
-    losscrit = obj0 + 1.92  # CORRECTED: 3.84/2 for 1 DOF when objective is NLLH
+    losscrit = obj0 + 3.84  # Chi-squared critical value for 95% CI with 1 DOF
 
     println("Baseline loss (MLE): ", obj0)
-    println("Loss threshold (corrected for NLLH): ", losscrit)
+    println("Loss threshold (95% CI): ", losscrit)
 
     # Objective for CICOBase
     cico_objective = θ -> petab_problem.nllh(θ)
 
-    # Adaptive scan_bounds function to handle parameters at boundaries (FIXED)
+    # Tight scan tolerance
+    tight_scan_tol = 1e-4
+
+    # Simple scan_bounds function using expanded parameter bounds
     function scan_bounds_for(i)
-        θi, lbi, ubi = θ_mle_vector[i], lb_vector[i], ub_vector[i]
-        # Keep the side that contains θi unshrunk; shrink the opposite side by δ if room
-        lb_scan = θi ≤ lbi + δ ? lbi : lbi + δ
-        ub_scan = θi ≥ ubi - δ ? ubi : ubi - δ
-        # Ensure ordering if parameter is extremely close to both bounds
-        if lb_scan ≥ ub_scan
-            lb_scan = min(θi, lbi)
-            ub_scan = max(θi, ubi)
-        end
-        return (lb_scan, ub_scan)
+        θi, lbi, ubi = θ_mle_vector[i], lb_prof[i], ub_prof[i]
+        return (lbi, ubi)
     end
 
     # Storage
@@ -69,19 +59,19 @@ function run_likelihood_profiling(
     for i in eachindex(θ_mle_vector)
         println("Parameter $i: $(param_names[i]) bounds=($(lb_vector[i]), $(ub_vector[i])), MLE=$(θ_mle_vector[i])")
         
-        # Use adaptive scan_bounds to handle parameters at boundaries
+        # Use simple scan_bounds with original parameter bounds
         scan_bounds_tuple = scan_bounds_for(i)
-        println("  Adaptive scan_bounds: ", scan_bounds_tuple)
+        println("  Scan_bounds: ", scan_bounds_tuple)
         
         try
             intervals[i] = CICOBase.get_interval(
                 θ_mle_vector, i, cico_objective, :CICO_ONE_PASS;
                 loss_crit    = losscrit,
                 theta_bounds = cico_bounds,
-                scan_bounds  = scan_bounds_tuple,  # FIXED: use adaptive bounds
-                scan_tol     = 1e-4,
+                scan_bounds  = scan_bounds_tuple,
+                scan_tol     = tight_scan_tol,
                 local_alg    = :LN_NELDERMEAD,
-                silent       = true                # FIXED: suppress verbose logging
+                silent       = true
             )
             println("  ✓ done")
         catch e

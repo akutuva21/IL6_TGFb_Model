@@ -5,7 +5,7 @@ begin parameters
     TGFb_0                  1.0
     IL6_0                   0.0
 
-    # Reversible ligand binding parameters (FIXED: PI's suggestion)
+    # Reversible ligand binding parameters
     # IL-6 Pathway
     kf_il6_bind             0.3          # IL-6 forward binding rate
     kr_il6_bind             0.05         # IL-6 reverse binding rate  
@@ -31,12 +31,12 @@ begin parameters
     # SMAD3-TGFbR binding parameters
     kf_smad3_bind           0.08         # SMAD3 forward binding rate (slower than STAT3)
 
-    # Complex formation (now irreversible)
+    # Complex formation
     kf_s3s4                 0.6          # SMAD3-SMAD4 complex formation rate
     kf_s3stat3d             4.0          # SMAD3-STAT3 complex formation rate
     k_dephos_s3stat3d_complex 1.0       # Enhanced dephosphorylation of sequestered SMAD3-STAT3 complex
 
-    # PKA activation parameters (now two-step: binding + phosphorylation)
+    # PKA activation parameters
     kf_pka_bind             1.0          # PKA binding to SMAD3/4 complex
     Kd_pka_bind             0.1          # Dissociation constant for PKA-SMAD3/4
     k_phos_pka              0.5          # Catalytic rate of PKA autophosphorylation
@@ -88,7 +88,7 @@ begin observables
 end observables
 
 begin reaction rules
-    # Biologically correct reversible ligand binding (FIXED: PI's suggestion)
+    # Biologically correct reversible ligand binding
     # 0. IL-6 Signaling Pathway
     R0a_IL6_Bind_Receptor: IL6(r) + IL6R(l_bind,activity~I) <-> IL6(r!1).IL6R(l_bind!1,activity~I) kf_il6_bind,kr_il6_bind
     R0b_Activate_IL6R: IL6(r!+).IL6R(l_bind!+,activity~I) -> IL6(r!+).IL6R(l_bind!+,activity~A) k_act_il6r
