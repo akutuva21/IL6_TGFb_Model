@@ -7,7 +7,7 @@ ENV["GKSwstype"] = "100"
 include("src/model_param_est_robustness.jl")
 include("src/visualization.jl")
 include("src/optimization.jl")
-include("src/profiling.jl")
+include("src/profiling_plot.jl")
 include("src/identifiability.jl")
 
 using ArgParse, JLD2, Logging, PEtab, SciMLSensitivity, ReverseDiff, DiffEqCallbacks, OrdinaryDiffEq, Sundials, LinearAlgebra, CSV, DataFrames, ComponentArrays, Printf

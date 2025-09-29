@@ -10,7 +10,7 @@ using CSV
 using RecipesBase
 using Colors
 
-export run_visualization, plot_waterfall, plot_parameter_distribution, diagnose_multistart_data, plot_waterfall_native_fallback, plot_waterfall_custom_fallback, handle_Inf_vector!, assign_clustered_colors, add_reference_lines!
+export run_visualization, plot_waterfall, plot_er_distribution, diagnose_multistart_data, plot_waterfall_native_fallback, plot_waterfall_custom_fallback, handle_Inf_vector!, assign_clustered_colors, add_reference_lines!
 
 # Helper functions for recipe-based plotting
 """
@@ -234,6 +234,10 @@ Generates and saves plots comparing the model simulation against measurement dat
 
 This function manually solves the ODE for all conditions and creates plots for each observable.
 """
+
+
+
+
 function run_visualization(
     theta_optim::Vector{Float64},
     petab_prob::PEtabODEProblem,
@@ -274,55 +278,12 @@ function run_visualization(
 
         relevant_conditions = unique(measurements_df.simulation_condition_id[measurements_df.observable_id .== obs_id])
         
-        # Define a color palette for conditions - ensures points and lines match
-        condition_colors = [:blue, :red, :green, :orange, :purple, :brown, :pink, :gray, :olive, :cyan]
-        
-        for (idx, condition_id) in enumerate(relevant_conditions)
-            # Get consistent color for this condition
-            condition_color = condition_colors[mod1(idx, length(condition_colors))]
-            
-            # Plot measurement data
-            data_for_plot = measurements_df.measurement[
-                (measurements_df.observable_id .== obs_id) .& 
-                (measurements_df.simulation_condition_id .== condition_id)
-            ]
-            time_points = measurements_df.time[
-                (measurements_df.observable_id .== obs_id) .& 
-                (measurements_df.simulation_condition_id .== condition_id)
-            ]
-            scatter!(plt, time_points, data_for_plot, 
-                    color=condition_color, 
-                    markersize=6,
-                    markerstrokewidth=1,
-                    markerstrokecolor=condition_color,
-                    alpha=0.8,
-                    label="Data ($condition_id)")
-
-            # Plot simulation results
-            sol_key = nothing
-            for key in keys(ode_solutions)
-                if occursin(string(condition_id), string(key))
-                    sol_key = key
-                    break
-                end
-            end
-
-            if !isnothing(sol_key)
-                solution = ode_solutions[sol_key]
-                
-                simulated_values = [
-                    petab_prob.model_info.model.h(sol_u, sol_t, solution.prob.p, [], [], [], obs_id, nothing) 
-                    for (sol_u, sol_t) in zip(solution.u, solution.t)
-                ]
-                
-                plot!(plt, solution.t, simulated_values, 
-                     color=condition_color,
-                     linewidth=2.5,
-                     alpha=0.9,
-                     label="Model ($condition_id)")
-            else
-                @warn "Could not find a simulation solution for condition $condition_id"
-            end
+        obs_sym = Symbol(obs_id)
+        conds = unique(petab_prob.model_info.petab_measurements.simulation_condition_id[
+                       petab_prob.model_info.petab_measurements.observable_id .== obs_sym])
+        palette = [:blue, :red, :green, :orange, :purple, :brown, :cyan, :magenta]
+        for (i, cid) in enumerate(conds)
+            simulate_observable!(plt, obs_sym, Symbol(cid), theta_optim, petab_prob, ode_solutions, palette[mod1(i,length(palette))])
         end
         
         plot_filename = joinpath(plot_path, "plot_observable_$(obs_id).png")
@@ -661,22 +622,36 @@ function plot_parameter_distribution(multistart_result::PEtabMultistartResult, p
     param_names_strings = string.(param_names_symbols) # Use this for plot labels only
     n_params_plot = length(param_names_symbols)
     
+    # Define order first
+    param_order = petab_prob.xnames  # e.g., :log10_kf_il6_bind, ...
+    
+    # Bounds are already aligned to xnames (estimation scale)
     lower_bounds = collect(petab_prob.lower_bounds)
     upper_bounds = collect(petab_prob.upper_bounds)
+    @assert length(lower_bounds) == length(param_order) "Bounds length doesn't match xnames"
     
-    all_x_estimates = []
-    for run in multistart_result.runs
-        if !isempty(run.xmin)
-            push!(all_x_estimates, collect(run.xmin))
+    # Helper: robust value access for ComponentArray/NamedTuple-like xmin
+    @inline function _get_xval(xmin, sym::Symbol)
+        # First try as-is (prefer xnames with log10_)
+        try
+            return xmin[sym]
+        catch
+            s = String(sym)
+            alt = startswith(s, "log10_") ? Symbol(s[7:end]) : Symbol("log10_" * s)
+            return xmin[alt]  # will throw if neither exists, which is fine
         end
     end
     
-    if isempty(all_x_estimates)
-        @warn "No valid parameter estimates found to create a distribution plot."
-        return
+    # Build every run in the exact PEtab order (no axis/property introspection)
+    all_x_estimates = Vector{Vector{Float64}}()
+    for run in multistart_result.runs
+        isempty(run.xmin) && continue
+        push!(all_x_estimates, [_get_xval(run.xmin, sym) for sym in param_order])
     end
-
-    best_x = collect(multistart_result.xmin)
+    @assert !isempty(all_x_estimates) "No valid parameter estimates found to create a distribution plot."
+    
+    # Best-fit in the same order
+    best_x = [_get_xval(multistart_result.xmin, sym) for sym in param_order]
     plot_height = max(400, n_params_plot * 40) # Increased height for better readability
     
     plt = plot(
@@ -784,4 +759,103 @@ function plot_parameter_distribution(multistart_result::PEtabMultistartResult, p
     
     savefig(plt, save_path)
     println("✅ Parameter distribution plot saved to: $save_path")
+end
+
+function build_param_lin_dict(theta_vec::Vector{Float64}, petab_prob::PEtabODEProblem)
+    # Seed with all nominal values (linear) keyed by parameterId Symbols
+    mi   = petab_prob.model_info
+    ptab = mi.petab_parameters
+    ids  = Symbol.(ptab.parameter_id)
+    nom  = Vector{Float64}(ptab.nominal_value)  # already linear
+    param_lin = Dict{Symbol,Float64}(ids .=> nom)
+
+    # Overwrite with estimated values from θ, converting from estimation scale
+    for j in eachindex(petab_prob.xnames)
+        est_sym = petab_prob.xnames[j]              # e.g., :log10_kf_il6_bind or :kf_il6_bind
+        s = String(est_sym)
+        v_est = theta_vec[j]
+        if startswith(s, "log10_")
+            pid = Symbol(s[7:end]); v_lin = 10.0^v_est
+        elseif startswith(s, "log_")
+            pid = Symbol(s[5:end]); v_lin = exp(v_est)
+        elseif startswith(s, "log2_")
+            pid = Symbol(s[6:end]); v_lin = 2.0^v_est
+        else
+            pid = est_sym; v_lin = v_est
+        end
+        param_lin[pid] = v_lin
+    end
+    return param_lin
+end
+
+function build_xgroup_from_dict(param_lin::Dict{Symbol,Float64},
+                                petab_prob::PEtabODEProblem, group::Symbol)
+    PI   = petab_prob.model_info.xindices
+    xids = PI.xids[group]            # ordered Symbol IDs (e.g., [:scale_Free_IL6_obs, ...])
+    return [param_lin[id] for id in xids]  # works for fixed or estimated
+end
+
+function xobs_row_from_dict(param_lin::Dict{Symbol,Float64},
+                            mi, r::Int)
+    # Row-specific list of observable parameter IDs (Symbols)
+    xids_row = mi.xindices.row_xids[:observable][r]
+    return [param_lin[id] for id in xids_row]
+end
+
+function get_obs_map(petab_prob::PEtabODEProblem, obs_id::Symbol, cond_id::Symbol)
+    mi = petab_prob.model_info
+    df = mi.petab_measurements
+    mask = (df.observable_id .== obs_id) .& (df.simulation_condition_id .== cond_id)
+    ix = findfirst(mask)
+    ix === nothing && (ix = findfirst(df.observable_id .== obs_id))
+    @assert ix !== nothing "No measurement row for observable=$(obs_id), condition=$(cond_id)"
+    return mi.xindices.mapxobservable[ix]
+end
+
+function simulate_observable!(plt, obs_id::Symbol, condition_id::Symbol,
+                              theta_opt::Vector{Float64},
+                              petab_prob::PEtabODEProblem,
+                              ode_solutions::Dict{Symbol,ODESolution},
+                              color)
+    # Exact key lookup (no substring search)
+    sol = ode_solutions[condition_id]
+    mi  = petab_prob.model_info
+    df  = mi.petab_measurements
+    rowmask = (df.observable_id .== obs_id) .& (df.simulation_condition_id .== condition_id)
+    rows = findall(rowmask)
+    isempty(rows) && return
+
+    # 1) Reproduce nllh parameter handling exactly
+    xdyn, xobs, xnoise, xnond = PEtab.split_x(theta_opt, mi.xindices)
+    cache = getfield(petab_prob.probinfo, :cache)
+    xobs_ps  = PEtab.transform_x(xobs,  mi.xindices, :xobservable,  cache)
+    xnond_ps = PEtab.transform_x(xnond, mi.xindices, :xnondynamic, cache)
+
+    # 2) Row-wise prediction with identical transforms as nllh
+    ts = Float64.(df.time[rows])
+    preds = similar(ts)
+    for (k, r) in enumerate(rows)
+        t = ts[k]
+        u_t = sol(t, idxs=1:length(sol.u[end]))
+        maprow = mi.xindices.mapxobservable[r]
+        h = PEtab._h(u_t, t, sol.prob.p, xobs_ps, xnond_ps, mi.model.h, maprow, df.observable_id[r], mi.petab_parameters.nominal_value)
+        # Apply the same observable transform as the likelihood if available
+        if hasproperty(df, :measurement_transforms)
+            preds[k] = PEtab.transform_observable(h, df.measurement_transforms[r])
+        else
+            preds[k] = h
+        end
+    end
+
+    # 3) Use transformed measurements when available, else raw
+    if hasproperty(df, :measurement_transformed)
+        meas_vec = collect(df.measurement_transformed[rows])
+    else
+        meas_vec = collect(df.measurement[rows])
+    end
+    meas = Float64.(meas_vec)  # broadcast conversion (no pipeline, no trailing dot)
+
+    ord = sortperm(ts)
+    scatter!(plt, ts[ord], meas[ord]; color, markersize=6, alpha=0.8, label="Data ($(condition_id))")
+    plot!(plt, ts[ord], preds[ord]; color, linewidth=2.5, alpha=0.9, label="Model ($(condition_id))")
 end

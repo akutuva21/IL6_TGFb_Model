@@ -393,6 +393,10 @@ def generate_time_course_petab(config):
                                 elif noise_fraction > 0:
                                     meas_val = add_noise(pd.Series([meas_val]), noise_fraction, rng).iloc[0]
 
+                            # Floor for log domain stability (noise-free deterministic case)
+                            if meas_val <= 1e-12:
+                                meas_val = 1e-8
+
                             measurement_row = {
                                 'observableId': obs_name,
                                 'simulationConditionId': condition_name,
@@ -413,11 +417,15 @@ def generate_time_course_petab(config):
                 time_val = row['time']
                 for obs_name in all_observables:
                     if obs_name in row:
+                        meas_val = float(row[obs_name])
+                        if meas_val <= 1e-12:
+                            meas_val = 1e-8
+
                         measurement_row = {
                             'observableId': obs_name,
                             'simulationConditionId': condition_name,
                             'time': time_val,
-                            'measurement': row[obs_name],
+                            'measurement': meas_val,
                         }
                         if use_preeq:
                             measurement_row['preequilibrationConditionId'] = 'preeq_ss'
@@ -479,6 +487,10 @@ def generate_time_course_petab(config):
     measurement_path = os.path.join(output_dir, f"measurements_time_course{filename_suffix}.tsv")
     condition_path = os.path.join(output_dir, f"conditions_time_course{filename_suffix}.tsv")
     
+    if not measurement_df.empty:
+        measurement_df['observableParameters'] = measurement_df['observableId'].apply(lambda oid: f"scale_{oid}")
+        measurement_df['noiseParameters'] = "sigma_const"
+
     measurement_df.to_csv(measurement_path, index=False, sep='\t', float_format='%.8g')
     condition_df.to_csv(condition_path, index=False, sep='\t')
     
@@ -493,49 +505,32 @@ def generate_time_course_petab(config):
 # --------------------------------------------------------------------------
 
 def create_observables_petab(config, measurements_df, observables_mapping, output_path):
-    """Creates a PEtab observables file with a shared noise parameter."""
-    logging.info("Creating observables PEtab file (supports log-normal or combined normal noise)...")
-
-    noise_conf = config['time_course_settings']['noise']
-    noise_add = bool(noise_conf.get('add', False))
-    combined_mode = noise_add and (
-        str(noise_conf.get('model', '')).lower().startswith('combined') or
-        ('sigma_add' in noise_conf and 'sigma_mult' in noise_conf)
-    )
-    is_noisy = noise_add and ((not combined_mode and noise_conf.get('level_percent', 0) > 0) or combined_mode)
+    """Creates a PEtab observables file with fixed log-normal noise and per-observable scales."""
+    logging.info("Creating observables PEtab file with fixed log-normal noise (σ=1)...")
 
     observable_ids = measurements_df['observableId'].unique()
     # Respect optional observables_to_include (already applied to measurements, but keep consistent here)
     obs_include = config.get('time_course_settings', {}).get('observables_to_include')
     if isinstance(obs_include, (list, tuple)) and len(obs_include) > 0:
         observable_ids = [oid for oid in observable_ids if oid in set(obs_include)]
+
     observables_data = []
-
     for obs_id in observable_ids:
-        # Noise model selection
-        if combined_mode:
-            # Combined additive + multiplicative on linear scale, normal distribution
-            noise_formula = f"sigma_add + sigma_mult * {obs_id}"
-            noise_dist = "normal"
-        else:
-            # Legacy log-normal with shared sigma
-            noise_formula = "sigma_log_shared" if is_noisy else "1e-8"
-            noise_dist = "logNormal"
-
         observables_data.append({
             'observableId': obs_id,
             'observableName': observables_mapping.get(obs_id, obs_id),
-            'observableFormula': obs_id,
-            'noiseFormula': noise_formula,
-            'noiseDistribution': noise_dist
+            'observableFormula': f"observableParameter1_scale_{obs_id} * {obs_id}",
+            'noiseFormula': "noiseParameter1_sigma_const",
+            'noiseDistribution': "logNormal",
+            'observableParameters': f"scale_{obs_id}",
+            'noiseParameters': "sigma_const"
         })
 
     observables_df = pd.DataFrame(observables_data)
     observables_df.to_csv(output_path, sep='\t', index=False)
     logging.info(f"✅ Observables file saved: {output_path}")
 
-
-def create_parameters_petab(config, model, output_path):
+def create_parameters_petab(config, model, measurements_df, output_path):
     """
     Creates a parameters.tsv file with raw (linear) values, which is the
     format expected by PEtab.jl and other common toolboxes.
@@ -593,46 +588,29 @@ def create_parameters_petab(config, model, output_path):
             'estimate': estimate
         })
 
-    # Add noise parameter(s)
-    noise_conf = config['time_course_settings']['noise']
-    noise_add = bool(noise_conf.get('add', False))
-    combined_mode = noise_add and (
-        str(noise_conf.get('model', '')).lower().startswith('combined') or
-        ('sigma_add' in noise_conf and 'sigma_mult' in noise_conf)
-    )
+    # Per-observable scale parameters (log10 scale, positive bounds)
+    observable_ids = list(measurements_df['observableId'].unique())
+    for oid in observable_ids:
+        parameters_data.append({
+            'parameterId': f"scale_{oid}",
+            'parameterName': f"scale_{oid}",
+            'parameterScale': 'log10',
+            'lowerBound': 1e-3,
+            'upperBound': 1e3,
+            'nominalValue': 1.0,
+            'estimate': 1
+        })
 
-    if combined_mode:
-        # Add sigma_add and sigma_mult parameters (estimated on log10 scale)
-        sigma_add_nom = float(noise_conf.get('sigma_add', 0.1))
-        sigma_mult_nom = float(noise_conf.get('sigma_mult', 0.1))
-        parameters_data.append({
-            'parameterId': 'sigma_add', 'parameterName': 'sigma_add',
-            'parameterScale': 'log10', 'lowerBound': 1e-8, 'upperBound': 10.0,
-            'nominalValue': sigma_add_nom, 'estimate': 1
-        })
-        parameters_data.append({
-            'parameterId': 'sigma_mult', 'parameterName': 'sigma_mult',
-            'parameterScale': 'log10', 'lowerBound': 1e-4, 'upperBound': 1.0,
-            'nominalValue': sigma_mult_nom, 'estimate': 1
-        })
-    else:
-        # Single shared log-normal sigma parameter
-        is_noisy = noise_add and noise_conf.get('level_percent', 0) > 0
-        if is_noisy:
-            cv = noise_conf['level_percent'] / 100.0
-            sigma_nominal = float(np.sqrt(np.log(1.0 + cv**2)))
-            parameters_data.append({
-                'parameterId': 'sigma_log_shared', 'parameterName': 'sigma_log_shared',
-                'parameterScale': 'log10',
-                'lowerBound': 1e-5, 'upperBound': 10,
-                'nominalValue': sigma_nominal, 'estimate': 1
-            })
-        else:
-            parameters_data.append({
-                'parameterId': 'sigma_log_shared', 'parameterName': 'sigma_log_shared',
-                'parameterScale': 'log10', 'lowerBound': 1e-10, 'upperBound': 1.0,
-                'nominalValue': 1e-8, 'estimate': 1
-            })
+    # Fixed noise constant used by noiseParameter1_sigma_const
+    parameters_data.append({
+        'parameterId': 'sigma_const',
+        'parameterName': 'sigma_const',
+        'parameterScale': 'lin',
+        'lowerBound': 1.0,
+        'upperBound': 1.0,
+        'nominalValue': 1.0,
+        'estimate': 0
+    })
 
     pd.DataFrame(parameters_data).to_csv(output_path, sep='\t', index=False, float_format='%.16g')
     logging.info(f"✅ Parameters file saved: {output_path}")
@@ -689,6 +667,7 @@ def main():
     create_parameters_petab(
         config,
         model,
+        measurements_df,
         parameters_path
     )
     

@@ -15,11 +15,13 @@ function run_identifiability(petab_problem::PEtab.PEtabODEProblem, θ_full::Comp
     param_values = collect(θ_full)
     est_syms = petab_problem.xnames
     
-    # Filter to only kinetic parameters for the FIM calculation
-    kinetic_syms = filter(s -> !occursin("sigma", string(s)) && !endswith(string(s), "_0"), est_syms)
-    kinetic_indices = [findfirst(==(s), est_syms) for s in kinetic_syms]
+    # Use PEtab's dynamic parameter group instead of manual filtering
+    mi = petab_problem.model_info
+    dyn_names = mi.xindices.xids[:dynamic]                     # Symbols in PEtab order
+    # Map dynamic names into the full xnames index space
+    ix_dyn = [findfirst(==(n), petab_problem.xnames) for n in dyn_names]
     
-    @info "Analyzing identifiability for $(length(kinetic_syms)) kinetic parameters."
+    @info "Analyzing identifiability for $(length(dyn_names)) dynamic parameters."
 
     F_full = zeros(Float64, length(param_values), length(param_values))
     try
@@ -29,8 +31,8 @@ function run_identifiability(petab_problem::PEtab.PEtabODEProblem, θ_full::Comp
         return
     end
 
-    # Extract the sub-matrix corresponding to only the kinetic parameters
-    F = F_full[kinetic_indices, kinetic_indices]
+    # Extract the sub-matrix corresponding to only the dynamic parameters
+    F = F_full[ix_dyn, ix_dyn]
 
     try
         λ, U = eigen(Symmetric(F))
@@ -44,7 +46,7 @@ function run_identifiability(petab_problem::PEtab.PEtabODEProblem, θ_full::Comp
 
         println("\n=== Identifiability diagnostics ===")
         println("FIM eigenvalues: min=$(round(minimum(λ), digits=6)), max=$(round(maximum(λ), digits=6))")
-        println("Rank(F)=$(rank_F) of $(length(kinetic_syms)); null-space size=$(null_dim); tol=$(round(tol, digits=6))")
+        println("Rank(F)=$(rank_F) of $(length(dyn_names)); null-space size=$(null_dim); tol=$(round(tol, digits=6))")
         
         if null_dim > 0
             println("⚠️  PARTIAL: $(null_dim) parameter combinations are not identifiable.")
@@ -59,10 +61,10 @@ function run_identifiability(petab_problem::PEtab.PEtabODEProblem, θ_full::Comp
                 
                 # Find the most significant components of the eigenvector
                 components = []
-                for j in 1:length(kinetic_syms)
+                for j in 1:length(dyn_names)
                     # Show parameters with a significant contribution (e.g., >10% of the max component)
                     if abs(eigenvector[j]) > 0.1 * maximum(abs.(eigenvector))
-                        push!(components, (string(kinetic_syms[j]), round(eigenvector[j], digits=3)))
+                        push!(components, (string(dyn_names[j]), round(eigenvector[j], digits=3)))
                     end
                 end
                 
@@ -75,12 +77,12 @@ function run_identifiability(petab_problem::PEtab.PEtabODEProblem, θ_full::Comp
             end
             # --- END: NEW EIGENVECTOR ANALYSIS SECTION ---
         else
-            println("✅ All kinetic parameters appear to be locally identifiable.")
+            println("✅ All dynamic parameters appear to be locally identifiable.")
         end
 
     catch e
         @error "Eigen-decomposition of the FIM failed. Error: $e"
     end
 
-    return (FIM = F, names = kinetic_syms)
+    return (FIM = F, names = dyn_names)
 end

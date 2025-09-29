@@ -4,6 +4,7 @@ using Optimization
 using OptimizationNLopt
 using CICOBase
 using Printf
+using Logging
 using ComponentArrays
 
 function run_likelihood_profiling(
@@ -40,8 +41,18 @@ function run_likelihood_profiling(
     println("Baseline loss (MLE): ", obj0)
     println("Loss threshold (95% CI): ", losscrit)
 
-    # Objective for CICOBase
-    cico_objective = θ -> petab_problem.nllh(θ)
+    # Objective for CICOBase with defensive error handling
+    function safe_nllh(θ::AbstractVector{<:Real})
+        try
+            val = petab_problem.nllh(θ)
+            return isfinite(val) ? val : Inf
+        catch err
+            @warn "nllh evaluation failed during profiling; treating as Inf" err maxlog=10
+            return Inf
+        end
+    end
+
+    cico_objective = θ -> safe_nllh(θ)
 
     # Tight scan tolerance
     tight_scan_tol = 1e-4
@@ -70,7 +81,7 @@ function run_likelihood_profiling(
                 theta_bounds = cico_bounds,
                 scan_bounds  = scan_bounds_tuple,
                 scan_tol     = tight_scan_tol,
-                local_alg    = :LN_NELDERMEAD,
+                local_alg    = :LN_BOBYQA,
                 silent       = true
             )
             println("  ✓ done")

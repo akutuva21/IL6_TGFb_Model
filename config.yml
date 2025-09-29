@@ -46,7 +46,7 @@ time_course_settings:
     replicates: 3
 
   noise:
-    add: true
+    add: false
     model: combined
     sigma_add: 0.05   # additive SD on linear scale
     sigma_mult: 0.10  # multiplicative SD (fractional) on linear scale
