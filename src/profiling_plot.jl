@@ -7,15 +7,32 @@ using ComponentArrays
 using Plots
 using Logging
 using SciMLBase
+using OrdinaryDiffEq
 using ForwardDiff
 using LineSearches
 using CSV
+using Statistics
 
 const BIG_PEN = 1e30
 const EPS = 1e-6
+const PEN_CUTOFF = 1e6
 
 # Ensure GR backend for saving plots in headless environments
 gr()
+
+# Helper to move initial guesses strictly inside bounds
+@inline function move_inside!(θ::AbstractVector, lb::AbstractVector, ub::AbstractVector; δ=1e-6)
+    @inbounds for j in eachindex(θ)
+        if ub[j] > lb[j]  # only nudge if not fixed
+            if θ[j] <= lb[j]
+                θ[j] = (ub[j]-lb[j] > 2δ) ? lb[j] + δ : (lb[j] + ub[j]) * 0.5
+            elseif θ[j] >= ub[j]
+                θ[j] = (ub[j]-lb[j] > 2δ) ? ub[j] - δ : (lb[j] + ub[j]) * 0.5
+            end
+        end
+    end
+    return θ
+end
 
 """
 Continuation-based, warm-started profile of a single parameter.
@@ -45,6 +62,7 @@ function manual_profile_param!(
 
         θ0 = clamp.(θ_prev, lb, ub)
         θ0[i] = v
+        move_inside!(θ0, lb, ub)
 
         prob = OptimizationProblem(optfunc, θ0; lb=lb, ub=ub)
         sol  = solve(prob, base_optimizer; maxiters=maxiters, reltol=reltol)
@@ -74,17 +92,17 @@ function run_likelihood_profiling(
     θ_mle::ComponentVector,
     true_param_values::Dict;
     num_points::Int = 60,
-    expand::Float64 = 2.0,
+    expand::Float64 = 0.5,
     use_threads::Bool = true,
     min_distinct::Int = 8,               # threshold to trigger manual continuation
     manual_points::Int = 100,            # points for manual continuation when needed
-    manual_step_cap::Float64 = 2e-3      # small per-step cap for manual pass
+    manual_step_cap::Float64 = 1e-3      # small per-step cap for manual pass
 )
     println("\n--- Generating Likelihood Profiles with LikelihoodProfiler.jl ---")
     t_start = time()
 
     petab_problem = odesolver === nothing ?
-        PEtabODEProblem(petab_model, verbose=false) :
+        PEtabODEProblem(petab_model; verbose=false, odesolver=ODESolver(alg=Rodas5P(), reltol=1e-7, abstol=1e-9, maxiters=1e7)) :
         PEtabODEProblem(petab_model; verbose=false, odesolver=odesolver)
 
     param_syms  = collect(petab_problem.xnames)
@@ -114,6 +132,9 @@ function run_likelihood_profiling(
 
     # Assert feasibility to catch bound mistakes early
     @assert all(lb_prof .<= θ_mle_vector .<= ub_prof)
+
+    # Move MLE inside bounds for safety
+    move_inside!(θ_mle_vector, lb_prof, ub_prof)
 
     @inline function unwrap_dual(x)
         while x isa ForwardDiff.Dual
@@ -159,9 +180,11 @@ function run_likelihood_profiling(
     optimizer = OptimizationOptimJL.Fminbox(lbfgs_bt)
 
     # Build ProfileLikelihoodProblem for the first pass (package-driven scanning)
+    θ_start = copy(θ_mle_vector)
+    move_inside!(θ_start, lb_prof, ub_prof)
     plprob = LikelihoodProfiler.ProfileLikelihoodProblem(
-        OptimizationProblem(optfunc, θ_mle_vector; lb = lb_prof, ub = ub_prof),
-        θ_mle_vector,
+        OptimizationProblem(optfunc, θ_start; lb = lb_prof, ub = ub_prof),
+        θ_start,
         profile_ranges;
         threshold = 3.84
     )
@@ -265,9 +288,10 @@ function run_likelihood_profiling(
 
         # Plot
         loss_values = df[!, loss_col]
-        valid_mask  = findall(i -> isfinite(loss_values[i]), eachindex(loss_values))
+        valid_mask  = findall(i -> isfinite(loss_values[i]) && loss_values[i] < PEN_CUTOFF,
+                              eachindex(loss_values))
         if length(valid_mask) < 2
-            @warn "Skipping plot; insufficient valid points" parameter=pname valid_points=length(valid_mask)
+            @warn "Skipping plot; insufficient non-penalized points" parameter=pname valid_points=length(valid_mask)
             continue
         end
 
@@ -305,28 +329,32 @@ function run_likelihood_profiling(
         # Save raw profile data
         CSV.write(joinpath(plot_dir, "profile_$(pname)_raw.csv"), df[valid_mask, [xcol, loss_col]])
 
-        # Compute smoothed profile (moving average)
-        window_size = max(3, length(delta_ll) ÷ 10)
-        smoothed_delta_ll = [mean(delta_ll[max(1, i-window_size÷2):min(length(delta_ll), i+window_size÷2)]) for i in eachindex(delta_ll)]
-        
-        # Plot smoothed profile
-        plt_smooth = plot(
-            values, smoothed_delta_ll,
-            seriestype = :line,
-            linewidth = 2,
-            color = :blue,
-            label = "Smoothed Profile",
-            xlabel = pname,
-            ylabel = "ΔNLLH",
-            title = "Smoothed Profile for $pname",
-            legend = :top,
-            framestyle = :box,
-            ylims = (0, 15)
-        )
-        hline!(plt_smooth, [threshold_95], linestyle = :dash, color = :red,    label = "95% CI")
-        hline!(plt_smooth, [threshold_99], linestyle = :dash, color = :orange, label = "99% CI")
-        scatter!(plt_smooth, [mle_val], [0.0], color = :black, markersize = 5, label = "MLE")
-        savefig(plt_smooth, joinpath(plot_dir, "profile_$(pname)_smoothed.png"))
+        # Remove or guard smoothing:
+        DO_SMOOTH = false
+        if DO_SMOOTH
+            # Compute smoothed profile (moving average)
+            window_size = max(3, length(delta_ll) ÷ 10)
+            smoothed_delta_ll = [mean(delta_ll[max(1, i-window_size÷2):min(length(delta_ll), i+window_size÷2)]) for i in eachindex(delta_ll)]
+            
+            # Plot smoothed profile
+            plt_smooth = plot(
+                values, smoothed_delta_ll,
+                seriestype = :line,
+                linewidth = 2,
+                color = :blue,
+                label = "Smoothed Profile",
+                xlabel = pname,
+                ylabel = "ΔNLLH",
+                title = "Smoothed Profile for $pname",
+                legend = :top,
+                framestyle = :box,
+                ylims = (0, 15)
+            )
+            hline!(plt_smooth, [threshold_95], linestyle = :dash, color = :red,    label = "95% CI")
+            hline!(plt_smooth, [threshold_99], linestyle = :dash, color = :orange, label = "99% CI")
+            scatter!(plt_smooth, [mle_val], [0.0], color = :black, markersize = 5, label = "MLE")
+            savefig(plt_smooth, joinpath(plot_dir, "profile_$(pname)_smoothed.png"))
+        end
 
         # Compute confidence intervals numerically
         function find_ci_bounds(delta_ll_vals, threshold)
