@@ -8,6 +8,8 @@ using Plots
 using Logging
 using SciMLBase
 using OrdinaryDiffEq
+using SciMLSensitivity
+using ReverseDiff
 using ForwardDiff
 using LineSearches
 using CSV
@@ -55,6 +57,7 @@ function manual_profile_param!(
 )
     rows = Vector{NamedTuple{(:value,:objective,:retcode),Tuple{Float64,Float64,Symbol}}}(undef, length(vgrid))
     θ_prev = copy(θ_mle_vec)
+    bad_in_a_row = 0
 
     for (k, v) in enumerate(vgrid)
         lb = copy(lb_prof); ub = copy(ub_prof)
@@ -79,6 +82,17 @@ function manual_profile_param!(
         # Evaluate objective at the returned point (finite by construction)
         fval = sol.objective
 
+        if !(isfinite(fval)) || fval >= PEN_CUTOFF
+            bad_in_a_row += 1
+            if bad_in_a_row >= 2
+                # truncate remaining points in this direction
+                rows[k:end] .= [(value=vi, objective=BIG_PEN, retcode=:Penalty) for vi in vgrid[k:end]]
+                break
+            end
+        else
+            bad_in_a_row = 0
+        end
+
         rows[k] = (value=v, objective=fval, retcode=ret)
     end
 
@@ -98,15 +112,50 @@ function run_likelihood_profiling(
     manual_points::Int = 100,            # points for manual continuation when needed
     manual_step_cap::Float64 = 1e-3      # small per-step cap for manual pass
 )
+    function pick_solver(petab_model)
+        primary   = ODESolver(alg=KenCarp47(autodiff=false), reltol=1e-8, abstol=1e-8, maxiters=3e6)
+        fallback1 = ODESolver(alg=Rosenbrock23(), reltol=1e-6, abstol=1e-8, maxiters=3e6)
+        fallback2 = ODESolver(alg=TRBDF2(), reltol=1e-6, abstol=1e-8, maxiters=3e6)
+        for s in (primary, fallback1, fallback2)
+            prob_try = PEtabODEProblem(
+                petab_model;
+                verbose=false,
+                odesolver=s,
+                ss_solver=SteadyStateSolver(:Simulate, abstol=1e-8, reltol=1e-8),
+                gradient_method=:ForwardDiff,
+                sensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP()),
+            )
+            try
+                val = prob_try.nllh(prob_try.xnominal)  # quick finiteness check
+                if isfinite(val); return s; end
+            catch; end
+        end
+        return primary
+    end
+
     println("\n--- Generating Likelihood Profiles with LikelihoodProfiler.jl ---")
     t_start = time()
 
-    petab_problem = odesolver === nothing ?
-        PEtabODEProblem(petab_model; verbose=false, odesolver=ODESolver(alg=Rodas5P(), reltol=1e-7, abstol=1e-9, maxiters=1e7)) :
-        PEtabODEProblem(petab_model; verbose=false, odesolver=odesolver)
+    petab_problem = begin
+        solver = isnothing(odesolver) ? pick_solver(petab_model) : odesolver
+        steady = isnothing(steadystate_solver) ? SteadyStateSolver(:Simulate, abstol=1e-8, reltol=1e-8) : steadystate_solver
+        PEtabODEProblem(
+            petab_model;
+            verbose=false,
+            odesolver=solver,
+            ss_solver=steady,
+            gradient_method=:ForwardDiff,
+            sensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP()),
+        )
+    end
 
     param_syms  = collect(petab_problem.xnames)
     param_names = string.(param_syms)
+    println("Parameter count: ", length(param_names))
+    if !isempty(true_param_values)
+        matches = count(name -> haskey(true_param_values, name), param_names)
+        println("True parameter values available for $(matches) / $(length(param_names)) parameters")
+    end
 
     # Robust accessor that accepts :log10_x or :x and tries the alternate form if missing
     @inline function _get_key(x::ComponentVector, s::Symbol)
@@ -211,7 +260,13 @@ function run_likelihood_profiling(
     )
 
     parallel_mode = use_threads ? :threads : :none
-    pkg_sol = LikelihoodProfiler.solve(plprob, pkg_method; parallel_type = parallel_mode)
+    pkg_sol = nothing
+    try
+        pkg_sol = LikelihoodProfiler.solve(plprob, pkg_method; parallel_type = parallel_mode)
+    catch err
+        @warn "Package profiler failed; switching to manual continuation" err
+        pkg_sol = fill(DataFrame(), length(param_names))  # empty to trigger manual path per parameter
+    end
 
     # Helper to find columns, robust to String/Symbol names
     find_col(df, candidates::Vector{String}) = begin

@@ -4,6 +4,10 @@ begin parameters
     # Initial amounts of molecules
     TGFb_0                  1.0
     IL6_0                   0.0
+    s_TGFb                  1.0     # Global scaling factor for TGFb doses
+    b_TGFb                  0.0     # Basal TGFb offset (model units)
+    s_IL6                   1.0     # Global scaling factor for IL6 doses
+    b_IL6                   0.0     # Basal IL6 offset (model units)
 
     # Reversible ligand binding parameters
     # IL-6 Pathway
@@ -67,8 +71,8 @@ begin molecule types
 end molecule types
 
 begin seed species
-    TGFb(r)                                                            TGFb_0
-    IL6(r)                                                             IL6_0
+    TGFb(r)                                                             s_TGFb*(TGFb_0 + b_TGFb)
+    IL6(r)                                                              s_IL6*(IL6_0 + b_IL6)
     IL6R(l_bind,activity~I,stat3_site)                                 IL6R_0
     TGFbR(l_bind,activity~I,smad3_site)                                TGFbR_0
     SMAD3(phos~U,smad4_site,stat3_site,pka_site,tgfbr_site)            SMAD3_0

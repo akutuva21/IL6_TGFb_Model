@@ -39,8 +39,12 @@
     </listOfSpecies>
     <listOfParameters>
       <!-- Independent variables -->
-      <parameter id="TGFb_0" value="1"/>
-      <parameter id="IL6_0" value="0"/>
+  <parameter id="TGFb_0" value="1"/>
+  <parameter id="IL6_0" value="0"/>
+  <parameter id="s_TGFb" value="1"/>
+  <parameter id="b_TGFb" value="0"/>
+  <parameter id="s_IL6" value="1"/>
+  <parameter id="b_IL6" value="0"/>
       <parameter id="kf_il6_bind" value="0.3"/>
       <parameter id="kr_il6_bind" value="0.05"/>
       <parameter id="k_act_il6r" value="3"/>
@@ -88,12 +92,28 @@
       <!-- All initial values -->
       <initialAssignment symbol="S1">
         <math xmlns="http://www.w3.org/1998/Math/MathML">
-          <ci> TGFb_0 </ci>
+          <apply>
+            <times/>
+            <ci> s_TGFb </ci>
+            <apply>
+              <plus/>
+              <ci> TGFb_0 </ci>
+              <ci> b_TGFb </ci>
+            </apply>
+          </apply>
         </math>
       </initialAssignment>
       <initialAssignment symbol="S2">
         <math xmlns="http://www.w3.org/1998/Math/MathML">
-          <ci> IL6_0 </ci>
+          <apply>
+            <times/>
+            <ci> s_IL6 </ci>
+            <apply>
+              <plus/>
+              <ci> IL6_0 </ci>
+              <ci> b_IL6 </ci>
+            </apply>
+          </apply>
         </math>
       </initialAssignment>
       <initialAssignment symbol="S3">

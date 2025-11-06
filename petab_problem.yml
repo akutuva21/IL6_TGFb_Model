@@ -2,14 +2,16 @@
 # Standard PEtab problem definition file
 
 format_version: 1
-parameter_file: petab_files/parameters_noise_combined.tsv
+parameter_file: petab_files/parameters.tsv
 
 problems:
   - condition_files:
-      - SimData/conditions_time_course_noise_combined.tsv
+      - SimData/conditions_real_data.tsv
     measurement_files:
-      - SimData/measurements_time_course_noise_combined.tsv
+      - SimData/measurements_real_data.tsv
     observable_files:
-      - petab_files/observables_noise_combined.tsv
+      - petab_files/observables.tsv
+    visualization_files:
+      - petab_files/visualization.tsv
     sbml_files:
       - model_even_smaller_sbml.xml

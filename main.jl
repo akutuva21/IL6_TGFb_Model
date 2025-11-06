@@ -227,6 +227,19 @@ function main()
             odesolver
         )
 
+        try
+            plot_dose_response(
+                "SimData/measurements_real_data.tsv",
+                "SimData/conditions_real_data.tsv";
+                endpoint_time=60.0,
+                petab_prob=petab_problem,
+                theta_optim=collect(best_params),
+                odesolver=odesolver,
+            )
+        catch e
+            @warn "Dose–response plotting failed" exception=(e, catch_backtrace())
+        end
+
         if parsed_args["ident"]
             @info "--- Running identifiability diagnostics at best fit ---"
             

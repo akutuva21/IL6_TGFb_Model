@@ -9,8 +9,9 @@ using Printf
 using CSV
 using RecipesBase
 using Colors
+using Statistics
 
-export run_visualization, plot_waterfall, plot_er_distribution, diagnose_multistart_data, plot_waterfall_native_fallback, plot_waterfall_custom_fallback, handle_Inf_vector!, assign_clustered_colors, add_reference_lines!
+export run_visualization, plot_waterfall, plot_er_distribution, diagnose_multistart_data, plot_waterfall_native_fallback, plot_waterfall_custom_fallback, handle_Inf_vector!, assign_clustered_colors, add_reference_lines!, plot_dose_response
 
 # Helper functions for recipe-based plotting
 """
@@ -292,6 +293,261 @@ function run_visualization(
     end
 
     println("\n--- Visualization Complete ---")
+end
+
+
+"""
+    plot_dose_response(
+        measurements_tsv,
+        conditions_tsv;
+        observables=nothing,
+        endpoint_time::Real=60.0,
+        output_dir=joinpath(pwd(), "final_results_plots"),
+        petab_prob=nothing,
+        theta_optim=nothing,
+        odesolver=nothing,
+    )
+
+Render dose–response scatter plots for each observable by mapping the
+measurement rows at `endpoint_time` onto the IL-6 dose defined in the PEtab
+conditions table. Reads PEtab TSV files directly and saves one PNG per
+observable in `output_dir`.
+
+If `petab_prob` and `theta_optim` are provided, overlays a model prediction
+curve computed at the same endpoint time for each condition (dose). When
+`odesolver` (the ODESolver wrapper used elsewhere) is provided, its tolerances
+are used to solve the conditions for consistent numerical precision; otherwise
+defaults are used.
+"""
+function plot_dose_response(
+    measurements_tsv::AbstractString,
+    conditions_tsv::AbstractString;
+    observables=nothing,
+    endpoint_time::Real=60.0,
+    output_dir::AbstractString=joinpath(pwd(), "final_results_plots"),
+    petab_prob=nothing,
+    theta_optim=nothing,
+    odesolver=nothing,
+)
+    # Read TSVs - column names come in as Symbols by default
+    measurements_df = CSV.read(measurements_tsv, DataFrame; delim='\t')
+    conds_df = CSV.read(conditions_tsv, DataFrame; delim='\t')
+
+    @info "Measurements columns after CSV.read" names(measurements_df)
+    @info "Conditions columns after CSV.read" names(conds_df)
+
+    rename!(measurements_df,
+        "observableId" => :observable_id,
+        "simulationConditionId" => :simulation_condition_id,
+        "time" => :time,
+        "measurement" => :measurement)
+
+    if "replicateId" in names(measurements_df)
+        rename!(measurements_df, "replicateId" => :replicate_id)
+    end
+
+    rename!(conds_df,
+        "conditionId" => :condition_id,
+        "IL6_0" => :IL6_0)
+
+    @info "After rename - Measurements" names(measurements_df)
+    @info "After rename - Conditions" names(conds_df)
+
+    # Check required columns exist
+    required_meas = [:simulation_condition_id, :observable_id, :time, :measurement]
+    required_cond = [:condition_id, :IL6_0]
+
+    missing_meas = setdiff(required_meas, Symbol.(names(measurements_df)))
+    missing_cond = setdiff(required_cond, Symbol.(names(conds_df)))
+
+    !isempty(missing_meas) && error("Measurements TSV missing columns: $(missing_meas)")
+    !isempty(missing_cond) && error("Conditions TSV missing columns: $(missing_cond)")
+
+    # Convert to numeric
+    measurements_df[!, :time] = Float64.(measurements_df[:, :time])
+    measurements_df[!, :measurement] = Float64.(measurements_df[:, :measurement])
+    conds_df[!, :IL6_0] = Float64.(conds_df[:, :IL6_0])
+
+    measurements_df[!, :observable_id] = String.(measurements_df[:, :observable_id])
+    measurements_df[!, :simulation_condition_id] = String.(measurements_df[:, :simulation_condition_id])
+    conds_df[!, :condition_id] = String.(conds_df[:, :condition_id])
+
+    # Filter to endpoint time
+    endpoint = Float64(endpoint_time)
+    time_tol = sqrt(eps(Float64))
+    time_mask = abs.(measurements_df.time .- endpoint) .<= time_tol
+
+    # Select observables
+    obs_candidates = if observables === nothing
+        unique(measurements_df[:, :observable_id])
+    else
+        map(string, observables)
+    end
+
+    isempty(obs_candidates) && (@warn "No observables for dose–response"; return)
+
+    obs_mask = in.(measurements_df[:, :observable_id], Ref(Set(obs_candidates)))
+    filtered = measurements_df[time_mask .& obs_mask, :]
+
+    isempty(filtered) && (@warn "No measurements at endpoint time $(endpoint)"; return)
+
+    # Join IL6_0 from conditions
+    filtered = leftjoin(filtered, conds_df[:, [:condition_id, :IL6_0]],
+                        on=:simulation_condition_id => :condition_id)
+
+    if any(ismissing, filtered[:, :IL6_0])
+        missing_ids = unique(filtered[ismissing.(filtered[:, :IL6_0]), :simulation_condition_id])
+        error("Missing IL6_0 for conditions: $(missing_ids)")
+    end
+
+    isdir(output_dir) || mkpath(output_dir)
+
+    sem_or_zero(x) = length(x) > 1 ? std(x) / sqrt(length(x)) : 0.0
+
+    # Prepare model predictions if requested
+    do_overlay = !(petab_prob === nothing || theta_optim === nothing)
+    ode_solutions = nothing
+    if do_overlay
+        try
+            if odesolver === nothing
+                ode_solutions = PEtab.solve_all_conditions(theta_optim, petab_prob)
+            else
+                ode_solutions = PEtab.solve_all_conditions(
+                    theta_optim,
+                    petab_prob,
+                    odesolver.solver;
+                    abstol=odesolver.abstol,
+                    reltol=odesolver.reltol,
+                    maxiters=odesolver.maxiters,
+                )
+            end
+            @info "Prepared ODE solutions for model overlay in dose–response"
+        catch e
+            @warn "Failed to prepare ODE solutions for overlay; proceeding with data-only plot" exception=(e, catch_backtrace())
+            do_overlay = false
+        end
+    end
+
+    # Plot each observable
+    for obs in obs_candidates
+    df = filtered[filtered[:, :observable_id] .== obs, :]
+        isempty(df) && continue
+        sort!(df, :IL6_0)
+
+        plt = plot(
+            title = string(obs),
+            xscale = :log10,
+            xlabel = "IL-6 dose (ng/ml)",
+            ylabel = "Measurement",
+            legend = :topright,
+            size = (800, 500),
+            dpi = 300,
+            framestyle = :box
+        )
+
+        # Scatter replicates
+        if :replicate_id in names(df)
+            for rep in unique(df[:, :replicate_id])
+                rep_df = df[df[:, :replicate_id] .== rep, :]
+                scatter!(plt, rep_df[:, :IL6_0], rep_df[:, :measurement];
+                         markersize = 6,
+                         alpha = 0.75,
+                         label = "Replicate $(rep)",
+                         markerstrokewidth = 0)
+            end
+        else
+            scatter!(plt, df[:, :IL6_0], df[:, :measurement];
+                     markersize = 6,
+                     alpha = 0.75,
+                     label = "Data",
+                     markerstrokewidth = 0)
+        end
+
+        # Mean ± SEM per dose
+        grouped = combine(groupby(df, :IL6_0),
+                          :measurement => mean => :y,
+                          :measurement => sem_or_zero => :sem)
+        sort!(grouped, :IL6_0)
+
+        if !isempty(grouped)
+            plot!(plt, grouped[:, :IL6_0], grouped[:, :y];
+                  color = :orange,
+                  linewidth = 2.5,
+                  label = "Mean")
+            scatter!(plt, grouped[:, :IL6_0], grouped[:, :y];
+                     yerror = grouped[:, :sem],
+                     color = :orange,
+                     markersize = 5,
+                     label = "SEM")
+        end
+
+        # Optional: overlay model prediction at endpoint
+        if do_overlay
+            try
+                # Collect per-dose model predictions at endpoint
+                mi = petab_prob.model_info
+                dfmi = mi.petab_measurements
+                obs_sym = Symbol(obs)
+                # Use same time tolerance as data filter
+                t_endpoint = Float64(endpoint)
+                # Group by dose in df and predict once per condition (shared across replicates)
+                bycond = unique(df[:, [:simulation_condition_id, :IL6_0]])
+                pred_pairs = Vector{Tuple{Float64,Float64}}()
+                for row in eachrow(bycond)
+                    cid_str = row[:simulation_condition_id]
+                    dose = Float64(row[:IL6_0])
+                    cond_sym = Symbol(cid_str)
+                    # Find matching measurement row index to get observable mapping
+                    obs_vals = String.(dfmi.observable_id)
+                    cond_vals = String.(dfmi.simulation_condition_id)
+                    times = Float64.(dfmi.time)
+                    mask = (obs_vals .== string(obs_sym)) .& (cond_vals .== cid_str) .& (abs.(times .- t_endpoint) .<= time_tol)
+                    r = findfirst(mask)
+                    if r === nothing
+                        # fallback: any row for obs+cond
+                        mask2 = (obs_vals .== string(obs_sym)) .& (cond_vals .== cid_str)
+                        r = findfirst(mask2)
+                    end
+                    r === nothing && continue
+
+                    # Build transforms consistent with likelihood
+                    xdyn, xobs, xnoise, xnond = PEtab.split_x(theta_optim, mi.xindices)
+                    cache = getfield(petab_prob.probinfo, :cache)
+                    xobs_ps  = PEtab.transform_x(xobs,  mi.xindices, :xobservable,  cache)
+                    xnond_ps = PEtab.transform_x(xnond, mi.xindices, :xnondynamic, cache)
+
+                    # Interpolate solution at endpoint and evaluate observable
+                    sol = ode_solutions[cond_sym]
+                    u_t = sol(t_endpoint, idxs=1:length(sol.u[end]))
+                    maprow = mi.xindices.mapxobservable[r]
+                    h = PEtab._h(u_t, t_endpoint, sol.prob.p, xobs_ps, xnond_ps, mi.model.h, maprow, dfmi.observable_id[r], mi.petab_parameters.nominal_value)
+                    ypred = if hasproperty(dfmi, :measurement_transforms)
+                        PEtab.transform_observable(h, dfmi.measurement_transforms[r])
+                    else
+                        h
+                    end
+                    push!(pred_pairs, (dose, Float64(ypred)))
+                end
+
+                if !isempty(pred_pairs)
+                    doses = first.(pred_pairs)
+                    preds = last.(pred_pairs)
+                    ord = sortperm(doses)
+                    plot!(plt, doses[ord], preds[ord];
+                          color = :black,
+                          linestyle = :dash,
+                          linewidth = 2.5,
+                          label = "Model")
+                end
+            catch e
+                @warn "Model overlay failed for observable $(obs); continuing with data-only" exception=(e, catch_backtrace())
+            end
+        end
+
+        outfile = joinpath(output_dir, "dose_response_$(string(obs)).png")
+        savefig(plt, outfile)
+        @info "Dose–response plot saved" observable = obs path = outfile
+    end
 end
 
 
@@ -821,7 +1077,11 @@ function simulate_observable!(plt, obs_id::Symbol, condition_id::Symbol,
     sol = ode_solutions[condition_id]
     mi  = petab_prob.model_info
     df  = mi.petab_measurements
-    rowmask = (df.observable_id .== obs_id) .& (df.simulation_condition_id .== condition_id)
+    obs_str = string(obs_id)
+    cond_str = string(condition_id)
+    obs_vals = string.(df.observable_id)
+    cond_vals = string.(df.simulation_condition_id)
+    rowmask = (obs_vals .== obs_str) .& (cond_vals .== cond_str)
     rows = findall(rowmask)
     isempty(rows) && return
 
