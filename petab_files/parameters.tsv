@@ -49,3 +49,7 @@ scale_PKA_active	scale_PKA_active	log10	0.001	1000	1	1
 sigma_PKA	sigma_PKA	lin	0.1	2	0.5	1
 sigma_S3S4	sigma_S3S4	lin	0.1	2	0.5	1
 sigma_S3STAT3d	sigma_S3STAT3d	lin	0.1	2	0.5	1
+scale_pSTAT3_norm	scale_pSTAT3_norm	log10	0.01	100	1	1
+sigma_pSTAT3_norm	sigma_pSTAT3_norm	lin	0.001	5	0.5	1
+scale_pSMAD3_norm	scale_pSMAD3_norm	log10	0.01	100	1	1
+sigma_pSMAD3_norm	sigma_pSMAD3_norm	lin	0.001	5	0.5	1

@@ -227,17 +227,32 @@ function main()
             odesolver
         )
 
+        # 1. Plot 60-minute data (Complexes)
         try
             plot_dose_response(
                 "SimData/measurements_real_data.tsv",
                 "SimData/conditions_real_data.tsv";
-                endpoint_time=60.0,
+                endpoint_time=60.0,                  # <--- Time for complexes
                 petab_prob=petab_problem,
                 theta_optim=collect(best_params),
                 odesolver=odesolver,
             )
         catch e
-            @warn "Dose–response plotting failed" exception=(e, catch_backtrace())
+            @warn "Dose–response plotting (60 min) failed" exception=(e, catch_backtrace())
+        end
+
+        # 2. Plot 10-minute data (Phosphorylation)
+        try
+            plot_dose_response(
+                "SimData/measurements_real_data.tsv",
+                "SimData/conditions_real_data.tsv";
+                endpoint_time=10.0,                  # <--- Time for pSTAT3/pSMAD3
+                petab_prob=petab_problem,
+                theta_optim=collect(best_params),
+                odesolver=odesolver,
+            )
+        catch e
+            @warn "Dose–response plotting (10 min) failed" exception=(e, catch_backtrace())
         end
 
         if parsed_args["ident"]
