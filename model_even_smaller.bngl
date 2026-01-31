@@ -92,6 +92,7 @@ begin observables
     Molecules S3S4_complex_obs SMAD3(smad4_site!1,tgfbr_site).SMAD4(s3_site!1)
     Molecules S3STAT3d_complex_obs SMAD3(stat3_site!1).STAT3m(s3_site!1)
     Molecules PKA_active PKA(phos~P)
+    # Added these two lines for normalization:
     Molecules Total_SMAD3_obs  SMAD3()
     Molecules Total_STAT3_obs  STAT3m()
 end observables

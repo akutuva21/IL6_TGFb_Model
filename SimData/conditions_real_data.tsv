@@ -1,0 +1,17 @@
+conditionId	IL6_0	TGFb_0
+TREG	0	1
+TH17	50	1
+dose_0_01	0.01	1
+dose_0_1	0.1	1
+dose_0_2	0.2	1
+dose_0_5	0.5	1
+dose_1	1	1
+dose_5	5	1
+dose_10	10	1
+dose_25	25	1
+dose_50	50	1
+condition_10min_IL6_50	50	1
+condition_10min_IL6_25	25	1
+condition_10min_IL6_12_5	12.5	1
+condition_10min_IL6_6_25	6.25	1
+condition_10min_IL6_3_125	3.125	1

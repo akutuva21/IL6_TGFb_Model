@@ -221,10 +221,23 @@ function main()
         
         # --- Visualization Part ---
         @info "--- Starting visualization for the best fit ---"
+        # OPTIMIZATION: Pre-compute ODE solutions ONCE for all plotting tasks
+        @info "Pre-computing ODE solutions for all plotting tasks..."
+        viz_solutions = PEtab.solve_all_conditions(
+            collect(best_params),
+            petab_problem,
+            odesolver.solver;
+            abstol=odesolver.abstol,
+            reltol=odesolver.reltol,
+            maxiters=odesolver.maxiters
+        )
+        @info "✅ Solutions computed."
+
+        # Call visualization with precomputed solutions
         run_visualization(
             collect(best_params),
             petab_problem,
-            odesolver
+            viz_solutions
         )
 
         # 1. Plot 60-minute data (Complexes)
@@ -233,12 +246,14 @@ function main()
                 "SimData/measurements_real_data.tsv",
                 "SimData/conditions_real_data.tsv";
                 endpoint_time=60.0,                  # <--- Time for complexes
+                observables=["S3S4_complex_obs", "S3STAT3d_complex_obs"], # Filter to complex observables
                 petab_prob=petab_problem,
                 theta_optim=collect(best_params),
+                ode_solutions=viz_solutions,
                 odesolver=odesolver,
             )
         catch e
-            @warn "Dose–response plotting (60 min) failed" exception=(e, catch_backtrace())
+            @warn "Dose–response plotting (Complexes 60min) failed" exception=(e, catch_backtrace())
         end
 
         # 2. Plot 10-minute data (Phosphorylation)
@@ -247,12 +262,14 @@ function main()
                 "SimData/measurements_real_data.tsv",
                 "SimData/conditions_real_data.tsv";
                 endpoint_time=10.0,                  # <--- Time for pSTAT3/pSMAD3
+                observables=["pSTAT3_norm_total_obs", "pSMAD3_norm_total_obs"], # Phospho observables only
                 petab_prob=petab_problem,
                 theta_optim=collect(best_params),
+                ode_solutions=viz_solutions,
                 odesolver=odesolver,
             )
         catch e
-            @warn "Dose–response plotting (10 min) failed" exception=(e, catch_backtrace())
+            @warn "Dose–response plotting (Phospho 10min) failed" exception=(e, catch_backtrace())
         end
 
         if parsed_args["ident"]

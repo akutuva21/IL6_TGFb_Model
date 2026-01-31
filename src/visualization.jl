@@ -228,7 +228,7 @@ end
     run_visualization(
         theta_optim::Vector{Float64},
         petab_prob::PEtabODEProblem,
-        odesolver::ODESolver
+        ode_solutions::AbstractDict
     )
 
 Generates and saves plots comparing the model simulation against measurement data.
@@ -236,29 +236,15 @@ Generates and saves plots comparing the model simulation against measurement dat
 This function manually solves the ODE for all conditions and creates plots for each observable.
 """
 
-
-
-
 function run_visualization(
     theta_optim::Vector{Float64},
     petab_prob::PEtabODEProblem,
-    odesolver::ODESolver
+    ode_solutions::AbstractDict
 )
     println("\n--- Starting Visualization (Manual Workaround) ---")
 
-    # Step 1: Manually solve the ODE for all conditions
-    println("Manually solving ODE for all conditions with high precision...")
-    # Pass the high-precision tolerances from the odesolver object to ensure
-    # visualization uses the same numerical precision as parameter estimation
-    ode_solutions = PEtab.solve_all_conditions(
-        theta_optim, 
-        petab_prob, 
-        odesolver.solver;
-        abstol=odesolver.abstol,
-        reltol=odesolver.reltol,
-        maxiters=odesolver.maxiters
-    )
-    println("✅ ODE solutions obtained.")
+    # The ode_solutions are expected to be passed-in; do not re-simulate here.
+    println("✅ Using pre-computed ODE solutions for visualization.")
 
     plot_path = joinpath(pwd(), "final_results_plots")
     if !isdir(plot_path); mkpath(plot_path); end
@@ -268,6 +254,14 @@ function run_visualization(
     observable_ids = unique(measurements_df.observable_id)
 
     for obs_id in observable_ids
+        # --- NEW: Skip dose-response observables to avoid redundant/confusing plots ---
+        # Heuristic: If all measurements for this observable are at the same time point, skip it.
+        times_for_obs = measurements_df.time[measurements_df.observable_id .== obs_id]
+        if length(unique(times_for_obs)) <= 1
+            println("Skipping time-course plot for $obs_id (looks like dose-response data)")
+            continue
+        end
+        # ------------------------------------------------------------------------------
         println("Plotting observable: $obs_id")
         
         plt = plot(
@@ -321,6 +315,7 @@ function plot_dose_response(
     output_dir::AbstractString=joinpath(pwd(), "final_results_plots"),
     petab_prob=nothing,
     theta_optim=nothing,
+    ode_solutions=nothing,
     odesolver=nothing,
 )
     println("\n--- DEBUG: Entering plot_dose_response ---")
@@ -359,18 +354,23 @@ function plot_dose_response(
     time_tol = sqrt(eps(Float64))
     time_mask = abs.(measurements_df.time .- endpoint) .<= time_tol
 
-    obs_candidates = if observables === nothing
-        unique(measurements_df[:, :observable_id])
+    # --- FILTERING LOGIC ---
+    # Find observables that actually have measurements at the endpoint time
+    unique_obs_at_time = unique(measurements_df[time_mask, :observable_id])
+
+    obs_to_plot = if observables !== nothing
+        # User requested a subset; intersect with what exists at the requested time
+        intersect(map(string, observables), unique_obs_at_time)
     else
-        map(string, observables)
+        unique_obs_at_time
     end
 
-    if isempty(obs_candidates)
-        @warn "No observables for dose–response"
+    if isempty(obs_to_plot)
+        @warn "No matching observables found for dose–response at time $(endpoint). (Requested: $(observables))"
         return
     end
 
-    obs_mask = in.(measurements_df[:, :observable_id], Ref(Set(obs_candidates)))
+    obs_mask = in.(measurements_df[:, :observable_id], Ref(Set(obs_to_plot)))
     filtered = measurements_df[time_mask .& obs_mask, :]
 
     if isempty(filtered)
@@ -390,14 +390,14 @@ function plot_dose_response(
 
     # 2. Prepare Model Simulations (if provided)
     do_overlay = !(petab_prob === nothing || theta_optim === nothing)
-    ode_solutions = nothing
-    
-    if do_overlay
-        println("--- Simulating model for Dose-Response Overlay ---")
+    final_solutions = ode_solutions
+
+    if do_overlay && final_solutions === nothing
+        println("--- Simulating model for Dose-Response Overlay (fallback) ---")
         if odesolver === nothing
-            ode_solutions = PEtab.solve_all_conditions(theta_optim, petab_prob)
+            final_solutions = PEtab.solve_all_conditions(theta_optim, petab_prob)
         else
-            ode_solutions = PEtab.solve_all_conditions(
+            final_solutions = PEtab.solve_all_conditions(
                 theta_optim,
                 petab_prob,
                 odesolver.solver;
@@ -406,13 +406,15 @@ function plot_dose_response(
                 maxiters=odesolver.maxiters,
             )
         end
-        println("✅ Simulations complete. Available conditions: $(length(keys(ode_solutions)))")
+        println("✅ Simulations complete. Available conditions: $(length(keys(final_solutions)))")
+    elseif do_overlay && final_solutions !== nothing
+        println("✅ Using pre-computed ODE solutions for dose–response plots.")
     else
         println("⚠️ Skipping model overlay because petab_prob or theta_optim is missing.")
     end
 
     # 3. Plotting Loop
-    for obs in obs_candidates
+    for obs in obs_to_plot
         df = filtered[filtered[:, :observable_id] .== obs, :]
         isempty(df) && continue
         sort!(df, :IL6_0)
@@ -461,13 +463,13 @@ function plot_dose_response(
                 dose = Float64(row[:IL6_0])
                 cond_sym = Symbol(cid_str)
 
-                if !haskey(ode_solutions, cond_sym)
+                    if final_solutions === nothing || !haskey(final_solutions, cond_sym)
                     # This might happen if the condition exists in data but wasn't part of the simulation problem
                     # Silence warning to avoid spam, but skip
                     continue
                 end
                 
-                sol = ode_solutions[cond_sym]
+                        sol = final_solutions[cond_sym]
                 if sol.retcode != :Success && sol.retcode != :Terminated
                     println("⚠️ Warning: Simulation failed for $(cond_sym) with code $(sol.retcode)")
                     continue
@@ -1048,7 +1050,7 @@ end
 function simulate_observable!(plt, obs_id::Symbol, condition_id::Symbol,
                               theta_opt::Vector{Float64},
                               petab_prob::PEtabODEProblem,
-                              ode_solutions::Dict{Symbol,ODESolution},
+                              ode_solutions::AbstractDict,
                               color)
     # Exact key lookup (no substring search)
     sol = ode_solutions[condition_id]
@@ -1146,56 +1148,4 @@ function get_obs_map(petab_prob::PEtabODEProblem, obs_id::Symbol, cond_id::Symbo
     ix === nothing && (ix = findfirst(df.observable_id .== obs_id))
     @assert ix !== nothing "No measurement row for observable=$(obs_id), condition=$(cond_id)"
     return mi.xindices.mapxobservable[ix]
-end
-
-function simulate_observable!(plt, obs_id::Symbol, condition_id::Symbol,
-                              theta_opt::Vector{Float64},
-                              petab_prob::PEtabODEProblem,
-                              ode_solutions::Dict{Symbol,ODESolution},
-                              color)
-    # Exact key lookup (no substring search)
-    sol = ode_solutions[condition_id]
-    mi  = petab_prob.model_info
-    df  = mi.petab_measurements
-    obs_str = string(obs_id)
-    cond_str = string(condition_id)
-    obs_vals = string.(df.observable_id)
-    cond_vals = string.(df.simulation_condition_id)
-    rowmask = (obs_vals .== obs_str) .& (cond_vals .== cond_str)
-    rows = findall(rowmask)
-    isempty(rows) && return
-
-    # 1) Reproduce nllh parameter handling exactly
-    xdyn, xobs, xnoise, xnond = PEtab.split_x(theta_opt, mi.xindices)
-    cache = getfield(petab_prob.probinfo, :cache)
-    xobs_ps  = PEtab.transform_x(xobs,  mi.xindices, :xobservable,  cache)
-    xnond_ps = PEtab.transform_x(xnond, mi.xindices, :xnondynamic, cache)
-
-    # 2) Row-wise prediction with identical transforms as nllh
-    ts = Float64.(df.time[rows])
-    preds = similar(ts)
-    for (k, r) in enumerate(rows)
-        t = ts[k]
-        u_t = sol(t, idxs=1:length(sol.u[end]))
-        maprow = mi.xindices.mapxobservable[r]
-        h = PEtab._h(u_t, t, sol.prob.p, xobs_ps, xnond_ps, mi.model.h, maprow, df.observable_id[r], mi.petab_parameters.nominal_value)
-        # Apply the same observable transform as the likelihood if available
-        if hasproperty(df, :measurement_transforms)
-            preds[k] = PEtab.transform_observable(h, df.measurement_transforms[r])
-        else
-            preds[k] = h
-        end
-    end
-
-    # 3) Use transformed measurements when available, else raw
-    if hasproperty(df, :measurement_transformed)
-        meas_vec = collect(df.measurement_transformed[rows])
-    else
-        meas_vec = collect(df.measurement[rows])
-    end
-    meas = Float64.(meas_vec)  # broadcast conversion (no pipeline, no trailing dot)
-
-    ord = sortperm(ts)
-    scatter!(plt, ts[ord], meas[ord]; color, markersize=6, alpha=0.8, label="Data ($(condition_id))")
-    plot!(plt, ts[ord], preds[ord]; color, linewidth=2.5, alpha=0.9, label="Model ($(condition_id))")
 end

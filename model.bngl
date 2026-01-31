@@ -1,0 +1,293 @@
+# ------------------------------------------------------------
+#  T‑cell SMAD / PKA / CSK / PI3K model  (Prado et al., 2021)
+# ------------------------------------------------------------
+
+begin model
+
+begin parameters
+  # binding
+  kf_tcr_bind       1.0
+  kr_tcr_bind       0.1
+  kf_tgfb_bind      1.0
+  kr_tgfb_bind      0.1
+  kf_il6_bind       1.0
+  kr_il6_bind       0.1
+  kf_lck_tcr        1.0
+  kr_lck_tcr        0.1
+  kf_zap70_tcr      1.0
+  kr_zap70_tcr      0.1
+  kf_csk_lck        1.0
+  kr_csk_lck        0.1
+  kf_stat3_dimer    1.0
+  kr_stat3_dimer    0.1
+  kf_s3s4           1.0
+  kr_s3s4           0.1
+  kf_st3s3          1.0
+  kr_st3s3          0.1
+  kf_pka_s3s4       1.0
+  kr_pka_s3s4       0.1
+  kf_pi3k_bind      1.0
+  kr_pi3k_bind      0.1
+  # new bindings
+  kf_il6r_jak2      1.0
+  kr_il6r_jak2      0.1
+  kf_smad3_foxp3    1.0
+  kr_smad3_foxp3    0.1
+  kf_stat3_rorgt    1.0
+  kr_stat3_rorgt    0.1
+  kf_pip2_pi3k      1.0
+  kr_pip2_pi3k      0.1
+  kf_pip3_akt       1.0
+  kr_pip3_akt       0.1
+  kf_rorgt_il17     1.0
+  kr_rorgt_il17     0.1
+
+  # catalytic / switching
+  k_act_lck         1.0
+  k_inact_lck       0.1
+  k_phos_zap70      1.0
+  k_dephos_zap70    0.1
+  k_act_tgfbr       1.0
+  k_inact_tgfbr     0.1
+  k_act_il6r        1.0
+  k_inact_il6r      0.1
+  k_act_jak2        1.0
+  k_inact_jak2      0.1
+  k_phos_stat3      1.0
+  k_dephos_stat3    0.1
+  k_phos_smad3      1.0
+  k_dephos_smad3    0.1
+  k_act_pka         1.0
+  k_inact_pka       0.1
+  k_act_csk         1.0
+  k_inact_csk       0.1
+  k_inact_lck_by_csk 10.0
+
+  # TF switches
+  k_act_foxp3       1.0
+  k_inact_foxp3     0.1
+  k_act_rorgt       1.0
+  k_inact_rorgt     0.1
+
+  # PI3K / AKT
+  k_cat_pi3k        0.5
+  k_phos_p85        1.0
+  k_act_akt         1.0
+  k_dephos_akt      0.1
+  k_pten            0.05
+  k_deg_p85P        0.01
+
+  # outputs / clearance
+  k_prod_il17       0.1
+  k_deg_il17        0.4
+  k_deg_il6         0.001
+
+  # constitutive turnover
+  k_prod_rec        0.1
+  k_deg_rec         0.01
+  k_prod_kin        0.1
+  k_deg_kin         0.01
+  k_prod_smad       0.1
+  k_deg_smad        0.01
+  k_prod_stat3      0.1
+  k_deg_stat3       0.01
+  k_prod_tf         0.01
+  k_deg_tf          0.01
+  k_prod_lipid      0.005
+
+  # mutual inhibition
+  k_inhibit         1.0
+end parameters
+
+
+begin molecule types
+  TCR(l,lck,zap70)
+  TGFbR(l,act~I~A)
+  IL6R(l,act~I~A,jak2)
+  TCR_L(r)
+  TGFb(r)
+  IL6(r)
+  JAK2(act~I~A,rec)
+  STAT3(pY~U~P,dimer,s3,rorgt)
+  SMAD3(pS~U~P,smad3_partner,pka_site,s3,foxp3)
+  SMAD4(smad3_partner)
+  LCK(pY~U~P,tcr,csk)
+  ZAP70(pY~U~P,tcr)
+  PKA(smad,act~I~A)
+  CSK(act~I~A,lck)
+  FOXP3(act~I~A,smad3)
+  RORgt(act~I~A,stat3,il17)
+  P85(phos~U~P,p110)
+  P110(p85,pip2)
+  PIP2(pi3k)
+  PIP3(akt)
+  AKT(pS473~U~P,pip3)
+  IL17(rorgt)
+end molecule types
+
+
+begin seed species
+  TCR(l,lck,zap70)                                                100
+  TGFbR(l,act~I)                                                  100
+  IL6R(l,act~I,jak2)                                              100
+  TCR_L(r)                                                        100
+  TGFb(r)                                                         100
+  IL6(r)                                                          10
+  LCK(pY~U,tcr,csk)                                               100
+  ZAP70(pY~U,tcr)                                                 100
+  JAK2(act~I,rec)                                                 100
+  STAT3(pY~U,dimer,s3,rorgt)                                      100
+  SMAD3(pS~U,smad3_partner,pka_site,s3,foxp3)                     100
+  SMAD4(smad3_partner)                                            100
+  PKA(smad,act~I)                                                 100
+  CSK(act~I,lck)                                                  100
+  FOXP3(act~I,smad3)                                              100
+  RORgt(act~I,stat3,il17)                                         100
+  P85(phos~U,p110)                                                100
+  P110(p85,pip2)                                                  100
+  PIP2(pi3k)                                                      100
+  PIP3(akt)                                                       100
+  AKT(pS473~U,pip3)                                               100
+  IL17(rorgt)                                                     100
+end seed species
+
+
+begin observables
+  Molecules TGFbR_Active    TGFbR(act~A)
+  Molecules IL6R_Active     IL6R(act~A)
+  Molecules JAK2_Active     JAK2(act~A)
+  Molecules LCK_Active      LCK(pY~P)
+  Molecules ZAP70_P         ZAP70(pY~P)
+  Molecules PKA_Active      PKA(act~A)
+  Molecules CSK_Active      CSK(act~A)
+  Molecules SMAD3_P         SMAD3(pS~P)
+  Molecules STAT3_P         STAT3(pY~P)
+  Molecules STAT3_Dimer     STAT3(dimer!1).STAT3(dimer!1)
+  Molecules FOXP3_Active    FOXP3(act~A)
+  Molecules RORgt_Active    RORgt(act~A)
+  Molecules IL17_total      IL17()
+  Molecules PIP3_conc       PIP3()
+  Molecules AKT_pS473       AKT(pS473~P)
+  Molecules P85_P           P85(phos~P)
+  Molecules PI3K_Complex    P85(p110!1).P110(p85!1)
+end observables
+
+
+begin reaction rules
+  # — ligand binding
+  Ligand_TCR:   TCR(l)+TCR_L(r) <-> TCR(l!1).TCR_L(r!1)                             kf_tcr_bind,kr_tcr_bind
+  Ligand_TGFbR: TGFbR(l)+TGFb(r) <-> TGFbR(l!1).TGFb(r!1)                           kf_tgfb_bind,kr_tgfb_bind
+  Ligand_IL6R:  IL6R(l)+IL6(r)   <-> IL6R(l!1).IL6(r!1)                             kf_il6_bind,kr_il6_bind
+
+  # — receptor activation
+  Act_TGFbR:   TGFbR(l!+,act~I) -> TGFbR(l!+,act~A)                                 k_act_tgfbr
+  Deact_TGFbR: TGFbR(act~A)     -> TGFbR(act~I)                                     k_inact_tgfbr
+  Act_IL6R:    IL6R(l!+,act~I)  -> IL6R(l!+,act~A)                                  k_act_il6r
+  Deact_IL6R:  IL6R(act~A)      -> IL6R(act~I)                                      k_inact_il6r
+
+  # — IL-6R ⟷ JAK2
+  Bind_JAK2_IL6R: IL6R(jak2)+JAK2(rec) <-> IL6R(jak2!1).JAK2(rec!1)                 kf_il6r_jak2,kr_il6r_jak2
+  Act_JAK2:       IL6R(act~A,jak2!1).JAK2(rec!1,act~I) -> IL6R(act~A,jak2!1).JAK2(rec!1,act~A) k_act_jak2
+  Deact_JAK2:     IL6R(jak2!1).JAK2(rec!1,act~A) -> IL6R(jak2!1).JAK2(rec!1,act~I)             k_inact_jak2
+
+  # — STAT3 dimerisation / phospho-cycle
+  Phos_STAT3:    JAK2(act~A)+STAT3(pY~U) -> JAK2(act~A)+STAT3(pY~P)                  k_phos_stat3
+  Dephos_STAT3:  STAT3(pY~P) -> STAT3(pY~U)                                          k_dephos_stat3
+  Dimer_STAT3:   STAT3(pY~P,dimer,s3)+STAT3(pY~P,dimer,s3) <-> STAT3(pY~P,dimer!1,s3).STAT3(pY~P,dimer!1,s3)                      kf_stat3_dimer,kr_stat3_dimer
+
+  # — SMAD3 phosphorylation / complexes
+  Phos_SMAD3:   TGFbR(act~A)+SMAD3(pS~U,s3) -> TGFbR(act~A)+SMAD3(pS~P,s3)           k_phos_smad3
+  Dephos_SMAD3: SMAD3(pS~P,s3) -> SMAD3(pS~U,s3)                                     k_dephos_smad3
+  Bind_S3S4:    SMAD3(pS~P,smad3_partner,s3)+SMAD4(smad3_partner) <-> SMAD3(pS~P,smad3_partner!1,s3).SMAD4(smad3_partner!1)               kf_s3s4,kr_s3s4
+  Bind_S3S3:    SMAD3(pS~P,s3)+STAT3(pY~P,s3,dimer) <-> SMAD3(pS~P,s3!1).STAT3(pY~P,s3!1,dimer)                             kf_st3s3,kr_st3s3
+
+  # — SMAD3 ⟷ FOXP3
+  Bind_FOXP3_S3: SMAD3(pS~P,foxp3)+FOXP3(smad3) <-> SMAD3(pS~P,foxp3!1).FOXP3(smad3!1) kf_smad3_foxp3,kr_smad3_foxp3
+  Act_FOXP3:     SMAD3(foxp3!1).FOXP3(smad3!1,act~I) -> SMAD3(foxp3!1).FOXP3(smad3!1,act~A)     k_act_foxp3
+  Deact_FOXP3:   FOXP3(act~A) -> FOXP3(act~I)                                                    k_inact_foxp3
+
+  # — PKA / CSK / LCK / zap70 (unchanged from your file)
+
+  Bind_PKA_S3S4: SMAD3(smad3_partner!1,pka_site,s3).SMAD4(smad3_partner!1)+PKA(smad,act~I) <-> SMAD3(smad3_partner!1,pka_site!2,s3).SMAD4(smad3_partner!1).PKA(smad!2,act~I)   kf_pka_s3s4,kr_pka_s3s4
+  Act_PKA:       SMAD3(pka_site!2).PKA(smad!2,act~I) -> SMAD3(pka_site!2).PKA(smad!2,act~A)      k_act_pka
+  Deact_PKA:     PKA(act~A) -> PKA(act~I)                                                        k_inact_pka
+  Act_CSK:       PKA(act~A)+CSK(act~I) -> PKA(act~A)+CSK(act~A)                                  k_act_csk
+  Deact_CSK:     CSK(act~A) -> CSK(act~I)                                                        k_inact_csk
+  Bind_CSK_LCK:  CSK(act~A,lck)+LCK(pY~P,csk) <-> CSK(act~A,lck!1).LCK(pY~P,csk!1)               kf_csk_lck,kr_csk_lck
+  Inhib_LCK:     CSK(lck!+,act~A)+LCK(csk!+,pY~P) -> CSK(lck!+,act~A)+LCK(csk!+,pY~U)            k_inact_lck_by_csk
+
+  Bind_LCK_TCR:  TCR(lck)+LCK(tcr) <-> TCR(lck!1).LCK(tcr!1)                                     kf_lck_tcr,kr_lck_tcr
+  Autophos_LCK:  LCK(tcr!+,pY~U) -> LCK(tcr!+,pY~P)                                              k_act_lck
+  Dephos_LCK:    LCK(pY~P) -> LCK(pY~U)                                                          k_inact_lck
+  Bind_ZAP70:    TCR(zap70)+ZAP70(tcr) <-> TCR(zap70!1).ZAP70(tcr!1)                             kf_zap70_tcr,kr_zap70_tcr
+  Phos_ZAP70:    LCK(pY~P,tcr!1).TCR(lck!1,zap70!2).ZAP70(tcr!2,pY~U) -> LCK(pY~P,tcr!1).TCR(lck!1,zap70!2).ZAP70(tcr!2,pY~P)                            k_phos_zap70
+  Dephos_ZAP70:  ZAP70(pY~P) -> ZAP70(pY~U)                                                      k_dephos_zap70
+
+  # — STAT3 ⟷ RORγt and IL-17
+  Bind_RORgt_STAT3: STAT3(pY~P,rorgt)+RORgt(stat3) <-> STAT3(pY~P,rorgt!1).RORgt(stat3!1)        kf_stat3_rorgt,kr_stat3_rorgt
+  Act_RORgt:        STAT3(rorgt!1).RORgt(stat3!1,act~I) -> STAT3(rorgt!1).RORgt(stat3!1,act~A)   k_act_rorgt
+  Deact_RORgt:      RORgt(act~A) -> RORgt(act~I)                                                 k_inact_rorgt
+
+  Bind_RORgt_IL17:  RORgt(act~A,il17)+IL17(rorgt) <-> RORgt(act~A,il17!1).IL17(rorgt!1)          kf_rorgt_il17,kr_rorgt_il17
+  Produce_IL17: STAT3(pY~P,dimer!1,rorgt!2).STAT3(pY~P,dimer!1).RORgt(act~A,stat3!2,il17) -> STAT3(pY~P,dimer!1,rorgt!2).STAT3(pY~P,dimer!1).RORgt(act~A,stat3!2,il17!3).IL17(rorgt!3) k_prod_il17
+  Degrade_IL17:     IL17() -> 0                                                                  k_deg_il17
+
+  # — PI3K / AKT
+  PI3K_Bind:      P85(p110)+P110(p85,pip2) <-> P85(p110!1).P110(p85!1,pip2)                      kf_pi3k_bind,kr_pi3k_bind
+  Bind_PIP2_PI3K: P110(pip2)+PIP2(pi3k) <-> P110(pip2!1).PIP2(pi3k!1)                            kf_pip2_pi3k,kr_pip2_pi3k
+
+  PI3K_Cat:      P85(phos~U,p110!2).P110(p85!2,pip2!1).PIP2(pi3k!1) -> P85(phos~U,p110!2).P110(p85!2,pip2)+PIP3(akt)                                   k_cat_pi3k
+
+  Phos_P85:      CSK(act~A)+P85(phos~U,p110!1).P110(p85!1,pip2) -> CSK(act~A)+P85(phos~P,p110)+P110(p85,pip2) k_phos_p85
+
+  Bind_PIP3_AKT: PIP3(akt)+AKT(pip3) <-> PIP3(akt!1).AKT(pip3!1)                                kf_pip3_akt,kr_pip3_akt
+  Act_AKT:       PIP3(akt!1).AKT(pip3!1,pS473~U) -> PIP3(akt!1).AKT(pip3!1,pS473~P)             k_act_akt
+  Dephos_AKT:    AKT(pip3!1,pS473~P).PIP3(akt!1) -> AKT(pip3!1,pS473~U).PIP3(akt!1)             k_dephos_akt
+  Degrade_PIP3:  PIP3() -> PIP2(pi3k)                                                           k_pten
+  Degrade_P85P:  P85(phos~P) -> 0                                                               k_deg_p85P
+
+  # — IL-6 clearance
+  Degrade_IL6: IL6(r) -> 0                                                                      k_deg_il6
+
+  # — constitutive turnover (unchanged)
+  Prod_TCR:        0 -> TCR(l,lck,zap70)                                                         k_prod_rec
+  Deg_TCR:         TCR(l,lck,zap70) -> 0                                                         k_deg_rec
+  Prod_TGFbR:      0 -> TGFbR(l,act~I)                                                           k_prod_rec
+  Deg_TGFbR:       TGFbR(l,act~I) -> 0                                                           k_deg_rec
+  Prod_IL6R:       0 -> IL6R(l,act~I,jak2)                                                       k_prod_rec
+  Deg_IL6R:        IL6R(l,act~I,jak2) -> 0                                                       k_deg_rec
+
+  Prod_LCK:        0 -> LCK(pY~U,tcr,csk)                                                        k_prod_kin
+  Deg_LCK:         LCK(pY~U,tcr,csk) -> 0                                                        k_deg_kin
+  Prod_ZAP70:      0 -> ZAP70(pY~U,tcr)                                                          k_prod_kin
+  Deg_ZAP70:       ZAP70(pY~U,tcr) -> 0                                                          k_deg_kin
+  Prod_JAK2:       0 -> JAK2(act~I,rec)                                                          k_prod_kin
+  Deg_JAK2:        JAK2(act~I,rec) -> 0                                                          k_deg_kin
+  Prod_CSK:        0 -> CSK(act~I,lck)                                                           k_prod_kin
+  Deg_CSK:         CSK(act~I,lck) -> 0                                                           k_deg_kin
+  Prod_PKA:        0 -> PKA(smad,act~I)                                                          k_prod_kin
+  Deg_PKA:         PKA(smad,act~I) -> 0                                                          k_deg_kin
+
+  Prod_SMAD3:      0 -> SMAD3(pS~U,smad3_partner,pka_site,s3,foxp3)                               k_prod_smad
+  Deg_SMAD3:       SMAD3(pS~U,smad3_partner,pka_site,s3,foxp3) -> 0                               k_deg_smad
+  Prod_SMAD4:      0 -> SMAD4(smad3_partner)                                                     k_prod_smad
+  Deg_SMAD4:       SMAD4(smad3_partner) -> 0                                                     k_deg_smad
+  Prod_STAT3:      0 -> STAT3(pY~U,dimer,s3,rorgt)                                               k_prod_stat3
+  Deg_STAT3:       STAT3(pY~U,dimer,s3,rorgt) -> 0                                               k_deg_stat3
+
+  Prod_FOXP3:      0 -> FOXP3(act~I,smad3)                                                       k_prod_tf
+  Deg_FOXP3:       FOXP3(act~I,smad3) -> 0                                                       k_deg_tf
+  Prod_RORgt:      0 -> RORgt(act~I,stat3,il17)                                                  k_prod_tf
+  Deg_RORgt:       RORgt(act~I,stat3,il17) -> 0                                                  k_deg_tf
+
+  Prod_PIP2:       0 -> PIP2(pi3k)                                                               k_prod_lipid
+
+  # — mutual inhibition
+  FOXP3_Inhib:     FOXP3(act~A) + RORgt(act~A) -> FOXP3(act~A) + RORgt(act~I)                     k_inhibit
+  RORgt_Inhib:     RORgt(act~A) + FOXP3(act~A) -> RORgt(act~A) + FOXP3(act~I)                     k_inhibit
+end reaction rules
+end model
+
+generate_network({overwrite=>1,verbose=>0,max_agg=>4})
+simulate({method=>"ode",t_end=>1000,n_steps=>1000})
+visualize({type=>"contactmap",suffix=>"all"})

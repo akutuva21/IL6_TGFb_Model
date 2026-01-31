@@ -1,0 +1,5 @@
+plotId	plotType	datasetId	observableId	simulationConditionId	xValues	xValuesLabel	xScale	legendEntry
+pkA_timecourse	data	time_course_PKA	PKA_active	TREG	time	time (min)	lin	TREG
+pkA_timecourse	data	time_course_PKA	PKA_active	TH17	time	time (min)	lin	TH17
+dose_S3S4	data	dose_response_S3S4	S3S4_complex_obs	dose_0_01;dose_0_1;dose_0_2;dose_0_5;dose_1;dose_5;dose_10;dose_25;dose_50	condition:IL6_0	IL-6 (ng/ml)	log10	S3S4 complex
+dose_S3STAT3d	data	dose_response_S3STAT3d	S3STAT3d_complex_obs	dose_0_01;dose_0_1;dose_0_2;dose_0_5;dose_1;dose_5;dose_10;dose_25;dose_50	condition:IL6_0	IL-6 (ng/ml)	log10	S3STAT3d complex
