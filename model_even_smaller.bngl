@@ -142,5 +142,7 @@ end model
 
 # Actions
 generate_network({overwrite=>1})
-simulate({method=>"ode",t_end=>100,n_steps=>1000})
 writeSBML()
+writeMexfile()
+writeMfile()
+simulate({method=>"ode",t_end=>100,n_steps=>1000})

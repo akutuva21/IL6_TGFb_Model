@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Created by BioNetGen 2.9.3  -->
 <sbml xmlns="http://www.sbml.org/sbml/level2/version3" level="2" version="3">
-  <model id="temp">
+  <model id="model_even_smaller">
     <listOfUnitDefinitions>
       <unitDefinition id="substance" name="substance">
         <listOfUnits>
@@ -19,32 +19,41 @@
       <species id="S4" compartment="cell" initialAmount="40" name="TGFbR(activity~I,l_bind,smad3_site)"/>
       <species id="S5" compartment="cell" initialAmount="45" name="SMAD3(phos~U,pka_site,smad4_site,stat3_site,tgfbr_site)"/>
       <species id="S6" compartment="cell" initialAmount="30" name="SMAD4(s3_site)"/>
-      <species id="S7" compartment="cell" initialAmount="250" name="STAT3m(il6r_site,phos~U)"/>
+      <species id="S7" compartment="cell" initialAmount="250" name="STAT3m(d,il6r_site,phos~U,s3_site)"/>
       <species id="S8" compartment="cell" initialAmount="50" name="PKA(phos~U,s3s4_site)"/>
       <species id="S9" compartment="cell" initialAmount="0" name="IL6(r!1).IL6R(activity~I,l_bind!1,stat3_site)"/>
       <species id="S10" compartment="cell" initialAmount="0" name="TGFb(r!1).TGFbR(activity~I,l_bind!1,smad3_site)"/>
       <species id="S11" compartment="cell" initialAmount="0" name="IL6(r!1).IL6R(activity~A,l_bind!1,stat3_site)"/>
       <species id="S12" compartment="cell" initialAmount="0" name="TGFb(r!1).TGFbR(activity~A,l_bind!1,smad3_site)"/>
       <species id="S13" compartment="cell" initialAmount="0" name="SMAD3(phos~U,pka_site,smad4_site,stat3_site,tgfbr_site!1).TGFb(r!2).TGFbR(activity~A,l_bind!2,smad3_site!1)"/>
-      <species id="S14" compartment="cell" initialAmount="0" name="IL6(r!1).IL6R(activity~A,l_bind!1,stat3_site!2).STAT3m(il6r_site!2,phos~U)"/>
+      <species id="S14" compartment="cell" initialAmount="0" name="IL6(r!1).IL6R(activity~A,l_bind!1,stat3_site!2).STAT3m(d,il6r_site!2,phos~U,s3_site)"/>
       <species id="S15" compartment="cell" initialAmount="0" name="SMAD3(phos~P,pka_site,smad4_site,stat3_site,tgfbr_site)"/>
-      <species id="S16" compartment="cell" initialAmount="0" name="STAT3m(il6r_site,phos~P)"/>
-      <species id="S17" compartment="cell" initialAmount="0" name="STAT3d_active(s3_site)"/>
+      <species id="S16" compartment="cell" initialAmount="0" name="STAT3m(d,il6r_site,phos~P,s3_site)"/>
+      <species id="S17" compartment="cell" initialAmount="0" name="STAT3m(d!1,il6r_site,phos~P,s3_site).STAT3m(d!1,il6r_site,phos~P,s3_site)"/>
       <species id="S18" compartment="cell" initialAmount="0" name="SMAD3(phos~P,pka_site,smad4_site!1,stat3_site,tgfbr_site).SMAD4(s3_site!1)"/>
-      <species id="S19" compartment="cell" initialAmount="0" name="SMAD3(phos~P,pka_site,smad4_site,stat3_site!1,tgfbr_site).STAT3d_active(s3_site!1)"/>
+      <species id="S19" compartment="cell" initialAmount="0" name="SMAD3(phos~P,pka_site,smad4_site,stat3_site!1,tgfbr_site).STAT3m(d!2,il6r_site,phos~P,s3_site!1).STAT3m(d!2,il6r_site,phos~P,s3_site)"/>
       <species id="S20" compartment="cell" initialAmount="0" name="PKA(phos~U,s3s4_site!1).SMAD3(phos~P,pka_site!1,smad4_site!2,stat3_site,tgfbr_site).SMAD4(s3_site!2)"/>
-      <species id="S21" compartment="cell" initialAmount="0" name="PKA(phos~P,s3s4_site!1).SMAD3(phos~P,pka_site!1,smad4_site!2,stat3_site,tgfbr_site).SMAD4(s3_site!2)"/>
-      <species id="S22" compartment="cell" initialAmount="0" name="SMAD3(phos~U,pka_site,smad4_site,stat3_site!1,tgfbr_site).STAT3d_active(s3_site!1)"/>
-      <species id="S23" compartment="cell" initialAmount="0" name="PKA(phos~P,s3s4_site)"/>
+      <species id="S21" compartment="cell" initialAmount="0" name="SMAD3(phos~P,pka_site,smad4_site,stat3_site!1,tgfbr_site).STAT3m(d,il6r_site,phos~P,s3_site!1)"/>
+      <species id="S22" compartment="cell" initialAmount="0" name="SMAD3(phos~P,pka_site,smad4_site,stat3_site!1,tgfbr_site).STAT3m(d,il6r_site,phos~U,s3_site!1)"/>
+      <species id="S23" compartment="cell" initialAmount="0" name="PKA(phos~P,s3s4_site!1).SMAD3(phos~P,pka_site!1,smad4_site!2,stat3_site,tgfbr_site).SMAD4(s3_site!2)"/>
+      <species id="S24" compartment="cell" initialAmount="0" name="SMAD3(phos~U,pka_site,smad4_site,stat3_site!1,tgfbr_site).STAT3m(d!2,il6r_site,phos~P,s3_site!1).STAT3m(d!2,il6r_site,phos~P,s3_site)"/>
+      <species id="S25" compartment="cell" initialAmount="0" name="IL6(r!1).IL6R(activity~A,l_bind!1,stat3_site!2).SMAD3(phos~P,pka_site,smad4_site,stat3_site!3,tgfbr_site).STAT3m(d,il6r_site!2,phos~U,s3_site!3)"/>
+      <species id="S26" compartment="cell" initialAmount="0" name="SMAD3(phos~P,pka_site,smad4_site,stat3_site!1,tgfbr_site).SMAD3(phos~P,pka_site,smad4_site,stat3_site!2,tgfbr_site).STAT3m(d!3,il6r_site,phos~P,s3_site!1).STAT3m(d!3,il6r_site,phos~P,s3_site!2)"/>
+      <species id="S27" compartment="cell" initialAmount="0" name="SMAD3(phos~U,pka_site,smad4_site,stat3_site!1,tgfbr_site).STAT3m(d,il6r_site,phos~P,s3_site!1)"/>
+      <species id="S28" compartment="cell" initialAmount="0" name="SMAD3(phos~U,pka_site,smad4_site,stat3_site!1,tgfbr_site).STAT3m(d,il6r_site,phos~U,s3_site!1)"/>
+      <species id="S29" compartment="cell" initialAmount="0" name="PKA(phos~P,s3s4_site)"/>
+      <species id="S30" compartment="cell" initialAmount="0" name="IL6(r!1).IL6R(activity~A,l_bind!1,stat3_site!2).SMAD3(phos~U,pka_site,smad4_site,stat3_site!3,tgfbr_site).STAT3m(d,il6r_site!2,phos~U,s3_site!3)"/>
+      <species id="S31" compartment="cell" initialAmount="0" name="SMAD3(phos~P,pka_site,smad4_site,stat3_site!1,tgfbr_site).SMAD3(phos~U,pka_site,smad4_site,stat3_site!2,tgfbr_site).STAT3m(d!3,il6r_site,phos~P,s3_site!1).STAT3m(d!3,il6r_site,phos~P,s3_site!2)"/>
+      <species id="S32" compartment="cell" initialAmount="0" name="SMAD3(phos~U,pka_site,smad4_site,stat3_site!1,tgfbr_site).SMAD3(phos~U,pka_site,smad4_site,stat3_site!2,tgfbr_site).STAT3m(d!3,il6r_site,phos~P,s3_site!1).STAT3m(d!3,il6r_site,phos~P,s3_site!2)"/>
     </listOfSpecies>
     <listOfParameters>
       <!-- Independent variables -->
-  <parameter id="TGFb_0" value="1"/>
-  <parameter id="IL6_0" value="0"/>
-  <parameter id="s_TGFb" value="1"/>
-  <parameter id="b_TGFb" value="0"/>
-  <parameter id="s_IL6" value="1"/>
-  <parameter id="b_IL6" value="0"/>
+      <parameter id="TGFb_0" value="1"/>
+      <parameter id="IL6_0" value="0"/>
+      <parameter id="s_TGFb" value="1"/>
+      <parameter id="b_TGFb" value="0"/>
+      <parameter id="s_IL6" value="1"/>
+      <parameter id="b_IL6" value="0"/>
       <parameter id="kf_il6_bind" value="0.3"/>
       <parameter id="kr_il6_bind" value="0.05"/>
       <parameter id="k_act_il6r" value="3"/>
@@ -76,6 +85,7 @@
       <parameter id="SMAD4_0" value="30"/>
       <parameter id="STAT3m_0" value="250"/>
       <parameter id="PKA_0" value="50"/>
+      <!-- Dependent variables -->
       <!-- Observables -->
       <parameter id="Free_IL6_obs" constant="false"/>
       <parameter id="Free_TGFb_obs" constant="false"/>
@@ -87,6 +97,8 @@
       <parameter id="S3S4_complex_obs" constant="false"/>
       <parameter id="S3STAT3d_complex_obs" constant="false"/>
       <parameter id="PKA_active" constant="false"/>
+      <parameter id="Total_SMAD3_obs" constant="false"/>
+      <parameter id="Total_STAT3_obs" constant="false"/>
     </listOfParameters>
     <listOfInitialAssignments>
       <!-- All initial values -->
@@ -146,6 +158,7 @@
           <ci> PKA_0 </ci>
         </math>
       </initialAssignment>
+      <!-- Dependent variables -->
     </listOfInitialAssignments>
     <listOfRules>
       <!-- Observables -->
@@ -173,6 +186,8 @@
               <plus/>
               <ci> S11 </ci>
               <ci> S14 </ci>
+              <ci> S25 </ci>
+              <ci> S30 </ci>
             </apply>
           </math>
       </assignmentRule>
@@ -194,6 +209,15 @@
               <ci> S19 </ci>
               <ci> S20 </ci>
               <ci> S21 </ci>
+              <ci> S22 </ci>
+              <ci> S23 </ci>
+              <ci> S25 </ci>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S26 </ci>
+              </apply>
+              <ci> S31 </ci>
             </apply>
           </math>
       </assignmentRule>
@@ -201,8 +225,9 @@
           <math xmlns="http://www.w3.org/1998/Math/MathML">
             <apply>
               <plus/>
-              <cn> 0 </cn>
               <ci> S16 </ci>
+              <ci> S21 </ci>
+              <ci> S27 </ci>
             </apply>
           </math>
       </assignmentRule>
@@ -210,9 +235,36 @@
           <math xmlns="http://www.w3.org/1998/Math/MathML">
             <apply>
               <plus/>
-              <ci> S17 </ci>
-              <ci> S19 </ci>
-              <ci> S22 </ci>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S17 </ci>
+              </apply>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S19 </ci>
+              </apply>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S24 </ci>
+              </apply>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S26 </ci>
+              </apply>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S31 </ci>
+              </apply>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S32 </ci>
+              </apply>
             </apply>
           </math>
       </assignmentRule>
@@ -222,7 +274,7 @@
               <plus/>
               <ci> S18 </ci>
               <ci> S20 </ci>
-              <ci> S21 </ci>
+              <ci> S23 </ci>
             </apply>
           </math>
       </assignmentRule>
@@ -231,7 +283,28 @@
             <apply>
               <plus/>
               <ci> S19 </ci>
+              <ci> S21 </ci>
               <ci> S22 </ci>
+              <ci> S24 </ci>
+              <ci> S25 </ci>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S26 </ci>
+              </apply>
+              <ci> S27 </ci>
+              <ci> S28 </ci>
+              <ci> S30 </ci>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S31 </ci>
+              </apply>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S32 </ci>
+              </apply>
             </apply>
           </math>
       </assignmentRule>
@@ -239,8 +312,90 @@
           <math xmlns="http://www.w3.org/1998/Math/MathML">
             <apply>
               <plus/>
-              <ci> S21 </ci>
               <ci> S23 </ci>
+              <ci> S29 </ci>
+            </apply>
+          </math>
+      </assignmentRule>
+      <assignmentRule variable="Total_SMAD3_obs">
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <plus/>
+              <ci> S5 </ci>
+              <ci> S13 </ci>
+              <ci> S15 </ci>
+              <ci> S18 </ci>
+              <ci> S19 </ci>
+              <ci> S20 </ci>
+              <ci> S21 </ci>
+              <ci> S22 </ci>
+              <ci> S23 </ci>
+              <ci> S24 </ci>
+              <ci> S25 </ci>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S26 </ci>
+              </apply>
+              <ci> S27 </ci>
+              <ci> S28 </ci>
+              <ci> S30 </ci>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S31 </ci>
+              </apply>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S32 </ci>
+              </apply>
+            </apply>
+          </math>
+      </assignmentRule>
+      <assignmentRule variable="Total_STAT3_obs">
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <plus/>
+              <ci> S7 </ci>
+              <ci> S14 </ci>
+              <ci> S16 </ci>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S17 </ci>
+              </apply>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S19 </ci>
+              </apply>
+              <ci> S21 </ci>
+              <ci> S22 </ci>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S24 </ci>
+              </apply>
+              <ci> S25 </ci>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S26 </ci>
+              </apply>
+              <ci> S27 </ci>
+              <ci> S28 </ci>
+              <ci> S30 </ci>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S31 </ci>
+              </apply>
+              <apply>
+                <times/>
+                <cn> 2 </cn>
+                <ci> S32 </ci>
+              </apply>
             </apply>
           </math>
       </assignmentRule>
@@ -430,44 +585,6 @@
       </reaction>
       <reaction id="R11" reversible="false">
         <listOfReactants>
-          <speciesReference species="S14"/>
-        </listOfReactants>
-        <listOfProducts>
-          <speciesReference species="S2"/>
-          <speciesReference species="S3"/>
-          <speciesReference species="S7"/>
-        </listOfProducts>
-        <kineticLaw>
-          <math xmlns="http://www.w3.org/1998/Math/MathML">
-            <apply>
-              <times/>
-              <ci> k_deact_il6r </ci>
-              <ci> S14 </ci>
-            </apply>
-          </math>
-        </kineticLaw>
-      </reaction>
-      <reaction id="R12" reversible="false">
-        <listOfReactants>
-          <speciesReference species="S13"/>
-        </listOfReactants>
-        <listOfProducts>
-          <speciesReference species="S1"/>
-          <speciesReference species="S4"/>
-          <speciesReference species="S5"/>
-        </listOfProducts>
-        <kineticLaw>
-          <math xmlns="http://www.w3.org/1998/Math/MathML">
-            <apply>
-              <times/>
-              <ci> k_deact_tgfbr </ci>
-              <ci> S13 </ci>
-            </apply>
-          </math>
-        </kineticLaw>
-      </reaction>
-      <reaction id="R13" reversible="false">
-        <listOfReactants>
           <speciesReference species="S13"/>
         </listOfReactants>
         <listOfProducts>
@@ -484,7 +601,7 @@
           </math>
         </kineticLaw>
       </reaction>
-      <reaction id="R14" reversible="false">
+      <reaction id="R12" reversible="false">
         <listOfReactants>
           <speciesReference species="S13"/>
         </listOfReactants>
@@ -502,7 +619,7 @@
           </math>
         </kineticLaw>
       </reaction>
-      <reaction id="R15" reversible="false">
+      <reaction id="R13" reversible="false">
         <listOfReactants>
           <speciesReference species="S14"/>
         </listOfReactants>
@@ -520,7 +637,7 @@
           </math>
         </kineticLaw>
       </reaction>
-      <reaction id="R16" reversible="false">
+      <reaction id="R14" reversible="false">
         <listOfReactants>
           <speciesReference species="S15"/>
         </listOfReactants>
@@ -537,7 +654,7 @@
           </math>
         </kineticLaw>
       </reaction>
-      <reaction id="R17" reversible="false">
+      <reaction id="R15" reversible="false">
         <listOfReactants>
           <speciesReference species="S16"/>
           <speciesReference species="S16"/>
@@ -557,7 +674,7 @@
           </math>
         </kineticLaw>
       </reaction>
-      <reaction id="R18" reversible="false">
+      <reaction id="R16" reversible="false">
         <listOfReactants>
           <speciesReference species="S16"/>
         </listOfReactants>
@@ -574,7 +691,7 @@
           </math>
         </kineticLaw>
       </reaction>
-      <reaction id="R19" reversible="false">
+      <reaction id="R17" reversible="false">
         <listOfReactants>
           <speciesReference species="S6"/>
           <speciesReference species="S15"/>
@@ -593,7 +710,7 @@
           </math>
         </kineticLaw>
       </reaction>
-      <reaction id="R20" reversible="false">
+      <reaction id="R18" reversible="false">
         <listOfReactants>
           <speciesReference species="S17"/>
         </listOfReactants>
@@ -611,7 +728,7 @@
           </math>
         </kineticLaw>
       </reaction>
-      <reaction id="R21" reversible="false">
+      <reaction id="R19" reversible="false">
         <listOfReactants>
           <speciesReference species="S17"/>
         </listOfReactants>
@@ -629,7 +746,7 @@
           </math>
         </kineticLaw>
       </reaction>
-      <reaction id="R22" reversible="false">
+      <reaction id="R20" reversible="false">
         <listOfReactants>
           <speciesReference species="S15"/>
           <speciesReference species="S17"/>
@@ -641,6 +758,7 @@
           <math xmlns="http://www.w3.org/1998/Math/MathML">
             <apply>
               <times/>
+              <cn> 2 </cn>
               <ci> kf_s3stat3d </ci>
               <ci> S15 </ci>
               <ci> S17 </ci>
@@ -648,7 +766,7 @@
           </math>
         </kineticLaw>
       </reaction>
-      <reaction id="R23" reversible="false">
+      <reaction id="R21" reversible="false">
         <listOfReactants>
           <speciesReference species="S8"/>
           <speciesReference species="S18"/>
@@ -663,6 +781,42 @@
               <ci> kf_pka_bind </ci>
               <ci> S8 </ci>
               <ci> S18 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R22" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S19"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S16"/>
+          <speciesReference species="S21"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> kr_dimer </ci>
+              <ci> S19 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R23" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S19"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S7"/>
+          <speciesReference species="S22"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> k_dephos_stat3d </ci>
+              <ci> S19 </ci>
             </apply>
           </math>
         </kineticLaw>
@@ -708,7 +862,7 @@
           <speciesReference species="S20"/>
         </listOfReactants>
         <listOfProducts>
-          <speciesReference species="S21"/>
+          <speciesReference species="S23"/>
         </listOfProducts>
         <kineticLaw>
           <math xmlns="http://www.w3.org/1998/Math/MathML">
@@ -725,7 +879,7 @@
           <speciesReference species="S19"/>
         </listOfReactants>
         <listOfProducts>
-          <speciesReference species="S22"/>
+          <speciesReference species="S24"/>
         </listOfProducts>
         <kineticLaw>
           <math xmlns="http://www.w3.org/1998/Math/MathML">
@@ -739,18 +893,367 @@
       </reaction>
       <reaction id="R28" reversible="false">
         <listOfReactants>
+          <speciesReference species="S11"/>
+          <speciesReference species="S22"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S25"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> kf_stat3_bind </ci>
+              <ci> S11 </ci>
+              <ci> S22 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R29" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S16"/>
           <speciesReference species="S21"/>
         </listOfReactants>
         <listOfProducts>
-          <speciesReference species="S18"/>
+          <speciesReference species="S19"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> kf_dimer </ci>
+              <ci> S16 </ci>
+              <ci> S21 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R30" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S21"/>
+          <speciesReference species="S21"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S26"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <cn> 0.5 </cn>
+              <ci> kf_dimer </ci>
+              <ci> S21 </ci>
+              <ci> S21 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R31" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S24"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S16"/>
+          <speciesReference species="S27"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> kr_dimer </ci>
+              <ci> S24 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R32" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S21"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S22"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> k_dephos_stat3p </ci>
+              <ci> S21 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R33" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S24"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S7"/>
+          <speciesReference species="S28"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> k_dephos_stat3d </ci>
+              <ci> S24 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R34" reversible="false">
+        <listOfReactants>
           <speciesReference species="S23"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S18"/>
+          <speciesReference species="S29"/>
         </listOfProducts>
         <kineticLaw>
           <math xmlns="http://www.w3.org/1998/Math/MathML">
             <apply>
               <times/>
               <ci> k_off_pka </ci>
+              <ci> S23 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R35" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S11"/>
+          <speciesReference species="S28"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S30"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> kf_stat3_bind </ci>
+              <ci> S11 </ci>
+              <ci> S28 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R36" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S25"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S11"/>
+          <speciesReference species="S21"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> k_phos_stat3 </ci>
+              <ci> S25 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R37" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S16"/>
+          <speciesReference species="S27"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S24"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> kf_dimer </ci>
+              <ci> S16 </ci>
+              <ci> S27 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R38" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S21"/>
+          <speciesReference species="S27"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S31"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> kf_dimer </ci>
               <ci> S21 </ci>
+              <ci> S27 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R39" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S27"/>
+          <speciesReference species="S27"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S32"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <cn> 0.5 </cn>
+              <ci> kf_dimer </ci>
+              <ci> S27 </ci>
+              <ci> S27 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R40" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S26"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S21"/>
+          <speciesReference species="S21"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> kr_dimer </ci>
+              <ci> S26 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R41" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S27"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S28"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> k_dephos_stat3p </ci>
+              <ci> S27 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R42" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S26"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S22"/>
+          <speciesReference species="S22"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> k_dephos_stat3d </ci>
+              <ci> S26 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R43" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S30"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S11"/>
+          <speciesReference species="S27"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> k_phos_stat3 </ci>
+              <ci> S30 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R44" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S31"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S21"/>
+          <speciesReference species="S27"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> kr_dimer </ci>
+              <ci> S31 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R45" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S32"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S27"/>
+          <speciesReference species="S27"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> kr_dimer </ci>
+              <ci> S32 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R46" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S31"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S22"/>
+          <speciesReference species="S28"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> k_dephos_stat3d </ci>
+              <ci> S31 </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="R47" reversible="false">
+        <listOfReactants>
+          <speciesReference species="S32"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="S28"/>
+          <speciesReference species="S28"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <ci> k_dephos_stat3d </ci>
+              <ci> S32 </ci>
             </apply>
           </math>
         </kineticLaw>
