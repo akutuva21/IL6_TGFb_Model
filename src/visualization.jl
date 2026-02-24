@@ -246,7 +246,7 @@ function run_visualization(
     # The ode_solutions are expected to be passed-in; do not re-simulate here.
     println("✅ Using pre-computed ODE solutions for visualization.")
 
-    plot_path = joinpath(pwd(), "final_results_plots")
+    plot_path = joinpath(pwd(), "results", "final_results_plots")
     if !isdir(plot_path); mkpath(plot_path); end
 
     # Step 2: Manually plot each observable
@@ -312,7 +312,7 @@ function plot_dose_response(
     conditions_tsv::AbstractString;
     observables=nothing,
     endpoint_time::Real=60.0,
-    output_dir::AbstractString=joinpath(pwd(), "final_results_plots"),
+    output_dir::AbstractString=joinpath(pwd(), "results", "final_results_plots"),
     petab_prob=nothing,
     theta_optim=nothing,
     ode_solutions=nothing,
@@ -573,7 +573,7 @@ Generates a professional waterfall plot following PyPESTO design standards.
 Creates a layered plot with connecting lines and individual colored points.
 """
 function plot_waterfall(multistart_result::PEtabMultistartResult)
-    plot_dir = joinpath(pwd(), "final_results_plots")
+    plot_dir = joinpath(pwd(), "results", "final_results_plots")
     if !isdir(plot_dir); mkpath(plot_dir); end
     save_path = joinpath(plot_dir, "waterfall_plot.png")
 
@@ -801,7 +801,7 @@ end
 Attempts to use the native PEtab.jl plotting with error handling and fallback to custom implementation.
 """
 function plot_waterfall_native_fallback(multistart_result::PEtabMultistartResult, petab_prob::PEtabODEProblem)
-    plot_dir = joinpath(pwd(), "final_results_plots")
+    plot_dir = joinpath(pwd(), "results", "final_results_plots")
     if !isdir(plot_dir); mkpath(plot_dir); end
     save_path = joinpath(plot_dir, "waterfall_plot_native.png")
 
@@ -845,7 +845,7 @@ in the native plot.
 """
 function plot_parameter_distribution(multistart_result::PEtabMultistartResult, petab_prob::PEtabODEProblem; reference_values=nothing)
     println("\n--- Generating Parameter Distribution Plot  ---")
-    plot_dir = joinpath(pwd(), "final_results_plots")
+    plot_dir = joinpath(pwd(), "results", "final_results_plots")
     if !isdir(plot_dir); mkpath(plot_dir); end
     save_path = joinpath(plot_dir, "parameter_distribution_plot.png")
 

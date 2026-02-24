@@ -11,12 +11,17 @@ This repository provides a workflow to generate PEtab-compliant problems from a 
 
 ## Repository layout
 
-- config.yml — experiment, noise, and export settings for data generation and PEtab tables.
-- petab_problem.yml and petab_files/ — PEtab problem specification and generated TSVs for parameters, measurements, observables, and conditions.
-- src/ — Julia modules for optimization, profiling, identifiability, visualization, and robustness utilities used by the main CLI.
-- model_even_smaller.bngl — example model and exported SBML used to build the ODESystem.
-- Data/ and SimData/ — example inputs/outputs and artifacts for validation.
-- bngl_julia/Project.toml — Julia project environment for running the pipeline.
+- `src/` — Core Julia modules for optimization, visualization, and utilities.
+- `scripts/` — Executable scripts (e.g., `plot_best_fit.jl`) for analysis and plotting.
+- `notebooks/` — Jupyter notebooks for interactive analysis (ignored by Git).
+- `data/` — Contains `SimData/` (measurements and conditions) and other datasets.
+- `models/` — BNGL source, SBML exports, and `petab_files/` problem definitions.
+- `results/` — Output data, `best_fit.jld2`, and generated plots.
+- `docs/` — Documentation and presentations.
+- `archive/` — Deprecated code, test experiments, and old models (ignored by Git).
+- `bngl_julia/Project.toml` — Julia project environment for the pipeline.
+- `config.yml` — Experiment, noise, and export settings.
+- `petab_problem.yml` — Main PEtab problem specification.
 
 ## Requirements
 
@@ -28,6 +33,7 @@ This repository provides a workflow to generate PEtab-compliant problems from a 
 Instantiate the Julia environment under bngl_julia, run multi-start calibration with main.jl, collate to recover the best fit, and optionally compute profile-likelihood intervals.
 
 Example
+
 ```bash
 # Environment
 julia --project=bngl_julia -e "using Pkg; Pkg.instantiate()"
@@ -41,8 +47,11 @@ julia --project=bngl_julia main.jl \
 julia --project=bngl_julia main.jl --yaml petab_problem.yml --n-batches 16 --collate
 
 # Profile the best fit saved at collation
-julia --project=bngl_julia main.jl --yaml petab_problem.yml --profile --load-fit best_fit.jld2
+julia --project=bngl_julia main.jl --yaml petab_problem.yml --profile --load-fit results/best_fit.jld2
+# Visualize the parameter distribution without "True Values" overlay
+julia --project=bngl_julia scripts/plot_best_fit.jl
 ```
+
 These commands reflect the intended workflow: distributed starts, centralized collation, and optional profiling at the best fit.
 
 ## Workflow summary
@@ -62,8 +71,8 @@ The profiling step searches for where each parameter's profile intersects a conf
 
 ## Outputs
 
-- best_fit.jld2 — best parameters and metadata from collation for downstream profiling and visualization.
-- results/ — CSV summaries and plots (multi-start diagnostics, parameter distributions, and profile-based confidence intervals).
+- `results/best_fit.jld2` — best parameters and metadata from collation for downstream profiling and visualization.
+- `results/` — CSV summaries and plots (multi-start diagnostics, parameter distributions, and profile-based confidence intervals).
 
 ## Identifiability diagnostics
 
@@ -71,4 +80,4 @@ FIM and related local analyses at the best fit complement profile-based interval
 
 ## Reproducibility
 
-Use the included Julia project for all commands, keep seeds consistent where configured, and archive best_fit.jld2 and the environment files. For batch runs on clusters, maintain a consistent directory layout so that collation and profiling operate deterministically across runs.
+Use the included Julia project for all commands, keep seeds consistent where configured, and archive results/best_fit.jld2 and the environment files. For batch runs on clusters, maintain a consistent directory layout so that collation and profiling operate deterministically across runs.

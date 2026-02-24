@@ -44,7 +44,7 @@ function define_argument_parser()
         "--load-fit"
             help = "Path to a .jld2 file containing best-fit parameters for profiling."
             arg_type = String
-            default = "best_fit.jld2"
+            default = "results/best_fit.jld2"
         "--profiling-method"
             help = "Method for profiling. Options: cico, fixedstep, manual"
             arg_type = String
@@ -131,7 +131,7 @@ function main()
         
         multistart_res = PEtab.PEtabMultistartResult(best_params, best_cost, :collate, length(all_runs), "Array", nothing, all_runs)
         
-        JLD2.save("best_fit.jld2", Dict("best_mle" => best_params, "best_cost" => best_cost, "multistart_result" => multistart_res))
+        JLD2.save("results/best_fit.jld2", Dict("best_mle" => best_params, "best_cost" => best_cost, "multistart_result" => multistart_res))
         @info "   - Best parameters and full multistart results saved to best_fit.jld2"
 
         @info "--- Compare NLLH of Best-Fit vs. True Parameters ---"
@@ -243,8 +243,8 @@ function main()
         # 1. Plot 60-minute data (Complexes)
         try
             plot_dose_response(
-                "SimData/measurements_real_data.tsv",
-                "SimData/conditions_real_data.tsv";
+                "data/SimData/measurements_real_data.tsv",
+                "data/SimData/conditions_real_data.tsv";
                 endpoint_time=60.0,                  # <--- Time for complexes
                 observables=["S3S4_complex_obs", "S3STAT3d_complex_obs"], # Filter to complex observables
                 petab_prob=petab_problem,
@@ -259,8 +259,8 @@ function main()
         # 2. Plot 10-minute data (Phosphorylation)
         try
             plot_dose_response(
-                "SimData/measurements_real_data.tsv",
-                "SimData/conditions_real_data.tsv";
+                "data/SimData/measurements_real_data.tsv",
+                "data/SimData/conditions_real_data.tsv";
                 endpoint_time=10.0,                  # <--- Time for pSTAT3/pSMAD3
                 observables=["pSTAT3_norm_total_obs", "pSMAD3_norm_total_obs"], # Phospho observables only
                 petab_prob=petab_problem,

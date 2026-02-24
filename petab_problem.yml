@@ -2,16 +2,16 @@
 # Standard PEtab problem definition file
 
 format_version: 1
-parameter_file: petab_files/parameters.tsv
+parameter_file: models/petab_files/parameters.tsv
 
 problems:
   - condition_files:
-      - SimData/conditions_real_data.tsv
+      - data/SimData/conditions_real_data.tsv
     measurement_files:
-      - SimData/measurements_real_data.tsv
+      - data/SimData/measurements_real_data.tsv
     observable_files:
-      - petab_files/observables.tsv
+      - models/petab_files/observables.tsv
     visualization_files:
-      - petab_files/visualization.tsv
+      - models/petab_files/visualization.tsv
     sbml_files:
-      - model_even_smaller_sbml.xml
+      - models/model_even_smaller_sbml.xml
